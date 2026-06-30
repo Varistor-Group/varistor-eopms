@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-lime: #a3e635;
+  --color-brand-lime-tint: #ecfccb;
+  --color-brand-ink: #111111;
+  
+  --radius-xl: 12px;
+  
+  --font-sans: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: #f8fafc;
+    --foreground: #111111;
+  }
+  
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
