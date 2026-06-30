@@ -10,6 +10,7 @@ import { Menu, Bell, Search } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
+import { AdminCreateEmployee } from './components/AdminCreateEmployee';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -24,6 +25,7 @@ const AppContent: React.FC = () => {
       case 'ledger': return 'Points Ledger';
       case 'announcements': return 'Announcements Feed';
       case 'vault': return 'Document Vault';
+      case 'admin': return 'Create Employee';
       default: return 'EOPMS';
     }
   };
@@ -115,6 +117,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'ledger' && <PointsLedger />}
           {activeTab === 'announcements' && <AnnouncementsFeed />}
           {activeTab === 'vault' && <DocumentVault />}
+          {activeTab === 'admin' && <AdminCreateEmployee />}
         </main>
       </div>
 

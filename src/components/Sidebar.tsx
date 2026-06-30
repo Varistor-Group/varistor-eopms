@@ -9,7 +9,8 @@ import {
   MessageSquare, 
   BookOpen, 
   Lock,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
     { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+    { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
@@ -88,14 +90,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Desktop Sidebar Shell */}
       <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-white border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px]">
         {/* Header/Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-varistor-border">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
+        <div className="h-16 flex items-center px-5 border-b border-varistor-border">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-brand-ink p-1.5 px-2 rounded-lg shadow-sm border border-brand-ink/20 flex items-center justify-center">
+              <img
+                src="/logo.png"
+                alt="Varistor Logo"
+                className="h-8 w-auto object-contain block"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
             <div className="lg:flex flex-col hidden">
-              <span className="font-semibold text-[#111] leading-none">Varistor</span>
-              <span className="text-[10px] text-varistor-muted mt-0.5">EOPMS v1.0</span>
+              <span className="text-[10px] font-bold text-varistor-muted mt-0.5 tracking-widest uppercase">EOPMS v1.0</span>
             </div>
           </div>
         </div>
@@ -131,14 +137,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-50 transform transition-transform duration-200 lg:hidden ${
         isOpenMobile ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
+        <div className="h-16 flex items-center justify-between px-5 border-b border-varistor-border">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-brand-ink p-1.5 px-2 rounded-lg shadow-sm border border-brand-ink/20 flex items-center justify-center">
+              <img
+                src="/logo.png"
+                alt="Varistor Logo"
+                className="h-8 w-auto object-contain block"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
-            <div>
-              <span className="font-semibold text-[#111]">Varistor EOPMS</span>
-            </div>
+            <span className="text-[10px] font-bold text-varistor-muted tracking-widest uppercase">EOPMS</span>
           </div>
           <button 
             onClick={() => setIsOpenMobile(false)}
