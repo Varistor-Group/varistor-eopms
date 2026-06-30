@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Clean UI components scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D8DED2;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b3baa8;
+}
+
+/* Keyframes for the performance meter arc */
+@keyframes drawArc {
+  from {
+    stroke-dashoffset: 219.9;
+  }
+  to {
+    stroke-dashoffset: var(--dashoffset);
+  }
+}
+
+.animate-gauge {
+  animation: drawArc 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* General transitions */
+.transition-varistor {
+  transition: all 180ms ease-out;
+}
+
+/* Keyframes for sliding toasts in and out */
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.animate-toast-in {
+  animation: slideInRight 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: slideOutRight 300ms ease-in forwards;
+}

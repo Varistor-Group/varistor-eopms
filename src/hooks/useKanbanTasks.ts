@@ -1,0 +1,22 @@
+import { useContext } from 'react';
+import { EopmsContext } from '../context/EopmsContext';
+
+export const useKanbanTasks = () => {
+  const context = useContext(EopmsContext);
+  if (!context) {
+    throw new Error('useKanbanTasks must be used within an EopmsProvider');
+  }
+  
+  return {
+    tasks: context.tasks,
+    currentRole: context.currentRole,
+    moveTask: context.moveTask,
+    approveTask: context.approveTask,
+    rejectTask: context.rejectTask,
+    updateTaskDetails: context.updateTaskDetails,
+    addComment: context.addComment,
+    toggleChecklistItem: context.toggleChecklistItem,
+    addChecklistItem: context.addChecklistItem,
+    addAttachment: context.addAttachment,
+  };
+};
