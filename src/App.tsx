@@ -3,10 +3,10 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PointsLedger } from './components/PointsLedger';
-import { AnnouncementsFeed } from './components/AnnouncementsFeed';
+import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
-import { Menu, Bell, Search } from 'lucide-react';
+import { Menu, Bell } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
@@ -61,16 +61,6 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Mock Search */}
-            <div className="relative hidden sm:block">
-              <Search className="absolute left-3 top-2.5 text-varistor-muted" size={15} />
-              <input 
-                type="text" 
-                placeholder="Search everything..."
-                className="bg-[#f1f3f0] border border-transparent rounded-full pl-9 pr-4 py-1.5 text-xs w-[180px] focus:outline-none focus:bg-white focus:border-varistor-lime transition-all"
-              />
-            </div>
-
             {/* Live Role Switcher */}
             <div className="flex items-center gap-1.5 bg-[#f1f3f0] px-2.5 py-1.5 rounded-full border border-varistor-border">
               <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>

@@ -90,9 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
-            </div>
+            <img src="/logo.svg" alt="Varistor Logo" className="w-8 h-8 object-contain" />
             <div className="lg:flex flex-col hidden">
               <span className="font-semibold text-[#111] leading-none">Varistor</span>
               <span className="text-[10px] text-varistor-muted mt-0.5">EOPMS v1.0</span>
@@ -133,9 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
-            </div>
+            <img src="/logo.svg" alt="Varistor Logo" className="w-8 h-8 object-contain" />
             <div>
               <span className="font-semibold text-[#111]">Varistor EOPMS</span>
             </div>

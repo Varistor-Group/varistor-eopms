@@ -99,9 +99,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="mb-8">
             {/* Fallback to simple logo text if SVG logo not present */}
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-brand-ink flex items-center justify-center font-bold text-brand-lime text-2xl">
-                V
-              </div>
+              <img src="/logo.svg" alt="Varistor Logo" className="w-10 h-10 object-contain bg-white/90 p-1 rounded-lg shadow-sm" />
               <span className="font-extrabold text-brand-ink text-2xl tracking-tight">Varistor</span>
             </div>
           </div>

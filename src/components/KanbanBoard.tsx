@@ -282,7 +282,7 @@ export const KanbanBoard: React.FC = () => {
 
       {/* Details Slide-out Drawer */}
       <TaskDrawer 
-        task={selectedTask} 
+        task={selectedTask ? tasks.find(t => t.id === selectedTask.id) || null : null} 
         onClose={() => setSelectedTask(null)} 
       />
     </div>

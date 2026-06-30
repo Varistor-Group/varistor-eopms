@@ -139,6 +139,33 @@ const initialTasks: Task[] = [
     checklist: [],
     comments: [],
     attachments: []
+  },
+  {
+    id: 'task-7',
+    title: 'Checklist Bug Test Task',
+    description: 'Use this task to verify the checkbox visual state sync. Open this task in the detail drawer, click on checkboxes, and confirm the checkbox visually changes immediately.',
+    dueDate: '2026-07-04',
+    priority: 'medium',
+    status: 'todo',
+    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    checklist: [
+      { id: 'c10', text: 'Toggle this item and verify visual checkbox update', completed: false },
+      { id: 'c11', text: 'Another checklist item to test toggle behavior', completed: false }
+    ],
+    comments: [],
+    attachments: []
+  },
+  {
+    id: 'task-8',
+    title: 'Drag and Drop Order Test',
+    description: 'Drag this task from TO DO and drop it into IN PROGRESS. It should automatically jump to the top of the In Progress column.',
+    dueDate: '2026-07-06',
+    priority: 'low',
+    status: 'todo',
+    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    checklist: [],
+    comments: [],
+    attachments: []
   }
 ];
 
@@ -333,8 +360,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         pointsProcessed: awardResult ? true : task.pointsProcessed 
       };
 
-      if (oldStatus === 'todo' && statusToSet === 'in_progress') {
-        // Prepend task when transitioning from TO DO to IN PROGRESS
+      if (statusToSet === 'in_progress') {
+        // Prepend task when transitioning/dropped into IN PROGRESS
         return [updatedTask, ...filtered];
       } else {
         // Maintain original position for other transitions

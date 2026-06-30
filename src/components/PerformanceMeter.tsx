@@ -17,12 +17,12 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
   }, [score]);
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[210px] transition-varistor hover:shadow-md">
+    <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[220px] transition-varistor hover:shadow-md">
       <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec]">
         <h3 className="text-sm font-semibold text-varistor-dark">Performance meter</h3>
       </div>
       
-      <div className="relative flex items-end justify-center h-[110px] overflow-hidden">
+      <div className="relative flex items-end justify-center h-[120px] overflow-hidden">
         {/* SVG Arc Gauge */}
         <svg className="w-[170px] h-[170px] translate-y-[40px]" viewBox="0 0 180 180">
           {/* Background Arc */}
