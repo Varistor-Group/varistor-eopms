@@ -1,31 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, FileText, ShieldCheck } from 'lucide-react';
+import { Lock, FileText, ShieldCheck, Users } from 'lucide-react';
 import { getVaultDocuments, trackDocumentAction } from '../api/vault';
+import { useVariPoints } from '../hooks/useVariPoints';
+import { mockEmployeeStore } from '../api/employees';
 
 export const DocumentVault: React.FC = () => {
+  const { currentRole } = useVariPoints();
   const [documents, setDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Default to our mock logged-in user Aarav Patel (VAR-024)
+  const loggedInEmployeeId = 'VAR-024';
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
 
-  // Mock fetching for an employee
+  // Re-fetch documents when the selected employee changes
   useEffect(() => {
-    getVaultDocuments('VAR-024').then(docs => {
+    setIsLoading(true);
+    getVaultDocuments(selectedEmployeeId).then(docs => {
       setDocuments(docs);
       setIsLoading(false);
     });
-  }, []);
+  }, [selectedEmployeeId]);
+
+  // Also, if the role switches from Admin to Employee, lock the dropdown back to the logged in user
+  useEffect(() => {
+    if (currentRole !== 'Admin' && currentRole !== 'HR') {
+      setSelectedEmployeeId(loggedInEmployeeId);
+    }
+  }, [currentRole]);
 
   const handleAction = (docId: string, actionName: string) => {
     trackDocumentAction('admin@varistor.in', actionName, docId);
-    console.log(`[Audit Log] admin@varistor.in performed ${actionName} on document ${docId}`);
+    console.log(`[Audit Log] admin@varistor.in performed ${actionName} on document ${docId} (Employee: ${selectedEmployeeId})`);
   };
+
+  const selectedEmployee = mockEmployeeStore.find(e => e.id === selectedEmployeeId) || mockEmployeeStore[0];
+  const canSelectEmployee = currentRole === 'Admin' || currentRole === 'HR';
 
   return (
     <div className="max-w-6xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
       {/* Header Profile Summary */}
       <div className="bg-white rounded-[12px] p-6 lg:p-8 border border-varistor-border shadow-[0_4px_24px_rgba(0,0,0,0.02)] mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-brand-ink mb-1">Aarav Patel · VAR-024</h1>
-          <p className="text-gray-500 font-medium text-sm">Operations Department</p>
+          {canSelectEmployee ? (
+            <div className="flex items-center gap-3 mb-2">
+              <Users size={18} className="text-varistor-lime" />
+              <select
+                value={selectedEmployeeId}
+                onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                className="bg-varistor-pageBg border border-varistor-border text-brand-ink text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime block w-full p-2 font-semibold"
+              >
+                {mockEmployeeStore.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.fullName} ({emp.employeeId})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <h1 className="text-2xl font-bold text-brand-ink mb-1">{selectedEmployee?.fullName} · {selectedEmployee?.employeeId}</h1>
+          )}
+          <p className="text-gray-500 font-medium text-sm">{selectedEmployee?.department} Department</p>
         </div>
         <div className="flex gap-3">
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100">

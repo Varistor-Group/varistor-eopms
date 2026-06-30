@@ -43,6 +43,7 @@ export interface CreateEmployeeInput {
   phone: string;
   department: Department;
   reportingManager: string;
+  role: UserRole;
 }
 
 // In-memory store (acts as the DB until Supabase is connected)
@@ -97,7 +98,6 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   const employee: Employee = {
     ...input,
     id: input.employeeId,
-    role: 'Employee',
     tempPassword: generateTempPassword(input.fullName),
     createdAt: new Date().toISOString(),
     status: 'Active',

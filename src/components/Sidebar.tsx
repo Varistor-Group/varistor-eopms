@@ -10,7 +10,7 @@ import {
   BookOpen, 
   Lock,
   X,
-  UserPlus
+  Users
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
     { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-    { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+    { id: 'admin', label: 'Employees', icon: Users, enabled: true },
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
