@@ -10,7 +10,7 @@ import {
   BookOpen,
   Lock,
   X,
-  UserPlus
+  Users
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
     { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-    ...(hasAdminAccess ? [{ id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true }] : []),
+    ...(hasAdminAccess ? [{ id: 'admin', label: 'Employees', icon: Users, enabled: true }] : []),
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
@@ -61,8 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             key={item.id}
             onClick={() => handleTabClick(item.id, item.enabled)}
             className={`w-full flex items-center px-3 py-3 text-sm font-medium rounded-varistor border-l-[3px] transition-varistor group relative ${isActive
-                ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
-                : 'text-[#555a52] border-transparent hover:bg-[#eef1ed] hover:text-black'
+              ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
+              : 'text-[#555a52] border-transparent hover:bg-[#eef1ed] hover:text-black'
               } ${!item.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Icon

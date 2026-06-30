@@ -47,11 +47,12 @@ const EMPTY_FORM: CreateEmployeeInput = {
   phone: '',
   department: '' as Department,
   reportingManager: '',
+  role: 'Employee',
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const AdminCreateEmployee: React.FC = () => {
+export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCancel }) => {
   const { currentRole } = useVariPoints();
 
   const [form, setForm] = useState<CreateEmployeeInput>(EMPTY_FORM);
@@ -85,6 +86,7 @@ export const AdminCreateEmployee: React.FC = () => {
     if (!form.phone.trim()) errs.phone = 'Phone number is required.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
+    if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -258,15 +260,29 @@ export const AdminCreateEmployee: React.FC = () => {
             </Field>
 
             {/* Reporting Manager */}
-            <Field label="Reporting manager" required error={errors.reportingManager}>
+            <Field label="Reporting Manager" required error={errors.reportingManager}>
               <input
+                type="text"
                 className={inputCls(!!errors.reportingManager)}
-                placeholder="e.g. Admin User"
+                placeholder="Manager name..."
                 value={form.reportingManager}
                 onChange={set('reportingManager')}
               />
             </Field>
 
+            {/* System Role */}
+            <Field label="System Role" required error={errors.role}>
+              <select
+                className={inputCls(!!errors.role)}
+                value={form.role}
+                onChange={set('role')}
+              >
+                <option value="Employee">Employee</option>
+                <option value="Reporting Manager">Reporting Manager</option>
+                <option value="HR">HR</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </Field>
           </div>
 
           {/* Actions */}
@@ -275,6 +291,15 @@ export const AdminCreateEmployee: React.FC = () => {
               <span className="text-red-500">*</span> Required fields
             </p>
             <div className="flex gap-3">
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2.5 text-sm font-medium rounded-varistor border border-transparent text-varistor-muted hover:text-varistor-dark hover:bg-varistor-pageBg transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setForm(EMPTY_FORM); setErrors({}); }}

@@ -10,7 +10,7 @@ import { Menu, Bell } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
-import { AdminCreateEmployee } from './components/AdminCreateEmployee';
+import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -25,7 +25,7 @@ const AppContent: React.FC = () => {
       case 'ledger': return 'Points Ledger';
       case 'announcements': return 'Announcements Feed';
       case 'vault': return 'Document Vault';
-      case 'admin': return 'Create Employee';
+      case 'admin': return 'Employees';
       default: return 'EOPMS';
     }
   };
@@ -36,23 +36,23 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-varistor-pageBg text-varistor-dark flex font-sans w-full">
-      
+
       {/* Sidebar navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isOpenMobile={isOpenMobile} 
-        setIsOpenMobile={setIsOpenMobile} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isOpenMobile={isOpenMobile}
+        setIsOpenMobile={setIsOpenMobile}
       />
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col lg:pl-[220px]">
-        
+
         {/* Top Header bar */}
         <header className="h-16 bg-white border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4">
             {/* Mobile Sidebar Toggle Button */}
-            <button 
+            <button
               onClick={() => setIsOpenMobile(true)}
               className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-varistor-dark"
               title="Open menu"
@@ -80,7 +80,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Notification Bell */}
-            <button 
+            <button
               className="p-2 rounded-full hover:bg-[#f1f3f0] transition-colors relative"
               title="Notifications"
             >
@@ -90,9 +90,9 @@ const AppContent: React.FC = () => {
 
             {/* User Profile */}
             <div className="flex items-center gap-2 border-l border-varistor-border pl-4">
-              <img 
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60" 
-                alt="User Profile" 
+              <img
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
+                alt="User Profile"
                 className="w-8 h-8 rounded-full object-cover border border-varistor-border"
               />
               <span className="text-xs font-semibold text-varistor-dark hidden sm:inline">Aarav Patel</span>
@@ -109,7 +109,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'vault' && <DocumentVault />}
           {activeTab === 'admin' && (
             (currentRole === 'Admin' || currentRole === 'HR') ? (
-              <AdminCreateEmployee />
+              <EmployeeManagementPortal />
             ) : (
               <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm">
                 <div className="text-red-500 font-bold text-6xl mb-4">403</div>
