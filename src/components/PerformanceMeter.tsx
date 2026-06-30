@@ -24,7 +24,7 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
       
       <div className="relative flex items-end justify-center h-[120px] overflow-hidden">
         {/* SVG Arc Gauge */}
-        <svg className="w-[170px] h-[170px] translate-y-[40px]" viewBox="0 0 180 180">
+        <svg className="w-[170px] h-[170px] translate-y-[58px]" viewBox="0 0 180 180">
           {/* Background Arc */}
           <path
             d="M 20,90 A 70,70 0 0,1 160,90"
@@ -49,7 +49,7 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
         </svg>
 
         {/* Score display inside the gauge */}
-        <div className="absolute bottom-4 flex flex-col items-center">
+        <div className="absolute bottom-0 flex flex-col items-center">
           <span className="text-3xl font-extrabold text-varistor-dark leading-none">{score}</span>
           <span className="text-[10px] text-varistor-muted font-medium uppercase tracking-wider mt-1">Rating</span>
         </div>

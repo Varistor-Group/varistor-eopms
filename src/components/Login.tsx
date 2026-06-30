@@ -4,7 +4,7 @@ import { Button } from './shared/Button';
 import { Modal } from './shared/Modal';
 import { mockLogin, mockResetPassword } from '../api/auth';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
   onLogin: () => void;

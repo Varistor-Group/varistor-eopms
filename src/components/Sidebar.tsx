@@ -12,6 +12,7 @@ import {
   X,
   UserPlus
 } from 'lucide-react';
+import { useVariPoints } from '../hooks/useVariPoints';
 
 interface SidebarProps {
   activeTab: string;
@@ -26,15 +27,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   setIsOpenMobile
 }) => {
+  const { currentRole } = useVariPoints();
+  const hasAdminAccess = currentRole === 'Admin' || currentRole === 'HR';
+  const isEmployee = currentRole === 'Employee';
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
     { id: 'kanban', label: 'My tasks', icon: Kanban, enabled: true },
     { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
     { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-    { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+    ...(hasAdminAccess ? [{ id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true }] : []),
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
-    { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
+    ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
     { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
   ];
@@ -90,9 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
-            </div>
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
             <div className="lg:flex flex-col hidden">
               <span className="text-[10px] font-bold text-varistor-muted mt-0.5 tracking-widest uppercase">EOPMS v1.0</span>
             </div>
@@ -131,9 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-varistor-lime flex items-center justify-center font-bold text-black text-lg">
-              V
-            </div>
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
             <div>
               <span className="font-semibold text-[#111]">Varistor EOPMS</span>
             </div>

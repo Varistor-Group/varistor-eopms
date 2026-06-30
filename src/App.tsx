@@ -107,7 +107,17 @@ const AppContent: React.FC = () => {
           {activeTab === 'ledger' && <PointsLedger />}
           {activeTab === 'announcements' && <AnnouncementsFeed />}
           {activeTab === 'vault' && <DocumentVault />}
-          {activeTab === 'admin' && <AdminCreateEmployee />}
+          {activeTab === 'admin' && (
+            (currentRole === 'Admin' || currentRole === 'HR') ? (
+              <AdminCreateEmployee />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm">
+                <div className="text-red-500 font-bold text-6xl mb-4">403</div>
+                <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
+                <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions (Admin or HR) to view this page.</p>
+              </div>
+            )
+          )}
         </main>
       </div>
 

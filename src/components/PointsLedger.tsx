@@ -14,14 +14,20 @@ export const PointsLedger: React.FC = () => {
   
   // HR Penalty Form State
   const [showForm, setShowForm] = useState(false);
-  const [penaltyType, setPenaltyType] = useState<'misconduct' | 'late_entry'>('misconduct');
+  const [penaltyType, setPenaltyType] = useState<'misconduct' | 'late_entry' | 'custom'>('misconduct');
   const [penaltyReason, setPenaltyReason] = useState('');
+  const [customPoints, setCustomPoints] = useState<number | ''>('');
 
   const handleAssertPenalty = (e: React.FormEvent) => {
     e.preventDefault();
     if (!penaltyReason.trim()) return;
-    assertAdministrativePenalty(penaltyType, penaltyReason.trim());
+    
+    const pointsToDeduct = penaltyType === 'custom' ? Number(customPoints) : undefined;
+    if (penaltyType === 'custom' && (!pointsToDeduct || pointsToDeduct <= 0)) return;
+
+    assertAdministrativePenalty(penaltyType, penaltyReason.trim(), pointsToDeduct);
     setPenaltyReason('');
+    setCustomPoints('');
     setShowForm(false);
   };
 
@@ -108,6 +114,7 @@ export const PointsLedger: React.FC = () => {
                 >
                   <option value="misconduct">Office Misconduct (-50 VP)</option>
                   <option value="late_entry">Late Entry (-25 VP)</option>
+                  <option value="custom">Custom Penalty</option>
                 </select>
               </div>
 
@@ -116,13 +123,29 @@ export const PointsLedger: React.FC = () => {
                 <label className="text-[9px] text-red-800 font-bold uppercase tracking-wider block mb-1">Reason justification</label>
                 <input
                   type="text"
-                  placeholder={penaltyType === 'misconduct' ? "e.g. Policy breach in meeting rooms" : "e.g. Late check-in exceeding 15 minutes"}
+                  placeholder={penaltyType === 'misconduct' ? "e.g. Policy breach in meeting rooms" : (penaltyType === 'late_entry' ? "e.g. Late check-in exceeding 15 minutes" : "e.g. Unauthorized absence")}
                   value={penaltyReason}
                   onChange={(e) => setPenaltyReason(e.target.value)}
                   className="w-full bg-white border border-red-300 rounded-lg px-3 py-1.5 text-xs text-red-900 focus:outline-none focus:border-red-500 transition-colors"
                   required
                 />
               </div>
+
+              {/* Custom Points Input */}
+              {penaltyType === 'custom' && (
+                <div className="w-full sm:w-28">
+                  <label className="text-[9px] text-red-800 font-bold uppercase tracking-wider block mb-1">Points to Deduct</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 100"
+                    value={customPoints}
+                    onChange={(e) => setCustomPoints(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full bg-white border border-red-300 rounded-lg px-3 py-1.5 text-xs text-red-900 focus:outline-none focus:border-red-500 transition-colors"
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 justify-end pt-1">

@@ -25,7 +25,7 @@ interface EopmsContextType {
   addAttachment: (taskId: string, name: string, size: string, type: string) => void;
   
   // Points System Actions
-  assertAdministrativePenalty: (type: 'misconduct' | 'late_entry', reason: string) => void;
+  assertAdministrativePenalty: (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number) => void;
   addToast: (message: string, points: number, type: 'credit' | 'debit') => void;
   dismissToast: (toastId: string) => void;
   announcements: AnnouncementDTO[];
@@ -530,15 +530,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Manual Administrative Penalty (Office Misconduct: -50, Late Entry: -25)
   // Restricted to Admin and HR roles
-  const assertAdministrativePenalty = (type: 'misconduct' | 'late_entry', reason: string) => {
+  const assertAdministrativePenalty = (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number) => {
     if (currentRole !== 'Admin' && currentRole !== 'HR') {
       addToast('Access Denied: Only Admin and HR can manually debit points.', 0, 'debit');
       return;
     }
 
     const isMisconduct = type === 'misconduct';
-    const penaltyPoints = isMisconduct ? 50 : 25;
-    const ruleTitle = isMisconduct ? 'Office Misconduct Penalty' : 'Late Entry Penalty';
+    const isLateEntry = type === 'late_entry';
+    const penaltyPoints = isMisconduct ? 50 : (isLateEntry ? 25 : (customPoints || 0));
+    const ruleTitle = isMisconduct ? 'Office Misconduct Penalty' : (isLateEntry ? 'Late Entry Penalty' : 'Custom Penalty');
 
     const newLedgerEntry: LedgerEntry = {
       id: `led-admin-${Date.now()}`,
