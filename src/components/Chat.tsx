@@ -35,12 +35,10 @@ export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [typingChannel, setTypingChannel] = useState<ChannelId | null>(null);
   const [unread, setUnread] = useState<{ total: number; byChannel: Record<string, number> }>({ total: 0, byChannel: {} });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const replyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const activeChannel = channels.find(c => c.id === activeChannelId)!;
 
@@ -64,29 +62,12 @@ export const Chat: React.FC = () => {
     refreshUnread();
     const handler = () => refreshUnread();
     window.addEventListener(chatApi.CHAT_EVENT, handler);
-    return () => {
-      window.removeEventListener(chatApi.CHAT_EVENT, handler);
-      replyTimers.current.forEach(clearTimeout);
-    };
+    return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, typingChannel]);
-
-  const scheduleSimulatedReply = (channelId: ChannelId) => {
-    const typingTimer = setTimeout(() => setTypingChannel(channelId), 1000);
-    const replyTimer = setTimeout(() => {
-      const reply = chatApi.simulateReply(channelId);
-      setTypingChannel(null);
-      if (channelId === activeChannelId) {
-        setMessages(prev => [...prev, reply]);
-        chatApi.markChannelRead(channelId);
-      }
-      refreshUnread();
-    }, 2400);
-    replyTimers.current.push(typingTimer, replyTimer);
-  };
+  }, [messages]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +78,6 @@ export const Chat: React.FC = () => {
     setMessages(prev => [...prev, message]);
     setDraft('');
     setShowEmojiPicker(false);
-    scheduleSimulatedReply(activeChannelId);
   };
 
   const handleAttachClick = () => fileInputRef.current?.click();
@@ -112,7 +92,6 @@ export const Chat: React.FC = () => {
       size: formatFileSize(file.size),
     });
     setMessages(prev => [...prev, message]);
-    scheduleSimulatedReply(activeChannelId);
   };
 
   const insertEmoji = (emoji: string) => {
@@ -225,17 +204,6 @@ export const Chat: React.FC = () => {
                 </div>
               </div>
             ))
-          )}
-
-          {/* Typing Indicator */}
-          {typingChannel === activeChannelId && (
-            <div className="flex items-center gap-2 pl-11">
-              <div className="flex gap-1 bg-[#f1f3f0] rounded-full px-3 py-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-varistor-muted animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-varistor-muted animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-varistor-muted animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
           )}
 
           <div ref={messagesEndRef} />

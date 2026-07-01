@@ -25,14 +25,6 @@ export const CHANNELS: ChatChannel[] = [
   { id: 'hr-announcements', name: 'hr-announcements', memberCount: 40 },
 ];
 
-const AUTO_REPLIES: Record<ChannelId, string[]> = {
-  'all-hands': ['Got it, thanks for the update!', 'Noted @Aarav Patel, will do.', 'Sounds good 👍'],
-  'sales-team': ['On it, will update the pipeline sheet.', '@Aarav Patel can you loop in the client too?'],
-  'operations': ['Copy that, updating the tracker now.', 'Thanks for the heads up @Aarav Patel.'],
-  'tech-dev': ['Deploying that fix shortly.', '@Aarav Patel PR is up for review.'],
-  'hr-announcements': ['Acknowledged, thank you HR!', 'Will share this with the team.'],
-};
-
 function seedMessages(): ChatMessage[] {
   const now = Date.now();
   const minsAgo = (m: number) => new Date(now - m * 60 * 1000).toISOString();
@@ -176,28 +168,6 @@ export const chatApi = {
 
     await delay(50);
     return message;
-  },
-
-  // Simulates a teammate reply (used to demo the typing indicator + real-time feel)
-  simulateReply(channelId: ChannelId): ChatMessage {
-    const teammate = TEAMMATES[channelId];
-    const replies = AUTO_REPLIES[channelId];
-    const reply: ChatMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      channelId,
-      authorName: teammate.name,
-      authorRole: teammate.role,
-      authorAvatar: teammate.avatar,
-      isSelf: false,
-      text: replies[Math.floor(Math.random() * replies.length)],
-      timestamp: new Date().toISOString(),
-    };
-
-    const messages = loadMessages();
-    messages.push(reply);
-    saveMessages(messages);
-    notifyUpdated();
-    return reply;
   },
 
   markChannelRead(channelId: ChannelId) {
