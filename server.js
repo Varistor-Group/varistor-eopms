@@ -1,6 +1,9 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
+import fs from 'fs/promises';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -175,6 +178,112 @@ app.post('/api/quiz/submit', async (req, res) => {
     console.error('Server error:', err);
     res.status(500).json({ success: false, error: 'Failed to send quiz result email' });
   }
+});
+
+// --- Mock Local Database Routes ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const DB_PATH = path.join(__dirname, 'db.json');
+
+async function readDB() {
+  try {
+    const data = await fs.readFile(DB_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Failed to read db.json', err);
+    return { employees: [], documents: [], activity_log: [] };
+  }
+}
+
+async function writeDB(data) {
+  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+}
+
+// Employees
+app.get('/api/employees', async (req, res) => {
+  const db = await readDB();
+  res.json(db.employees || []);
+});
+
+app.post('/api/employees', async (req, res) => {
+  const db = await readDB();
+  const employee = req.body;
+  if (!db.employees) db.employees = [];
+  
+  const duplicate = db.employees.find(
+    e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
+  );
+  if (duplicate) {
+    return res.status(400).json({ success: false, error: 'Employee ID or email already exists.' });
+  }
+
+  db.employees.push(employee);
+  
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'CREATE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Created employee ${employee.fullName} (${employee.employeeId})`,
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, employee });
+});
+
+app.put('/api/employees/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  if (!db.employees) db.employees = [];
+
+  const index = db.employees.findIndex(e => e.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Employee not found.' });
+  }
+
+  const safeUpdates = { ...req.body };
+  delete safeUpdates.id;
+  delete safeUpdates.employeeId;
+  delete safeUpdates.personalEmail;
+  delete safeUpdates.createdAt;
+  delete safeUpdates.tempPassword;
+
+  db.employees[index] = { ...db.employees[index], ...safeUpdates };
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'UPDATE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Updated employee ${db.employees[index].fullName} (${id})`,
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, employee: db.employees[index] });
+});
+
+// Documents
+app.get('/api/documents/:employeeId', async (req, res) => {
+  const db = await readDB();
+  const docs = (db.documents || []).filter(d => d.employeeId === req.params.employeeId);
+  res.json(docs);
+});
+
+// Activity
+app.post('/api/activity', async (req, res) => {
+  const db = await readDB();
+  const log = req.body;
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    ...log,
+    timestamp: new Date().toISOString()
+  });
+  await writeDB(db);
+  res.json({ success: true });
+>>>>>>> 9602f58 (minor testing, temp local db implemented)
 });
 
 app.listen(port, () => {

@@ -1,0 +1,152 @@
+{
+  "employees": [
+    {
+      "id": "VAR-024",
+      "fullName": "Aarav Patel",
+      "employeeId": "VAR-024",
+      "username": "aarav.patel",
+      "personalEmail": "aarav.patel@gmail.com",
+      "phone": "+91 98765 43210",
+      "department": "Operations",
+      "reportingManager": "Admin User",
+      "role": "Employee",
+      "tempPassword": "Employee@2026!",
+      "createdAt": "2026-01-15T09:00:00Z",
+      "status": "Active",
+      "variPoints": 1800
+    },
+    {
+      "id": "VAR-001",
+      "fullName": "Admin User",
+      "employeeId": "VAR-001",
+      "username": "admin",
+      "personalEmail": "admin@varistor.in",
+      "phone": "+91 99999 99999",
+      "department": "Ops Heads",
+      "reportingManager": "None",
+      "role": "Admin",
+      "tempPassword": "Admin@2026!",
+      "createdAt": "2025-01-01T09:00:00Z",
+      "status": "Active",
+      "variPoints": 5000
+    },
+    {
+      "id": "VAR-002",
+      "fullName": "HR User",
+      "employeeId": "VAR-002",
+      "username": "hr",
+      "personalEmail": "hr@varistor.in",
+      "phone": "+91 88888 88888",
+      "department": "Operations",
+      "reportingManager": "Admin User",
+      "role": "HR",
+      "tempPassword": "HR@2026!",
+      "createdAt": "2025-01-01T09:00:00Z",
+      "status": "Active",
+      "variPoints": 2000
+    },
+    {
+      "fullName": "akash kumar",
+      "employeeId": "213",
+      "username": "adasd",
+      "personalEmail": "akash@varistor.in",
+      "phone": "+917022630114",
+      "department": "Finance",
+      "reportingManager": "asdasdsa",
+      "role": "Admin"
+    },
+    {
+      "fullName": "akash kumar",
+      "employeeId": "2131",
+      "username": "21331",
+      "personalEmail": "cobbstark01@gmail.com",
+      "phone": "+917022630114",
+      "department": "Operations",
+      "reportingManager": "na",
+      "role": "Admin",
+      "id": "2131",
+      "tempPassword": "AK@2026!896",
+      "createdAt": "2026-07-01T07:27:17.041Z",
+      "status": "Active",
+      "variPoints": 0
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-1",
+      "employeeId": "VAR-024",
+      "filename": "Aadhar_Card_Aarav.pdf",
+      "type": "PDF",
+      "size": "1.2 MB",
+      "uploadDate": "2026-01-15",
+      "verified": true,
+      "status": "Verified"
+    },
+    {
+      "id": "doc-2",
+      "employeeId": "VAR-024",
+      "filename": "PAN_Card_Aarav.pdf",
+      "type": "PDF",
+      "size": "0.8 MB",
+      "uploadDate": "2026-01-15",
+      "verified": true,
+      "status": "Verified"
+    },
+    {
+      "id": "doc-3",
+      "employeeId": "VAR-024",
+      "filename": "Passport_Photo.jpg",
+      "type": "JPG",
+      "size": "2.1 MB",
+      "uploadDate": "2026-01-16",
+      "verified": false,
+      "status": "Pending"
+    },
+    {
+      "id": "doc-4",
+      "employeeId": "VAR-024",
+      "filename": "Experience_Letter_Prev.pdf",
+      "type": "PDF",
+      "size": "1.5 MB",
+      "uploadDate": "2026-01-16",
+      "verified": true,
+      "status": "Verified"
+    },
+    {
+      "id": "doc-5",
+      "employeeId": "VAR-024",
+      "filename": "BTech_Degree.pdf",
+      "type": "PDF",
+      "size": "3.4 MB",
+      "uploadDate": "2026-01-16",
+      "verified": false,
+      "status": "Pending"
+    },
+    {
+      "id": "doc-6",
+      "employeeId": "VAR-024",
+      "filename": "Offer_Letter_Signed.pdf",
+      "type": "PDF",
+      "size": "0.5 MB",
+      "uploadDate": "2026-01-17",
+      "verified": true,
+      "status": "Verified"
+    }
+  ],
+  "activity_log": [
+    {
+      "id": "1782890369904",
+      "action": "CREATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Created employee akash kumar (213)",
+      "timestamp": "2026-07-01T07:19:29.904Z"
+    },
+    {
+      "id": "1782890837048",
+      "action": "CREATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Created employee akash kumar (2131)",
+      "timestamp": "2026-07-01T07:27:17.048Z"
+    }
+  ]
+}

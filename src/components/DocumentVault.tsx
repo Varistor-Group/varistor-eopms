@@ -2,16 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Lock, FileText, ShieldCheck, Users } from 'lucide-react';
 import { getVaultDocuments, trackDocumentAction } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { mockEmployeeStore } from '../api/employees';
+import { getEmployees } from '../api/employees';
+import type { Employee } from '../api/employees';
 
 export const DocumentVault: React.FC = () => {
   const { currentRole } = useVariPoints();
   const [documents, setDocuments] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Default to our mock logged-in user Aarav Patel (VAR-024)
   const loggedInEmployeeId = 'VAR-024';
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
+
+  useEffect(() => {
+    getEmployees().then(setEmployees);
+  }, []);
 
   // Re-fetch documents when the selected employee changes
   useEffect(() => {
@@ -34,7 +40,7 @@ export const DocumentVault: React.FC = () => {
     console.log(`[Audit Log] admin@varistor.in performed ${actionName} on document ${docId} (Employee: ${selectedEmployeeId})`);
   };
 
-  const selectedEmployee = mockEmployeeStore.find(e => e.id === selectedEmployeeId) || mockEmployeeStore[0];
+  const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
   const canSelectEmployee = currentRole === 'Admin' || currentRole === 'HR';
 
   return (
@@ -50,7 +56,7 @@ export const DocumentVault: React.FC = () => {
                 onChange={(e) => setSelectedEmployeeId(e.target.value)}
                 className="bg-varistor-pageBg border border-varistor-border text-brand-ink text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime block w-full p-2 font-semibold"
               >
-                {mockEmployeeStore.map(emp => (
+                {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.fullName} ({emp.employeeId})
                   </option>

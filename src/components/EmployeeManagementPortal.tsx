@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { mockEmployeeStore } from '../api/employees';
+import { getEmployees } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
 import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil } from 'lucide-react';
@@ -11,6 +11,11 @@ export const EmployeeManagementPortal: React.FC = () => {
   const { currentRole } = useVariPoints();
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    getEmployees().then(setEmployees);
+  }, [view]);
 
   // Role Gate
   if (currentRole !== 'Admin' && currentRole !== 'HR') {
@@ -93,7 +98,7 @@ export const EmployeeManagementPortal: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-varistor-border">
-              {mockEmployeeStore.map((emp) => (
+              {employees.map((emp) => (
                 <tr key={emp.id} className="hover:bg-varistor-pageBg/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -147,7 +152,7 @@ export const EmployeeManagementPortal: React.FC = () => {
             </tbody>
           </table>
           
-          {mockEmployeeStore.length === 0 && (
+          {employees.length === 0 && (
             <div className="p-8 text-center text-varistor-muted font-medium">
               No employees found.
             </div>
