@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...(hasAdminAccess ? [{ id: 'admin', label: 'Employees', icon: Users, enabled: true }] : []),
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
-    { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
     { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
   ];
 
