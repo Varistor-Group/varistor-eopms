@@ -283,7 +283,6 @@ app.post('/api/activity', async (req, res) => {
   });
   await writeDB(db);
   res.json({ success: true });
->>>>>>> 9602f58 (minor testing, temp local db implemented)
 });
 
 app.listen(port, () => {
