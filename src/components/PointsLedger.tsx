@@ -1,42 +1,21 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ShieldAlert, Filter, ArrowUpRight, ArrowDownRight, Lock } from 'lucide-react';
+import { Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
 export const PointsLedger: React.FC = () => {
   const { 
     ledger, 
-    pointsBalance, 
-    currentRole, 
-    assertAdministrativePenalty 
+    pointsBalance
   } = useVariPoints();
   
   const [filterType, setFilterType] = useState<'all' | 'credit' | 'debit'>('all');
   
-  // HR Penalty Form State
-  const [showForm, setShowForm] = useState(false);
-  const [penaltyType, setPenaltyType] = useState<'misconduct' | 'late_entry' | 'custom'>('misconduct');
-  const [penaltyReason, setPenaltyReason] = useState('');
-  const [customPoints, setCustomPoints] = useState<number | ''>('');
 
-  const handleAssertPenalty = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!penaltyReason.trim()) return;
-    
-    const pointsToDeduct = penaltyType === 'custom' ? Number(customPoints) : undefined;
-    if (penaltyType === 'custom' && (!pointsToDeduct || pointsToDeduct <= 0)) return;
-
-    assertAdministrativePenalty(penaltyType, penaltyReason.trim(), pointsToDeduct);
-    setPenaltyReason('');
-    setCustomPoints('');
-    setShowForm(false);
-  };
 
   const filteredLedger = ledger.filter((entry) => {
     if (filterType === 'all') return true;
     return entry.type === filterType;
   });
-
-  const hasAccess = currentRole === 'Admin' || currentRole === 'HR';
 
   return (
     <div className="space-y-6">
@@ -46,8 +25,8 @@ export const PointsLedger: React.FC = () => {
         <p className="text-xs text-varistor-muted mt-0.5">Transparent point tracking history, reward credits, and performance adjustments.</p>
       </div>
 
-      {/* Stats Summary & Simulation Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Stats Summary Panel */}
+      <div className="grid grid-cols-1 gap-6">
         
         {/* Balance Card */}
         <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-center h-[130px]">
@@ -57,115 +36,7 @@ export const PointsLedger: React.FC = () => {
             <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-1.5 py-0.5 rounded">VP</span>
           </div>
         </div>
-
-        {/* Engine Simulation Console */}
-        <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[130px] lg:col-span-2">
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <h3 className="text-xs font-bold text-varistor-dark uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldAlert size={15} className="text-red-600 animate-pulse" />
-                Engine Simulation Console
-              </h3>
-              {!hasAccess && (
-                <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <Lock size={10} />
-                  HR/Admin Only
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-varistor-muted leading-relaxed">
-              Test administrative penalties: **Office Misconduct** (debits <span className="font-bold">-50 VP</span>) or **Late Entry** (debits <span className="font-bold">-25 VP</span>).
-            </p>
-          </div>
-
-          <div className="flex pt-3 border-t border-[#f1f3f0]">
-            <button
-              onClick={() => {
-                if (hasAccess) setShowForm(!showForm);
-              }}
-              disabled={!hasAccess}
-              className={`w-full py-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
-                hasAccess 
-                  ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 cursor-pointer' 
-                  : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
-              }`}
-            >
-              <AlertTriangle size={14} />
-              Assert Manual Penalty
-            </button>
-          </div>
-        </div>
       </div>
-
-      {/* Manual Penalty Form Popover */}
-      {showForm && hasAccess && (
-        <div className="bg-[#fff1f2] border border-red-200 rounded-varistor p-4 shadow-sm animate-fade-in">
-          <form onSubmit={handleAssertPenalty} className="space-y-4">
-            <h4 className="text-xs font-bold text-red-900 uppercase tracking-wider">Debit Points Adjustment</h4>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Type Selection */}
-              <div className="w-full sm:w-48">
-                <label className="text-[9px] text-red-800 font-bold uppercase tracking-wider block mb-1">Penalty Type</label>
-                <select
-                  value={penaltyType}
-                  onChange={(e) => setPenaltyType(e.target.value as any)}
-                  className="w-full bg-white border border-red-300 rounded-lg px-2.5 py-1.5 text-xs text-red-900 focus:outline-none focus:border-red-500"
-                >
-                  <option value="misconduct">Office Misconduct (-50 VP)</option>
-                  <option value="late_entry">Late Entry (-25 VP)</option>
-                  <option value="custom">Custom Penalty</option>
-                </select>
-              </div>
-
-              {/* Reason Input */}
-              <div className="flex-1">
-                <label className="text-[9px] text-red-800 font-bold uppercase tracking-wider block mb-1">Reason justification</label>
-                <input
-                  type="text"
-                  placeholder={penaltyType === 'misconduct' ? "e.g. Policy breach in meeting rooms" : (penaltyType === 'late_entry' ? "e.g. Late check-in exceeding 15 minutes" : "e.g. Unauthorized absence")}
-                  value={penaltyReason}
-                  onChange={(e) => setPenaltyReason(e.target.value)}
-                  className="w-full bg-white border border-red-300 rounded-lg px-3 py-1.5 text-xs text-red-900 focus:outline-none focus:border-red-500 transition-colors"
-                  required
-                />
-              </div>
-
-              {/* Custom Points Input */}
-              {penaltyType === 'custom' && (
-                <div className="w-full sm:w-28">
-                  <label className="text-[9px] text-red-800 font-bold uppercase tracking-wider block mb-1">Points to Deduct</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 100"
-                    value={customPoints}
-                    onChange={(e) => setCustomPoints(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full bg-white border border-red-300 rounded-lg px-3 py-1.5 text-xs text-red-900 focus:outline-none focus:border-red-500 transition-colors"
-                    required
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 justify-end pt-1">
-              <button 
-                type="button" 
-                onClick={() => setShowForm(false)}
-                className="bg-white border border-red-200 text-red-700 px-3.5 py-1.5 rounded-lg text-xs hover:bg-red-50 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit"
-                className="bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-              >
-                Submit Debit
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Ledger Table Container */}
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">

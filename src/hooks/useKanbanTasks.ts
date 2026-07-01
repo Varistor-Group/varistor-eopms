@@ -13,6 +13,7 @@ export const useKanbanTasks = () => {
     moveTask: context.moveTask,
     approveTask: context.approveTask,
     rejectTask: context.rejectTask,
+    createTask: context.createTask,
     updateTaskDetails: context.updateTaskDetails,
     addComment: context.addComment,
     toggleChecklistItem: context.toggleChecklistItem,

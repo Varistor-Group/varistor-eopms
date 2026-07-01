@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckSquare, MessageSquare, Paperclip, Plus, Calendar, Check, Send } from 'lucide-react';
+import { X, CheckSquare, Paperclip, Plus, Calendar, Check } from 'lucide-react';
 import type { Task } from '../types';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
 
@@ -12,12 +12,10 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   const { 
     toggleChecklistItem, 
     addChecklistItem, 
-    addComment, 
     addAttachment 
   } = useKanbanTasks();
 
   const [newCheckItem, setNewCheckItem] = useState('');
-  const [commentText, setCommentText] = useState('');
 
   if (!task) return null;
 
@@ -26,13 +24,6 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
     if (!newCheckItem.trim()) return;
     addChecklistItem(task.id, newCheckItem.trim());
     setNewCheckItem('');
-  };
-
-  const handleAddComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    addComment(task.id, commentText.trim());
-    setCommentText('');
   };
 
   const handleSimulateAttachment = () => {
@@ -211,56 +202,6 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
             </div>
           </div>
 
-          {/* Comments */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-varistor-dark flex items-center gap-1.5 uppercase tracking-wider">
-              <MessageSquare size={16} className="text-[#555]" />
-              Comments ({task.comments.length})
-            </h3>
-
-            {/* Comments List */}
-            <div className="space-y-3">
-              {task.comments.length === 0 ? (
-                <p className="text-[11px] text-varistor-muted italic">No comments yet. Start the conversation!</p>
-              ) : (
-                task.comments.map((comm) => (
-                  <div key={comm.id} className="flex gap-2.5">
-                    <img 
-                      src={comm.authorAvatar} 
-                      alt={comm.author} 
-                      className="w-6 h-6 rounded-full object-cover border border-varistor-border flex-shrink-0"
-                    />
-                    <div className="flex-1 bg-[#fafbfa] border border-[#edf0ec] rounded-lg p-2.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-varistor-dark">{comm.author}</span>
-                        <span className="text-[9px] text-varistor-muted">
-                          {new Date(comm.timestamp).toLocaleDateString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#555a52] mt-1 leading-relaxed">{comm.text}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Comment Form */}
-            <form onSubmit={handleAddComment} className="flex gap-2 pt-2 border-t border-[#edf0ec]">
-              <input
-                type="text"
-                placeholder="Write a comment..."
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                className="flex-1 bg-white border border-varistor-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-varistor-lime transition-colors"
-              />
-              <button 
-                type="submit"
-                className="bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-lg flex items-center justify-center transition-colors"
-              >
-                <Send size={13} />
-              </button>
-            </form>
-          </div>
         </div>
       </div>
 

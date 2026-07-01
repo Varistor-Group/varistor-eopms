@@ -47,7 +47,7 @@ export interface CreateEmployeeInput {
   role: UserRole;
 }
 
-// In-memory store (acts as the DB until Supabase is connected)
+// Temporary mock array for legacy components that haven't been migrated to the JSON DB yet
 export const mockEmployeeStore: Employee[] = [
   {
     id: 'VAR-024',
@@ -57,12 +57,27 @@ export const mockEmployeeStore: Employee[] = [
     personalEmail: 'aarav.patel@gmail.com',
     phone: '+91 98765 43210',
     department: 'Operations',
-    reportingManager: 'Admin User',
+    reportingManager: 'VAR-001',
     role: 'Employee',
     tempPassword: 'Employee@2026!',
     createdAt: '2026-01-15T09:00:00Z',
     status: 'Active',
     variPoints: 1800,
+  },
+  {
+    id: 'VAR-001',
+    fullName: 'Manager User',
+    employeeId: 'VAR-001',
+    username: 'manager.user',
+    personalEmail: 'manager@example.com',
+    phone: '+91 00000 00000',
+    department: 'Operations',
+    reportingManager: 'Admin User',
+    role: 'Reporting Manager',
+    tempPassword: 'Manager@2026!',
+    createdAt: '2026-01-01T09:00:00Z',
+    status: 'Active',
+    variPoints: 2000,
   },
 ];
 
@@ -90,15 +105,8 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     return { success: false, employee: null, error: 'Missing required fields.' };
   }
 
-  // Duplicate check
-  const duplicate = mockEmployeeStore.find(
-    e => e.employeeId === input.employeeId || e.personalEmail === input.personalEmail
-  );
-  if (duplicate) {
-    return { success: false, employee: null, error: 'Employee ID or email already exists.' };
-  }
-
-  const employee: Employee = {
+  // Build full Employee object
+  const newEmployee: Employee = {
     ...input,
     id: input.employeeId,
     tempPassword: generateTempPassword(input.fullName),
@@ -107,18 +115,24 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     variPoints: 0,
   };
 
-  mockEmployeeStore.push(employee);
+  // Call JSON DB API
+  let employee: Employee;
+  try {
+    const res = await fetch('http://localhost:3001/api/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEmployee)
+    });
+    const result = await res.json();
+    if (!result.success) {
+      return { success: false, employee: null, error: result.error };
+    }
+    employee = result.employee;
+  } catch (err) {
+    return { success: false, employee: null, error: 'Database server unreachable.' };
+  }
 
-  // Log to activity log
-  mockActivityLog.push({
-    timestamp: new Date().toISOString(),
-    action: 'CREATE_EMPLOYEE',
-    by: 'admin@varistor.in',
-    details: `Created employee ${input.fullName} (${input.employeeId}) in ${input.department}`,
-  });
-
-  console.log('[Mock DB] Employee created:', employee);
-  console.log('[Audit Log]', mockActivityLog[mockActivityLog.length - 1]);
+  console.log('[JSON DB] Employee created:', employee);
 
   let emailError = null;
   try {
@@ -144,34 +158,25 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 }
 
 export async function getEmployees(): Promise<Employee[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
-  return [...mockEmployeeStore];
+  try {
+    const res = await fetch('http://localhost:3001/api/employees');
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch employees', err);
+    return [];
+  }
 }
 
 export async function updateEmployee(id: string, updates: Partial<Employee>): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
-  await new Promise(resolve => setTimeout(resolve, 600));
-  
-  const index = mockEmployeeStore.findIndex(e => e.id === id);
-  if (index === -1) {
-    return { success: false, employee: null, error: 'Employee not found.' };
+  try {
+    const res = await fetch(`http://localhost:3001/api/employees/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const result = await res.json();
+    return { success: result.success, employee: result.employee, error: result.error || null };
+  } catch (err) {
+    return { success: false, employee: null, error: 'Database server unreachable.' };
   }
-  
-  // Prevent editing of sensitive/immutable fields directly via this generic update
-  const safeUpdates = { ...updates };
-  delete safeUpdates.id;
-  delete safeUpdates.employeeId;
-  delete safeUpdates.personalEmail;
-  delete safeUpdates.createdAt;
-  delete safeUpdates.tempPassword;
-
-  mockEmployeeStore[index] = { ...mockEmployeeStore[index], ...safeUpdates };
-
-  mockActivityLog.push({
-    timestamp: new Date().toISOString(),
-    action: 'UPDATE_EMPLOYEE',
-    by: 'admin@varistor.in',
-    details: `Updated employee ${mockEmployeeStore[index].fullName} (${id})`,
-  });
-
-  return { success: true, employee: mockEmployeeStore[index], error: null };
 }

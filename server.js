@@ -1,6 +1,9 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
+import fs from 'fs/promises';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -111,6 +114,176 @@ app.post('/api/send-password-reset', async (req, res) => {
     console.error('Server error:', err);
     res.status(500).json({ success: false, error: 'Failed to send email' });
   }
+});
+
+// ── Task B: Quiz result email ──────────────────────────────────────────────────
+app.post('/api/quiz/submit', async (req, res) => {
+  try {
+    const { employeeEmail, hrEmail, moduleTitle, score, passed } = req.body;
+
+    if (!employeeEmail || !moduleTitle || score === undefined) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const statusColor = passed ? '#84CC16' : '#ef4444';
+    const statusLabel = passed ? '✅ PASSED' : '❌ FAILED';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Training Quiz Result</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+          <p>A training quiz has been completed on <strong>Varistor EOPMS</strong>.</p>
+          <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
+            <tr style="background:#f9f9f9;">
+              <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Module</td>
+              <td style="padding:10px 12px; border:1px solid #eee;">${moduleTitle}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Score</td>
+              <td style="padding:10px 12px; border:1px solid #eee;"><strong style="color:${statusColor};">${score}%</strong></td>
+            </tr>
+            <tr style="background:#f9f9f9;">
+              <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Result</td>
+              <td style="padding:10px 12px; border:1px solid #eee;"><strong style="color:${statusColor};">${statusLabel}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Passing score</td>
+              <td style="padding:10px 12px; border:1px solid #eee;">70%</td>
+            </tr>
+          </table>
+          ${!passed ? '<p style="color:#ef4444; font-size:13px;">The employee may retry after a 24-hour cooldown.</p>' : '<p style="color:#84CC16; font-size:13px;">The next module has been automatically unlocked.</p>'}
+          <p style="font-size:12px; color:#888; margin-top:24px;">This is an automated message from Varistor EOPMS Training.</p>
+        </div>
+      </div>
+    `;
+
+    const recipients = [employeeEmail, hrEmail].filter(Boolean);
+
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: recipients,
+      subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%)`,
+      html,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send quiz result email' });
+  }
+});
+
+// --- Mock Local Database Routes ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const DB_PATH = path.join(__dirname, 'db.json');
+
+async function readDB() {
+  try {
+    const data = await fs.readFile(DB_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Failed to read db.json', err);
+    return { employees: [], documents: [], activity_log: [] };
+  }
+}
+
+async function writeDB(data) {
+  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+}
+
+// Employees
+app.get('/api/employees', async (req, res) => {
+  const db = await readDB();
+  res.json(db.employees || []);
+});
+
+app.post('/api/employees', async (req, res) => {
+  const db = await readDB();
+  const employee = req.body;
+  if (!db.employees) db.employees = [];
+  
+  const duplicate = db.employees.find(
+    e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
+  );
+  if (duplicate) {
+    return res.status(400).json({ success: false, error: 'Employee ID or email already exists.' });
+  }
+
+  db.employees.push(employee);
+  
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'CREATE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Created employee ${employee.fullName} (${employee.employeeId})`,
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, employee });
+});
+
+app.put('/api/employees/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  if (!db.employees) db.employees = [];
+
+  const index = db.employees.findIndex(e => e.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Employee not found.' });
+  }
+
+  const safeUpdates = { ...req.body };
+  delete safeUpdates.id;
+  delete safeUpdates.employeeId;
+  delete safeUpdates.personalEmail;
+  delete safeUpdates.createdAt;
+  delete safeUpdates.tempPassword;
+
+  db.employees[index] = { ...db.employees[index], ...safeUpdates };
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'UPDATE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Updated employee ${db.employees[index].fullName} (${id})`,
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, employee: db.employees[index] });
+});
+
+// Documents
+app.get('/api/documents/:employeeId', async (req, res) => {
+  const db = await readDB();
+  const docs = (db.documents || []).filter(d => d.employeeId === req.params.employeeId);
+  res.json(docs);
+});
+
+// Activity
+app.post('/api/activity', async (req, res) => {
+  const db = await readDB();
+  const log = req.body;
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    ...log,
+    timestamp: new Date().toISOString()
+  });
+  await writeDB(db);
+  res.json({ success: true });
+>>>>>>> 9602f58 (minor testing, temp local db implemented)
 });
 
 app.listen(port, () => {
