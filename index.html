@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Varistor EOPMS - Area E</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Icons (Lucide via CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">V</div>
+        <h2>Varistor</h2>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div class="nav-section">MAIN</div>
+        <a href="#" class="nav-item">
+          <i data-lucide="layout-dashboard"></i> Dashboard
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="check-square"></i> My tasks
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="award"></i> Vari Points
+        </a>
+        <a href="#" class="nav-item active" id="navAnnouncements">
+          <i data-lucide="megaphone"></i> Announcements
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="calendar"></i> Leaves
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="banknote"></i> Payroll
+        </a>
+        <a href="#" class="nav-item chat-nav" id="navChat">
+          <i data-lucide="message-square"></i> Chat
+          <span class="badge">3</span>
+        </a>
+      </nav>
+      
+      <!-- Channels Mock (Module 14) -->
+      <div class="channels-list">
+        <div class="nav-section">CHANNELS</div>
+        <a href="#" class="channel-item active"># all-hands</a>
+        <a href="#" class="channel-item"># sales-team</a>
+        <a href="#" class="channel-item"># operations</a>
+        <a href="#" class="channel-item"># tech-dev</a>
+        <a href="#" class="channel-item"># hr-announcements</a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-title" id="topbarTitle">Announcements, Awards & Birthdays</div>
+        
+        <div class="topbar-actions">
+          <!-- Notification Bell -->
+          <div class="notification-wrapper">
+            <button class="icon-button notification-btn" id="notificationBtn">
+              <i data-lucide="bell"></i>
+              <span class="pulse-badge"></span>
+            </button>
+            
+            <!-- Notification Popover -->
+            <div class="notification-popover hidden" id="notificationPopover">
+              <div class="popover-header">
+                <h4>Notifications</h4>
+                <button class="text-button">Mark all as read</button>
+              </div>
+              <div class="notification-list">
+                <div class="notification-item unread">
+                  <div class="notif-icon"><i data-lucide="cake"></i></div>
+                  <div class="notif-content">
+                    <p><strong>Priya Sharma</strong>'s birthday is today!</p>
+                    <span class="notif-time">Just now</span>
+                  </div>
+                </div>
+                <div class="notification-item">
+                  <div class="notif-icon"><i data-lucide="award"></i></div>
+                  <div class="notif-content">
+                    <p>You earned <strong>+10 Vari Points</strong></p>
+                    <span class="notif-time">2 hours ago</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="user-profile">
+            <div class="avatar">AK</div>
+            <div class="user-details">
+              <span class="user-name">Aarav K.</span>
+              <span class="user-role">Operations</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- View Container (Switching between Announcements and Chat) -->
+      <div class="view-container">
+        
+        <!-- Announcements View -->
+        <section class="module-view" id="announcementsView">
+          
+          <!-- Hall of Fame -->
+          <div class="hall-of-fame-grid">
+            <div class="award-card employee-of-month">
+              <i data-lucide="trophy" class="award-icon"></i>
+              <span class="award-label">EMPLOYEE OF THE MONTH</span>
+              <h3 class="award-name">Priya Sharma</h3>
+            </div>
+            <div class="award-card punctuality">
+              <i data-lucide="clock" class="award-icon"></i>
+              <span class="award-label">PUNCTUALITY</span>
+              <h3 class="award-name">Rohit Mehta</h3>
+            </div>
+            <div class="award-card productive">
+              <i data-lucide="zap" class="award-icon"></i>
+              <span class="award-label">PRODUCTIVE (QUARTER)</span>
+              <h3 class="award-name">Sana Khan</h3>
+            </div>
+            <div class="award-card birthday">
+              <i data-lucide="cake" class="award-icon"></i>
+              <span class="award-label">BIRTHDAY TODAY</span>
+              <h3 class="award-name">Karan Verma</h3>
+            </div>
+          </div>
+
+          <!-- Announcements Feed -->
+          <div class="feed-section">
+            <div class="section-header">
+              <h3>Announcements feed</h3>
+            </div>
+            <div class="feed-list">
+              <!-- Pinned Announcement -->
+              <div class="announcement-card pinned">
+                <div class="announcement-header">
+                  <h4>New POSH policy v2.1 published</h4>
+                  <span class="meta">HR • 2h ago</span>
+                </div>
+                <div class="reactions">
+                  <button class="reaction-btn"><i data-lucide="thumbs-up"></i> 18</button>
+                  <button class="reaction-btn"><i data-lucide="heart"></i> 6</button>
+                  <button class="reaction-btn">🎉 2</button>
+                </div>
+              </div>
+              
+              <!-- Regular Announcement -->
+              <div class="announcement-card">
+                <div class="announcement-header">
+                  <h4>Diwali bonus credited with Oct salary</h4>
+                  <span class="meta">Admin • 1d ago</span>
+                </div>
+                <div class="reactions">
+                  <button class="reaction-btn">🎉 32</button>
+                  <button class="reaction-btn"><i data-lucide="thumbs-up"></i> 14</button>
+                </div>
+              </div>
+              
+              <div class="announcement-card">
+                <div class="announcement-header">
+                  <h4>Office closed on 2nd Oct</h4>
+                  <span class="meta">HR • 3d ago</span>
+                </div>
+                <div class="reactions">
+                  <button class="reaction-btn"><i data-lucide="thumbs-up"></i> 22</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Chat View (Initially Hidden) -->
+        <section class="module-view hidden" id="chatView">
+          <div class="chat-container">
+            <div class="chat-header">
+              <div class="channel-info">
+                <h3># all-hands</h3>
+                <span class="channel-meta">40 members • pinned: POSH policy.pdf</span>
+              </div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+              <!-- Messages -->
+              <div class="message-group">
+                <div class="message-avatar">P</div>
+                <div class="message-content">
+                  <div class="message-meta">
+                    <span class="sender">Priya</span>
+                    <span class="sender-role">HR</span>
+                    <span class="time">10:24</span>
+                  </div>
+                  <div class="message-bubble">
+                    Reminder: submit timesheets by EOD.
+                  </div>
+                </div>
+              </div>
+
+              <div class="message-group right">
+                <div class="message-content">
+                  <div class="message-meta">
+                    <span class="sender">You</span>
+                    <span class="time">10:26</span>
+                  </div>
+                  <div class="message-bubble accent">
+                    On it 👍
+                  </div>
+                </div>
+              </div>
+
+              <div class="message-group">
+                <div class="message-avatar">R</div>
+                <div class="message-content">
+                  <div class="message-meta">
+                    <span class="sender">Rohit</span>
+                    <span class="sender-role">Ops</span>
+                    <span class="time">10:28</span>
+                  </div>
+                  <div class="message-bubble attachment">
+                    <i data-lucide="paperclip"></i> vendor-quotes-Q3.xlsx
+                    <span class="searchable">(searchable archive)</span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Typing Indicator -->
+              <div class="typing-indicator hidden" id="typingIndicator">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </div>
+            </div>
+            
+            <div class="chat-input-area">
+              <button class="icon-button"><i data-lucide="plus"></i></button>
+              <input type="text" id="chatInput" placeholder="Message #all-hands..." autocomplete="off"/>
+              <button class="icon-button"><i data-lucide="smile"></i></button>
+              <button class="icon-button"><i data-lucide="arrow-up-right"></i></button>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+    </main>
+  </div>
+
+  <!-- Birthday Pop-up -->
+  <div class="birthday-overlay hidden" id="birthdayPopup">
+    <div class="birthday-card">
+      <button class="close-btn" id="closeBirthday"><i data-lucide="x"></i></button>
+      <div class="balloons-animation">
+        <div class="balloon b1">🎈</div>
+        <div class="balloon b2">🎂</div>
+        <div class="balloon b3">🎈</div>
+      </div>
+      <h3>Happy Birthday, Karan!</h3>
+      <p>Balloons + confetti animation on dashboard for the full day.</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
