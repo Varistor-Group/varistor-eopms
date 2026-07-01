@@ -15,6 +15,7 @@ import { EngineSimulationConsole } from './components/EngineSimulationConsole';
 import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
+import TrainingLibrary from './components/TrainingLibrary';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -61,6 +62,7 @@ const AppContent: React.FC = () => {
       case 'admin': return 'Employees';
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
+      case 'training': return 'Training Library';
       default: return 'EOPMS';
     }
   };
@@ -138,9 +140,9 @@ const AppContent: React.FC = () => {
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin' || currentRole === 'HR') {
-                return ['dashboard', 'admin', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation'];
+                return ['dashboard', 'admin', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'chat'];
+                return ['dashboard', 'task-management', 'announcements', 'chat', 'training'];
               } else {
                 return ['dashboard', 'kanban', 'ledger', 'announcements', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
@@ -167,6 +169,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
+                {activeTab === 'training' && <TrainingLibrary />}
               </>
             );
           })()}

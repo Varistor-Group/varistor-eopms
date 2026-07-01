@@ -94,3 +94,54 @@ export interface AnnouncementDTO extends Announcement {
   isRead: boolean;
 }
 
+// ─── Training (Task B) ──────────────────────────────────────────────────────
+
+export type TrainingTrack = 'General' | 'Department' | 'Tech';
+export type TrainingStatus = 'locked' | 'available' | 'in_progress' | 'completed' | 'failed';
+
+export interface TrainingModule {
+  id: string;
+  title: string;
+  description: string;
+  track: TrainingTrack;
+  department?: string;
+  duration_seconds: number;
+  thumbnail_url: string;
+  video_url: string;
+  order: number;
+  prerequisite_id: string | null;
+}
+
+export interface TrainingProgress {
+  id: string;
+  employee_id: string;
+  module_id: string;
+  watched_seconds: number;
+  completed: boolean;
+  created_at: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  module_id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+}
+
+export interface QuizAttempt {
+  id: string;
+  employee_id: string;
+  module_id: string;
+  answers: Record<string, number>;
+  score: number;
+  passed: boolean;
+  attempted_at: string;
+}
+
+export interface TrainingModuleWithStatus extends TrainingModule {
+  status: TrainingStatus;
+  progress: TrainingProgress | null;
+  latestAttempt: QuizAttempt | null;
+}
+

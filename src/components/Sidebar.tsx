@@ -41,14 +41,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
-      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true }
+      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else if (currentRole === 'Reporting Manager') {
     menuItems = [
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false }
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else {
     // Employee
@@ -61,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
-      { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   }
 
