@@ -5,9 +5,10 @@ import {
   useDroppable, 
   PointerSensor,
   useSensor,
-  useSensors
+  useSensors,
+  DragOverlay
 } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { Calendar, Check, FileText, CheckSquare, X } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
@@ -218,6 +219,7 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
 export const KanbanBoard: React.FC = () => {
   const { tasks, moveTask } = useKanbanTasks();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -228,7 +230,12 @@ export const KanbanBoard: React.FC = () => {
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -257,7 +264,7 @@ export const KanbanBoard: React.FC = () => {
       </div>
 
       {/* DnD Context */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           <KanbanColumn 
             id="todo" 
@@ -278,6 +285,14 @@ export const KanbanBoard: React.FC = () => {
             onCardClick={setSelectedTask}
           />
         </div>
+        <DragOverlay>
+          {activeId ? (
+            <KanbanCard 
+              task={tasks.find(t => t.id === activeId)!} 
+              onClick={() => {}} 
+            />
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {/* Details Slide-out Drawer */}

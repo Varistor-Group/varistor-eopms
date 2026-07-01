@@ -105,7 +105,7 @@ export const ResetPassword: React.FC = () => {
               <p className="text-gray-600 text-sm">
                 Your password has been reset successfully. You can now log in with your new password.
               </p>
-              <Button onClick={navigateToLogin} fullWidth className="mt-4">
+              <Button onClick={navigateToLogin} className="mt-4 w-full">
                 Return to Login
               </Button>
             </div>
@@ -137,7 +137,7 @@ export const ResetPassword: React.FC = () => {
 
               <Button
                 type="submit"
-                fullWidth
+                className="w-full"
                 isLoading={isLoading}
                 disabled={isLoading || !token}
               >

@@ -55,7 +55,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
-    setErrors(prev => ({ ...prev, [field]: undefined }));
+    setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
   const validate = (): boolean => {

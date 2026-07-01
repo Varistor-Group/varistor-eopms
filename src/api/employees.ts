@@ -77,6 +77,7 @@ export const mockEmployeeStore: Employee[] = [
     tempPassword: 'Manager@2026!',
     createdAt: '2026-01-01T09:00:00Z',
     status: 'Active',
+    variPoints: 2000,
   },
 ];
 

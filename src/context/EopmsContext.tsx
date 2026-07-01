@@ -19,7 +19,7 @@ interface EopmsContextType {
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
   approveTask: (taskId: string) => void;
   rejectTask: (taskId: string) => void;
-  createTask: (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string) => void;
+  createTask: (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => void;
   updateTaskDetails: (taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string) => void;
   addComment: (taskId: string, text: string) => void;
   toggleChecklistItem: (taskId: string, itemId: string) => void;
@@ -481,10 +481,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast(`Rejected: "${task.title}" returned to In Progress`, 0, 'debit');
   };
 
-  const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string) => {
+  const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => {
     // Determine assignee details from mock store, fallback to default
     const assigneeDetails = { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
     
+    const checklistItems = checkpoints?.map((cp, idx) => ({
+      id: `cp-${Date.now()}-${idx}`,
+      text: cp,
+      completed: false
+    })) || [];
+
     const newTask: Task = {
       id: `task-${Date.now()}`,
       title,
@@ -494,13 +500,18 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       status: 'todo',
       assigneeId,
       assignee: assigneeDetails,
-      checklist: [],
+      checklist: checklistItems,
       comments: [],
       attachments: []
     };
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
     addToast(`Task assigned: "${title}"`, 0, 'credit');
+    
+    // Dispatch real-time notification
+    const channel = new BroadcastChannel('eopms_notifications');
+    channel.postMessage({ type: 'TASK_ASSIGNED', taskId: newTask.id, title: newTask.title, assigneeId });
+    channel.close();
   };
 
   const updateTaskDetails = (taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string) => {

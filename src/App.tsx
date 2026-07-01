@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -6,7 +6,7 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
@@ -21,6 +21,35 @@ const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
+
+  useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('navigateTab', handleNavigate);
+    return () => window.removeEventListener('navigateTab', handleNavigate);
+  }, []);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel('eopms_notifications');
+    channel.onmessage = (event) => {
+      if (event.data.type === 'TASK_ASSIGNED') {
+        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
+        // Simulating matching assignee to currently logged in user context
+        if (event.data.assigneeId === MOCK_CURRENT_USER_ID) {
+          setTaskNotification({ title: event.data.title, show: true });
+          setTimeout(() => {
+            setTaskNotification(prev => prev ? { ...prev, show: false } : null);
+          }, 5000);
+        }
+      }
+    };
+    return () => channel.close();
+  }, [currentRole]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -147,11 +176,30 @@ const AppContent: React.FC = () => {
       {/* Floating Bottom-Right Points Toast notifications */}
       <Toast />
 
+      {/* Real-time Task Notification Pop-up */}
+      {taskNotification && taskNotification.show && (
+        <div className="fixed top-6 right-6 z-50 bg-white border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>
+              <p className="text-xs text-varistor-muted mt-1">You have been assigned: <span className="font-semibold text-varistor-dark">{taskNotification.title}</span></p>
+            </div>
+            <button onClick={() => setTaskNotification({ ...taskNotification, show: false })} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Page Fade-in Keyframe */}
       <style>{`
         @keyframes fadeInPage {
           from { opacity: 0; transform: translateY(4px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>

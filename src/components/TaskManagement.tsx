@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X, Plus } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
 import { mockEmployeeStore } from '../api/employees';
 import type { TaskPriority } from '../types';
@@ -17,16 +18,18 @@ export const TaskManagement: React.FC = () => {
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [assigneeId, setAssigneeId] = useState('');
+  const [checkpoints, setCheckpoints] = useState<string[]>([]);
 
   const handleAssignTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description || !dueDate || !assigneeId) return;
-    createTask(title, description, dueDate, priority, assigneeId);
+    createTask(title, description, dueDate, priority, assigneeId, checkpoints.filter(c => c.trim() !== ''));
     setTitle('');
     setDescription('');
     setDueDate('');
     setPriority('medium');
     setAssigneeId('');
+    setCheckpoints([]);
   };
 
   // Find tasks awaiting approval for subordinates
@@ -68,6 +71,43 @@ export const TaskManagement: React.FC = () => {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
+            </div>
+            <div className="md:col-span-2 pt-2 border-t border-varistor-border mt-2">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-semibold text-varistor-dark">Task Checkpoints (Sub-tasks)</label>
+                <button 
+                  type="button" 
+                  onClick={() => setCheckpoints([...checkpoints, ''])} 
+                  className="text-xs text-[#5da00d] bg-[#f4f7f2] px-2 py-1 rounded border border-[#5da00d] font-bold flex items-center gap-1 hover:brightness-105"
+                >
+                  <Plus size={12} strokeWidth={3} /> Add Checkpoint
+                </button>
+              </div>
+              <div className="space-y-2">
+                {checkpoints.map((cp, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      value={cp} 
+                      onChange={(e) => {
+                        const newCp = [...checkpoints];
+                        newCp[idx] = e.target.value;
+                        setCheckpoints(newCp);
+                      }} 
+                      placeholder={`Checkpoint ${idx + 1}`}
+                      className="flex-1 border border-varistor-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-varistor-lime bg-[#fafbfa]"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setCheckpoints(checkpoints.filter((_, i) => i !== idx))} 
+                      className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded-lg border border-red-100"
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))}
+                {checkpoints.length === 0 && <p className="text-xs text-varistor-muted italic">No checkpoints added.</p>}
+              </div>
             </div>
           </div>
           <div className="flex justify-end">

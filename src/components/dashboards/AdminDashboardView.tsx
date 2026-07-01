@@ -108,7 +108,7 @@ export const AdminDashboardView: React.FC = () => {
                 <p className="text-xs text-varistor-muted mt-1">IT Dept - 1 day ago</p>
               </div>
             </div>
-            <button className="w-full mt-4 bg-[#eef1ed] text-varistor-dark font-bold text-xs py-2 rounded hover:bg-[#e0e4de] transition-colors cursor-pointer">Manage Announcements</button>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'announcements' }))} className="w-full mt-4 bg-[#eef1ed] text-varistor-dark font-bold text-xs py-2 rounded hover:bg-[#e0e4de] transition-colors cursor-pointer">Manage Announcements</button>
           </div>
         </div>
       </div>
