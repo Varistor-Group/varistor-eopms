@@ -12,6 +12,7 @@ import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
 import { ResetPassword } from './components/ResetPassword';
+import TrainingLibrary from './components/TrainingLibrary';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -27,6 +28,7 @@ const AppContent: React.FC = () => {
       case 'announcements': return 'Announcements Feed';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
+      case 'training': return 'Training Library';
       default: return 'EOPMS';
     }
   };
@@ -112,6 +114,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'ledger' && <PointsLedger />}
           {activeTab === 'announcements' && <AnnouncementsFeed />}
           {activeTab === 'vault' && <DocumentVault />}
+          {activeTab === 'training' && <TrainingLibrary />}
           {activeTab === 'admin' && (
             (currentRole === 'Admin' || currentRole === 'HR') ? (
               <EmployeeManagementPortal />

@@ -41,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
-    { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
+    { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
   ];
 
   const handleTabClick = (itemId: string, enabled: boolean) => {
