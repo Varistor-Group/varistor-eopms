@@ -73,3 +73,16 @@ export default defineConfig([
 ])
 
 ```
+
+## Email Setup
+
+To send real emails using Resend, a temporary local Express server handles the API integration securely.
+
+1. Copy `.env.example` to `.env` and fill in your Resend API key:
+   ```bash
+   cp .env.example .env
+   # Edit .env to set VITE_RESEND_API_KEY=re_your_api_key_here
+   ```
+2. The local `server.js` starts automatically alongside the Vite dev server when you run `npm run dev` (it uses `concurrently`).
+
+*Note: The Express `server.js` script handles all Resend calls. This is a temporary setup and will be replaced by Supabase Edge Functions in the real backend phase to avoid managing a separate server.*

@@ -111,3 +111,27 @@ export async function mockResetPassword(email: string) {
     message: 'If an account exists with this email, a reset link has been sent.',
   };
 }
+
+export async function sendPasswordReset(email: string) {
+  if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    return { success: false, error: 'Please enter a valid email address.' };
+  }
+
+  try {
+    const res = await fetch('http://localhost:3001/api/send-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const result = await res.json();
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to send reset link.' };
+    }
+    return {
+      success: true,
+      message: 'Reset link sent — check your inbox',
+    };
+  } catch (err) {
+    return { success: false, error: 'Email server unreachable.' };
+  }
+}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from './shared/Input';
 import { Button } from './shared/Button';
 import { Modal } from './shared/Modal';
-import { mockLogin, mockResetPassword } from '../api/auth';
+import { mockLogin, sendPasswordReset } from '../api/auth';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { ShieldCheck } from 'lucide-react';
 
@@ -86,14 +86,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setResetSuccess(false);
 
     try {
-      const result = await mockResetPassword(resetEmail);
-      if (result.error) {
-        setResetMessage(result.error);
+      const result = await sendPasswordReset(resetEmail);
+      if (result.error || !result.success) {
+        setResetMessage(result.error || 'An error occurred while sending the reset link.');
         setResetSuccess(false);
       } else if (result.message) {
         setResetMessage(result.message);
         setResetSuccess(true);
-        setResetEmail('');
+        // Do not reset email so user sees they submitted it, or we could reset it
       }
     } catch {
       setResetMessage('An error occurred while sending the reset link.');
@@ -225,48 +225,47 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         onClose={closeForgotModal}
         title="Reset your password"
       >
-        {resetSuccess ? (
-          <div className="text-center py-4 space-y-3">
-            <div className="w-12 h-12 bg-varistor-limeTint rounded-full flex items-center justify-center mx-auto">
-              <ShieldCheck size={24} className="text-varistor-limeText" />
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <p className="text-sm text-varistor-muted">
+            Enter your work email address and we'll send a secure one-time reset link.
+          </p>
+
+          <Input
+            label="Work Email"
+            type="email"
+            placeholder="you@varistor.in"
+            value={resetEmail}
+            onChange={e => {
+              setResetEmail(e.target.value);
+              setResetMessage('');
+              setResetSuccess(false);
+            }}
+            autoComplete="email"
+            required
+          />
+
+          {resetMessage && resetSuccess && (
+            <div className="p-3 rounded-lg text-sm font-medium bg-varistor-limeTint text-varistor-dark border border-[#c3f0a0] flex items-center gap-2">
+              <ShieldCheck size={18} className="text-varistor-limeText flex-shrink-0" />
+              {resetMessage}
             </div>
-            <p className="text-sm font-medium text-varistor-dark">{resetMessage}</p>
-            <Button variant="secondary" onClick={closeForgotModal} className="w-full">
+          )}
+
+          {resetMessage && !resetSuccess && (
+            <div className="p-3 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-100">
+              {resetMessage}
+            </div>
+          )}
+
+          <div className="pt-2 flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={closeForgotModal}>
               Close
             </Button>
+            <Button type="submit" isLoading={isResetting}>
+              Send reset link
+            </Button>
           </div>
-        ) : (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <p className="text-sm text-varistor-muted">
-              Enter your work email address and we'll send a secure one-time reset link.
-            </p>
-
-            <Input
-              label="Work Email"
-              type="email"
-              placeholder="you@varistor.in"
-              value={resetEmail}
-              onChange={e => setResetEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
-
-            {resetMessage && !resetSuccess && (
-              <div className="p-3 rounded-lg text-sm font-medium bg-red-50 text-red-600 border border-red-100">
-                {resetMessage}
-              </div>
-            )}
-
-            <div className="pt-2 flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={closeForgotModal}>
-                Cancel
-              </Button>
-              <Button type="submit" isLoading={isResetting}>
-                Send reset link
-              </Button>
-            </div>
-          </form>
-        )}
+        </form>
       </Modal>
     </div>
   );

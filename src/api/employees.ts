@@ -25,6 +25,7 @@ export interface Employee {
   tempPassword: string;
   createdAt: string;
   status: 'Active' | 'Inactive';
+  variPoints: number;
 }
 
 export type Department =
@@ -61,6 +62,7 @@ export const mockEmployeeStore: Employee[] = [
     tempPassword: 'Employee@2026!',
     createdAt: '2026-01-15T09:00:00Z',
     status: 'Active',
+    variPoints: 1800,
   },
 ];
 
@@ -78,6 +80,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   success: boolean;
   employee: Employee | null;
   error: string | null;
+  emailError?: string | null;
 }> {
   // Simulate network latency
   await new Promise(resolve => setTimeout(resolve, 900));
@@ -101,6 +104,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     tempPassword: generateTempPassword(input.fullName),
     createdAt: new Date().toISOString(),
     status: 'Active',
+    variPoints: 0,
   };
 
   mockEmployeeStore.push(employee);
@@ -116,10 +120,58 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   console.log('[Mock DB] Employee created:', employee);
   console.log('[Audit Log]', mockActivityLog[mockActivityLog.length - 1]);
 
-  return { success: true, employee, error: null };
+  let emailError = null;
+  try {
+    const res = await fetch('http://localhost:3001/api/send-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: employee.fullName,
+        email: employee.personalEmail,
+        employeeId: employee.employeeId,
+        tempPassword: employee.tempPassword
+      }),
+    });
+    const result = await res.json();
+    if (!result.success) {
+      emailError = result.error || 'Failed to send welcome email.';
+    }
+  } catch (err) {
+    emailError = 'Email server unreachable.';
+  }
+
+  return { success: true, employee, error: null, emailError };
 }
 
 export async function getEmployees(): Promise<Employee[]> {
   await new Promise(resolve => setTimeout(resolve, 400));
   return [...mockEmployeeStore];
+}
+
+export async function updateEmployee(id: string, updates: Partial<Employee>): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
+  await new Promise(resolve => setTimeout(resolve, 600));
+  
+  const index = mockEmployeeStore.findIndex(e => e.id === id);
+  if (index === -1) {
+    return { success: false, employee: null, error: 'Employee not found.' };
+  }
+  
+  // Prevent editing of sensitive/immutable fields directly via this generic update
+  const safeUpdates = { ...updates };
+  delete safeUpdates.id;
+  delete safeUpdates.employeeId;
+  delete safeUpdates.personalEmail;
+  delete safeUpdates.createdAt;
+  delete safeUpdates.tempPassword;
+
+  mockEmployeeStore[index] = { ...mockEmployeeStore[index], ...safeUpdates };
+
+  mockActivityLog.push({
+    timestamp: new Date().toISOString(),
+    action: 'UPDATE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Updated employee ${mockEmployeeStore[index].fullName} (${id})`,
+  });
+
+  return { success: true, employee: mockEmployeeStore[index], error: null };
 }

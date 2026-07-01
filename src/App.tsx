@@ -11,6 +11,7 @@ import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
+import { ResetPassword } from './components/ResetPassword';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -29,6 +30,10 @@ const AppContent: React.FC = () => {
       default: return 'EOPMS';
     }
   };
+
+  if (window.location.pathname === '/reset') {
+    return <ResetPassword />;
+  }
 
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />;
