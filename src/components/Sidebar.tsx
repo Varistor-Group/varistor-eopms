@@ -10,7 +10,8 @@ import {
   BookOpen,
   Lock,
   X,
-  Users
+  UserPlus,
+  ShieldAlert
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -28,21 +29,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsOpenMobile
 }) => {
   const { currentRole } = useVariPoints();
-  const hasAdminAccess = currentRole === 'Admin' || currentRole === 'HR';
-  const isEmployee = currentRole === 'Employee';
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
-    { id: 'kanban', label: 'My tasks', icon: Kanban, enabled: true },
-    { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
-    { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
-    { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-    ...(hasAdminAccess ? [{ id: 'admin', label: 'Employees', icon: Users, enabled: true }] : []),
-    { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
-    ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
-    { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
-    { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
-  ];
+  let menuItems: any[] = [];
+  
+  if (currentRole === 'Admin' || currentRole === 'HR') {
+    menuItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true }
+    ];
+  } else if (currentRole === 'Reporting Manager') {
+    menuItems = [
+      { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false }
+    ];
+  } else {
+    // Employee
+    menuItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: false }
+    ];
+  }
 
   const handleTabClick = (itemId: string, enabled: boolean) => {
     if (!enabled) return;

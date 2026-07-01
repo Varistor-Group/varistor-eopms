@@ -33,6 +33,7 @@ export interface Attachment {
 
 export interface Task {
   id: string;
+  assigneeId?: string;
   title: string;
   description: string;
   dueDate: string;
@@ -54,6 +55,7 @@ export interface LedgerEntry {
   type: 'credit' | 'debit';
   reason: string;
   timestamp: string;
+  employeeId?: string;
 }
 
 export interface ToastMessage {

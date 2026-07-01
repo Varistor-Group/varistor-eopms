@@ -2,9 +2,10 @@ import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO } from '../types';
 import { announcementsApi } from '../api/announcements';
+import { mockEmployeeStore } from '../api/employees';
 
-// Let's set a fixed "today" date for simulated business rule checks (2026-06-30)
-const SIMULATED_TODAY = new Date('2026-06-30T12:00:00');
+// Simulated current date for testing due dates
+const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
 
 interface EopmsContextType {
   tasks: Task[];
@@ -18,14 +19,15 @@ interface EopmsContextType {
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
   approveTask: (taskId: string) => void;
   rejectTask: (taskId: string) => void;
-  updateTaskDetails: (taskId: string, updates: Partial<Task>) => void;
+  createTask: (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string) => void;
+  updateTaskDetails: (taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string) => void;
   addComment: (taskId: string, text: string) => void;
   toggleChecklistItem: (taskId: string, itemId: string) => void;
   addChecklistItem: (taskId: string, text: string) => void;
   addAttachment: (taskId: string, name: string, size: string, type: string) => void;
   
   // Points System Actions
-  assertAdministrativePenalty: (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number) => void;
+  assertAdministrativePenalty: (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number, employeeId?: string) => void;
   addToast: (message: string, points: number, type: 'credit' | 'debit') => void;
   dismissToast: (toastId: string) => void;
   announcements: AnnouncementDTO[];
@@ -52,6 +54,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-30',
     priority: 'critical', // Changed to critical to demonstrate new priority
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c1', text: 'Gather feedback from marketing', completed: false },
@@ -72,6 +75,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-02',
     priority: 'medium',
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c4', text: 'Count warehouse box items in Zone A', completed: false },
@@ -87,6 +91,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'medium',
     status: 'in_progress',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c6', text: 'Collect signed agreements', completed: true },
@@ -104,6 +109,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'high',
     status: 'awaiting_approval',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c8', text: 'Review formatting checklist', completed: true },
@@ -123,6 +129,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-05',
     priority: 'low',
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
@@ -135,6 +142,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'high',
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
@@ -147,6 +155,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-04',
     priority: 'medium',
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c10', text: 'Toggle this item and verify visual checkbox update', completed: false },
@@ -162,6 +171,7 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-06',
     priority: 'low',
     status: 'todo',
+    assigneeId: 'VAR-024',
     assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
@@ -213,7 +223,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return (saved as UserRole) || 'Admin'; // Default role is Admin
   });
 
-  const MOCK_USER_ID = 'user-aarav';
+  const MOCK_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
   const [announcements, setAnnouncements] = useState<AnnouncementDTO[]>([]);
 
   useEffect(() => {
@@ -265,6 +275,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const CONSECUTIVE_LATE_PENALTY = 50; // Configurable flat penalty for 3+ consecutive late tasks
+
   const awardPointsForTask = (task: Task) => {
     if (task.pointsProcessed) return null;
 
@@ -272,12 +284,34 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const completedOnTime = SIMULATED_TODAY <= taskDueDate;
     
     const ruleConfig = POINT_MATRIX[task.priority];
-    const pointsValue = completedOnTime ? ruleConfig.onTime : ruleConfig.missed;
-    const pointType: 'credit' | 'debit' = completedOnTime ? 'credit' : 'debit';
     
-    const reasonMessage = completedOnTime 
-      ? `Task completed before due date` 
-      : `Task completed past due date`;
+    let netPoints = 0;
+    let reasonMessage = '';
+
+    if (completedOnTime) {
+      netPoints = ruleConfig.onTime;
+      reasonMessage = `Task completed before due date (${task.priority.toUpperCase()} priority)`;
+    } else {
+      // Algebraic sum: Credit - Debit (since debit is stored as a positive number in the matrix)
+      netPoints = ruleConfig.onTime - ruleConfig.missed;
+      reasonMessage = `Task completed past due date (${task.priority.toUpperCase()} priority)`;
+      
+      // Consecutive Deadline Penalty Logic
+      const completionEntries = ledger.filter(l => 
+        l.employeeId === task.assigneeId && 
+        l.taskId !== undefined // Only look at task completion entries
+      );
+      
+      if (completionEntries.length >= 2 && 
+          completionEntries[0].reason.includes('past due date') && 
+          completionEntries[1].reason.includes('past due date')) {
+        netPoints -= CONSECUTIVE_LATE_PENALTY;
+        reasonMessage += ` [STRIKE-3: Consecutive Late Penalty Applied]`;
+      }
+    }
+
+    const pointsValue = Math.abs(netPoints);
+    const pointType: 'credit' | 'debit' = netPoints >= 0 ? 'credit' : 'debit';
 
     const newLedgerEntry: LedgerEntry = {
       id: `led-${Date.now()}-${task.id}`,
@@ -285,8 +319,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       taskTitle: task.title,
       points: pointsValue,
       type: pointType,
-      reason: `${reasonMessage} (${task.priority.toUpperCase()} priority)`,
-      timestamp: new Date().toISOString()
+      reason: reasonMessage,
+      timestamp: new Date().toISOString(),
+      employeeId: task.assigneeId
     };
 
     return { newLedgerEntry, pointsValue, pointType, completedOnTime };
@@ -393,6 +428,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
+    const taskAssigneeDetails = mockEmployeeStore.find(e => e.id === task.assigneeId);
+    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManager !== MOCK_USER_ID) {
+      addToast('Error: You can only approve tasks for your direct subordinates.', 0, 'debit');
+      return;
+    }
+
     if (task.status !== 'done') {
       const awardResult = awardPointsForTask(task);
 
@@ -425,6 +466,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
+    const taskAssigneeDetails = mockEmployeeStore.find(e => e.id === task.assigneeId);
+    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManager !== MOCK_USER_ID) {
+      addToast('Error: You can only reject tasks for your direct subordinates.', 0, 'debit');
+      return;
+    }
+
     setTasks((prevTasks) =>
       prevTasks.map((t) =>
         t.id === taskId ? { ...t, status: 'in_progress' } : t
@@ -434,9 +481,31 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast(`Rejected: "${task.title}" returned to In Progress`, 0, 'debit');
   };
 
-  const updateTaskDetails = (taskId: string, updates: Partial<Task>) => {
+  const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string) => {
+    // Determine assignee details from mock store, fallback to default
+    const assigneeDetails = { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
+    
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      title,
+      description,
+      dueDate,
+      priority,
+      status: 'todo',
+      assigneeId,
+      assignee: assigneeDetails,
+      checklist: [],
+      comments: [],
+      attachments: []
+    };
+
+    setTasks((prevTasks) => [newTask, ...prevTasks]);
+    addToast(`Task assigned: "${title}"`, 0, 'credit');
+  };
+
+  const updateTaskDetails = (taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string) => {
     setTasks((prevTasks) =>
-      prevTasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+      prevTasks.map((t) => (t.id === taskId ? { ...t, title, description, priority, dueDate } : t))
     );
   };
 
@@ -530,7 +599,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Manual Administrative Penalty (Office Misconduct: -50, Late Entry: -25)
   // Restricted to Admin and HR roles
-  const assertAdministrativePenalty = (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number) => {
+  const assertAdministrativePenalty = (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number, employeeId?: string) => {
     if (currentRole !== 'Admin' && currentRole !== 'HR') {
       addToast('Access Denied: Only Admin and HR can manually debit points.', 0, 'debit');
       return;
@@ -547,7 +616,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       points: penaltyPoints,
       type: 'debit',
       reason: reason,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      employeeId
     };
     
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
@@ -566,6 +636,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         moveTask,
         approveTask,
         rejectTask,
+        createTask,
         updateTaskDetails,
         addComment,
         toggleChecklistItem,
