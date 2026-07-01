@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { mockEmployeeStore } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
-import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle } from 'lucide-react';
+import { AdminEditEmployee } from './AdminEditEmployee';
+import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil } from 'lucide-react';
+import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
 export const EmployeeManagementPortal: React.FC = () => {
   const { currentRole } = useVariPoints();
-  const [view, setView] = useState<'list' | 'create'>('list');
+  const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   // Role Gate
   if (currentRole !== 'Admin' && currentRole !== 'HR') {
@@ -38,6 +41,26 @@ export const EmployeeManagementPortal: React.FC = () => {
     );
   }
 
+  if (view === 'edit' && selectedEmployee) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => { setView('list'); setSelectedEmployee(null); }}
+            className="text-sm font-semibold text-varistor-muted hover:text-varistor-dark transition-colors"
+          >
+            &larr; Back to Employees
+          </button>
+        </div>
+        <AdminEditEmployee 
+          employee={selectedEmployee} 
+          onCancel={() => { setView('list'); setSelectedEmployee(null); }} 
+          onSuccess={() => { setView('list'); setSelectedEmployee(null); }} 
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -64,7 +87,9 @@ export const EmployeeManagementPortal: React.FC = () => {
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Employee</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">ID / Role</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Department</th>
+                <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Points</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Status</th>
+                <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px] text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-varistor-border">
@@ -91,6 +116,11 @@ export const EmployeeManagementPortal: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2 py-1 rounded border border-varistor-lime/20 bg-varistor-limeTint text-xs font-bold text-varistor-limeText">
+                      {emp.variPoints} pts
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
                     {emp.status === 'Active' ? (
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
                         <BadgeCheck size={14} />
@@ -102,6 +132,15 @@ export const EmployeeManagementPortal: React.FC = () => {
                         Inactive
                       </span>
                     )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => { setSelectedEmployee(emp); setView('edit'); }}
+                      className="p-1.5 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-pageBg rounded-md transition-colors"
+                      title="Edit Employee"
+                    >
+                      <Pencil size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}

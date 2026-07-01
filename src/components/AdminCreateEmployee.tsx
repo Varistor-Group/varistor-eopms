@@ -103,16 +103,20 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!validate()) return;
     setIsLoading(true);
 
-    const { success, employee, error } = await createEmployee(form);
+    const { success, employee, error, emailError } = await createEmployee(form);
 
     if (!success || error) {
       showToast('error', 'Failed to create employee', error ?? undefined);
     } else {
-      showToast(
-        'success',
-        `${employee!.fullName} added successfully`,
-        `Temp password: ${employee!.tempPassword}`
-      );
+      if (emailError) {
+        showToast('error', 'Employee created, but email failed', emailError);
+      } else {
+        showToast(
+          'success',
+          `${employee!.fullName} added successfully`,
+          `Temp password: ${employee!.tempPassword}`
+        );
+      }
       setForm(EMPTY_FORM);
       setErrors({});
     }

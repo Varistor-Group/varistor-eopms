@@ -14,6 +14,7 @@ import { EmployeeManagementPortal } from './components/EmployeeManagementPortal'
 import { EngineSimulationConsole } from './components/EngineSimulationConsole';
 import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
+import { ResetPassword } from './components/ResetPassword';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -34,6 +35,10 @@ const AppContent: React.FC = () => {
       default: return 'EOPMS';
     }
   };
+
+  if (window.location.pathname === '/reset') {
+    return <ResetPassword />;
+  }
 
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />;
@@ -111,7 +116,7 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'kanban', 'ledger', 'announcements', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
-            
+
             const allowedTabs = getAllowedTabs();
             if (!allowedTabs.includes(activeTab)) {
               return (
