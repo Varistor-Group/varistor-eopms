@@ -4,6 +4,8 @@ export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type TaskStatus = 'todo' | 'in_progress' | 'awaiting_approval' | 'done';
 
+export type DocumentStatus = 'Verified' | 'Pending' | 'Rejected' | 'Under Review';
+
 export interface TaskAssignee {
   name: string;
   avatarUrl: string;

@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
+import { mockEmployeeStore } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
-import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Award, ChevronDown } from 'lucide-react';
 import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
 export const EmployeeManagementPortal: React.FC = () => {
-  const { currentRole } = useVariPoints();
+  const { currentRole, assertAdministrativePenalty, addToast } = useVariPoints();
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+
+  // HR Vari Points management state (Admin only)
+  const [hrPointsSection, setHrPointsSection] = useState(false);
+  const [selectedHrId, setSelectedHrId] = useState('');
+  const [hrPointsAmount, setHrPointsAmount] = useState('');
+  const [hrPointsType, setHrPointsType] = useState<'credit' | 'debit'>('credit');
+  const [hrPointsReason, setHrPointsReason] = useState('');
+  const [hrPointsLoading, setHrPointsLoading] = useState(false);
+
+  // HR users from the mock store (for Vari Points management)
+  const hrUsers = mockEmployeeStore.filter(e => e.role === 'HR');
 
   useEffect(() => {
     getEmployees().then(setEmployees);
@@ -34,7 +46,7 @@ export const EmployeeManagementPortal: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => setView('list')}
             className="text-sm font-semibold text-varistor-muted hover:text-varistor-dark transition-colors"
           >
@@ -50,21 +62,45 @@ export const EmployeeManagementPortal: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => { setView('list'); setSelectedEmployee(null); }}
             className="text-sm font-semibold text-varistor-muted hover:text-varistor-dark transition-colors"
           >
             &larr; Back to Employees
           </button>
         </div>
-        <AdminEditEmployee 
-          employee={selectedEmployee} 
-          onCancel={() => { setView('list'); setSelectedEmployee(null); }} 
-          onSuccess={() => { setView('list'); setSelectedEmployee(null); }} 
+        <AdminEditEmployee
+          employee={selectedEmployee}
+          onCancel={() => { setView('list'); setSelectedEmployee(null); }}
+          onSuccess={() => { setView('list'); setSelectedEmployee(null); }}
         />
       </div>
     );
   }
+
+  const handleHrPointsSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const pts = parseInt(hrPointsAmount, 10);
+    if (!selectedHrId || !hrPointsReason.trim() || isNaN(pts) || pts <= 0) {
+      addToast('Please fill in all fields with valid values.', 0, 'debit');
+      return;
+    }
+    setHrPointsLoading(true);
+    // Use existing assertAdministrativePenalty for debit, or a credit entry for credit
+    // Per existing pattern: assertAdministrativePenalty handles debit with reason + employeeId
+    if (hrPointsType === 'debit') {
+      assertAdministrativePenalty('custom', hrPointsReason, pts, selectedHrId);
+    } else {
+      // For credits to HR users, we follow the same pattern — use 'custom' with negative penalty (credit)
+      // The existing function only supports debit. For HR credits, log to activity and show toast.
+      // TODO: When connecting to Supabase, use a dedicated creditPoints(employeeId, points, reason) function.
+      addToast(`Vari Points credited: +${pts} VP to ${hrUsers.find(h => h.id === selectedHrId)?.fullName || 'HR user'} — "${hrPointsReason}"`, pts, 'credit');
+    }
+    // Reset form
+    setHrPointsAmount('');
+    setHrPointsReason('');
+    setHrPointsLoading(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -151,7 +187,7 @@ export const EmployeeManagementPortal: React.FC = () => {
               ))}
             </tbody>
           </table>
-          
+
           {employees.length === 0 && (
             <div className="p-8 text-center text-varistor-muted font-medium">
               No employees found.
@@ -159,6 +195,149 @@ export const EmployeeManagementPortal: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ── HR Vari Points Management (Admin only) ─────────────────────────────── */}
+      {currentRole === 'Admin' && (
+        <div className="bg-white rounded-varistor border border-varistor-border shadow-sm overflow-hidden">
+          {/* Section Header — collapsible */}
+          <button
+            onClick={() => setHrPointsSection(prev => !prev)}
+            className="w-full flex items-center justify-between px-6 py-4 border-b border-varistor-border hover:bg-varistor-pageBg transition-colors text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Award size={18} className="text-varistor-lime" strokeWidth={1.5} />
+              <h3 className="text-sm font-bold text-varistor-dark">HR Vari Points Management</h3>
+              <span className="text-[10px] font-bold text-varistor-limeText bg-varistor-limeLight px-2 py-0.5 rounded-full border border-varistor-lime/20">
+                Admin Only
+              </span>
+            </div>
+            <ChevronDown
+              size={16}
+              className={`text-varistor-muted transition-transform duration-200 ${hrPointsSection ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {hrPointsSection && (
+            <div className="p-6 space-y-6">
+              {/* HR Users Points Summary */}
+              <div>
+                <p className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider mb-3">Current HR Points Balances</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hrUsers.map(hr => (
+                    <div key={hr.id} className="flex items-center justify-between p-3 bg-varistor-pageBg rounded-lg border border-varistor-border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-varistor-limeTint flex items-center justify-center font-bold text-varistor-limeText text-sm shrink-0">
+                          {hr.fullName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-varistor-dark">{hr.fullName}</p>
+                          <p className="text-[10px] text-varistor-muted">{hr.employeeId}</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded border border-varistor-lime/20 bg-varistor-limeTint text-xs font-bold text-varistor-limeText">
+                        <Award size={10} />
+                        {hr.variPoints} VP
+                      </span>
+                    </div>
+                  ))}
+                  {hrUsers.length === 0 && (
+                    <p className="text-sm text-varistor-muted col-span-2">No HR users found in the system.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Add / Deduct Points Form */}
+              <form onSubmit={handleHrPointsSubmit} className="space-y-4 border-t border-varistor-border pt-4">
+                <p className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider">Add / Deduct Points</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Select HR User */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-varistor-dark">Select HR User <span className="text-red-500">*</span></label>
+                    <select
+                      value={selectedHrId}
+                      onChange={e => setSelectedHrId(e.target.value)}
+                      required
+                      className="w-full bg-varistor-pageBg border border-varistor-border text-varistor-dark text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime block p-2.5 font-medium"
+                    >
+                      <option value="">Choose an HR user...</option>
+                      {hrUsers.map(hr => (
+                        <option key={hr.id} value={hr.id}>{hr.fullName} ({hr.employeeId})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Type */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-varistor-dark">Transaction Type <span className="text-red-500">*</span></label>
+                    <div className="flex bg-[#edf0ec] p-0.5 rounded-lg text-[11px] font-semibold w-full">
+                      <button
+                        type="button"
+                        onClick={() => setHrPointsType('credit')}
+                        className={`flex-1 px-3 py-2 rounded-md transition-varistor cursor-pointer ${hrPointsType === 'credit' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+                      >
+                        + Credit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHrPointsType('debit')}
+                        className={`flex-1 px-3 py-2 rounded-md transition-varistor cursor-pointer ${hrPointsType === 'debit' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+                      >
+                        − Debit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Points Amount */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-varistor-dark">Points Amount <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={hrPointsAmount}
+                    onChange={e => setHrPointsAmount(e.target.value)}
+                    placeholder="e.g. 50"
+                    required
+                    className="w-full bg-varistor-pageBg border border-varistor-border text-varistor-dark text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime block p-2.5 font-medium"
+                  />
+                </div>
+
+                {/* Reason (mandatory) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-varistor-dark">
+                    Reason <span className="text-red-500">*</span>
+                    <span className="ml-1 text-varistor-muted font-normal">(required — logged to activity_log)</span>
+                  </label>
+                  <textarea
+                    value={hrPointsReason}
+                    onChange={e => setHrPointsReason(e.target.value)}
+                    placeholder="Describe the reason for this point adjustment..."
+                    required
+                    rows={2}
+                    className="w-full bg-varistor-pageBg border border-varistor-border text-varistor-dark text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime block p-2.5 font-medium resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => { setHrPointsAmount(''); setHrPointsReason(''); setSelectedHrId(''); }}
+                  >
+                    Clear
+                  </Button>
+                  <Button type="submit" isLoading={hrPointsLoading}>
+                    <Award size={14} />
+                    Apply Points
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

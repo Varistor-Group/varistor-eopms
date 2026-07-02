@@ -11,7 +11,8 @@ import {
   Lock,
   X,
   UserPlus,
-  ShieldAlert
+  ShieldAlert,
+  ScrollText
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -31,13 +32,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentRole } = useVariPoints();
 
   let menuItems: any[] = [];
-  
-  if (currentRole === 'Admin' || currentRole === 'HR') {
+
+  if (currentRole === 'Admin') {
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
+    ];
+  } else if (currentRole === 'HR') {
+    // HR participates in Vari Points — same rules as employees
+    menuItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
@@ -49,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
@@ -59,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },

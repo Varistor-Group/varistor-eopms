@@ -16,6 +16,7 @@ import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
+import { PolicyPage } from './components/PolicyPage';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -63,6 +64,7 @@ const AppContent: React.FC = () => {
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
       case 'training': return 'Training Library';
+      case 'policy': return 'Company Policy';
       default: return 'EOPMS';
     }
   };
@@ -139,12 +141,15 @@ const AppContent: React.FC = () => {
         <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
           {(() => {
             const getAllowedTabs = () => {
-              if (currentRole === 'Admin' || currentRole === 'HR') {
-                return ['dashboard', 'admin', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+              if (currentRole === 'Admin') {
+                return ['dashboard', 'admin', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+              } else if (currentRole === 'HR') {
+                // HR participates in Vari Points — ledger is included
+                return ['dashboard', 'admin', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'chat', 'training'];
+                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
               } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 
@@ -170,6 +175,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
+                {activeTab === 'policy' && <PolicyPage />}
               </>
             );
           })()}

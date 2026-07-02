@@ -53,7 +53,12 @@
       "phone": "+917022630114",
       "department": "Finance",
       "reportingManager": "asdasdsa",
-      "role": "Admin"
+      "role": "Admin",
+      "id": "213",
+      "tempPassword": "AK@2026!123",
+      "createdAt": "2026-07-01T07:19:29.904Z",
+      "status": "Active",
+      "variPoints": 0
     },
     {
       "fullName": "akash kumar",
@@ -148,5 +153,51 @@
       "details": "Created employee akash kumar (2131)",
       "timestamp": "2026-07-01T07:27:17.048Z"
     }
-  ]
+  ],
+  "policies": [
+    {
+      "id": "pol-001",
+      "title": "Code of Conduct",
+      "category": "HR",
+      "severity": "mandatory",
+      "content": "All employees are expected to maintain professional behaviour at all times. Harassment, discrimination, or any form of workplace misconduct will result in immediate disciplinary action, up to and including termination.",
+      "effectiveDate": "2026-01-01"
+    },
+    {
+      "id": "pol-002",
+      "title": "Work From Home Policy",
+      "category": "Operations",
+      "severity": "standard",
+      "content": "Employees may work from home up to 2 days per week with prior approval from their reporting manager. WFH days must be logged in the system by 9:00 AM. Repeated unapproved WFH will be treated as leave without pay.",
+      "effectiveDate": "2026-02-01"
+    },
+    {
+      "id": "pol-003",
+      "title": "Data Confidentiality & NDA",
+      "category": "Legal",
+      "severity": "mandatory",
+      "content": "All employees must adhere to the non-disclosure agreement signed at the time of joining. Sharing proprietary company data, client information, or internal communications with external parties is strictly prohibited and subject to legal action.",
+      "effectiveDate": "2026-01-01"
+    },
+    {
+      "id": "pol-004",
+      "title": "Leave & Attendance",
+      "category": "HR",
+      "severity": "standard",
+      "content": "Employees are entitled to 12 days of paid annual leave, 6 days of sick leave, and applicable public holidays. Leave requests must be submitted at least 3 working days in advance via the system. Unapproved absences will be marked as LOP (Loss of Pay).",
+      "effectiveDate": "2026-01-01"
+    },
+    {
+      "id": "pol-005",
+      "title": "Device & IT Usage Policy",
+      "category": "IT",
+      "severity": "advisory",
+      "content": "Company-issued devices are to be used strictly for work purposes. Installation of unauthorised software is prohibited. Employees must lock their screens when away from their desks. Any security incidents must be reported to IT within 24 hours.",
+      "effectiveDate": "2026-03-01"
+    }
+  ],
+  "policy": {
+    "content": "<p>1.come on time</p><p>2.dont be late</p>",
+    "updatedAt": "2026-07-02T06:16:46.549Z"
+  }
 }

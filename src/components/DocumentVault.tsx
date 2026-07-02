@@ -1,19 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, FileText, ShieldCheck, Users } from 'lucide-react';
-import { getVaultDocuments, trackDocumentAction } from '../api/vault';
+import { Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
+import { getVaultDocuments, trackDocumentAction, updateDocumentStatus } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
+import type { DocumentStatus } from '../types';
 
+// ── Status Badge Config ───────────────────────────────────────────────────────
+// Follows the exact badge pattern established in EmployeeManagementPortal:
+// inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border
+// Uses the design-system status colour tokens from tailwind.config.js
+interface StatusConfig {
+  icon: React.ElementType;
+  className: string;
+  label: string;
+}
+
+const STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
+  Verified: {
+    icon: CheckCircle,
+    className: 'bg-varistor-successBg text-varistor-successText border-varistor-successBorder',
+    label: 'Verified',
+  },
+  Pending: {
+    icon: Clock,
+    className: 'bg-varistor-pendingBg text-varistor-pendingText border-varistor-pendingBorder',
+    label: 'Pending',
+  },
+  Rejected: {
+    icon: XCircle,
+    className: 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder',
+    label: 'Rejected',
+  },
+  'Under Review': {
+    icon: Eye,
+    className: 'bg-amber-50 text-amber-700 border-amber-200',
+    label: 'Under Review',
+  },
+};
+
+const ALL_STATUSES: DocumentStatus[] = ['Verified', 'Pending', 'Rejected', 'Under Review'];
+
+// ── Status Badge Component ────────────────────────────────────────────────────
+const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG['Pending'];
+  const Icon = config.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${config.className}`}>
+      <Icon size={11} strokeWidth={2} />
+      {config.label}
+    </span>
+  );
+};
+
+// ── Document Vault ────────────────────────────────────────────────────────────
 export const DocumentVault: React.FC = () => {
-  const { currentRole } = useVariPoints();
+  const { currentRole, addToast } = useVariPoints();
   const [documents, setDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
+
   // Default to our mock logged-in user Aarav Patel (VAR-024)
   const loggedInEmployeeId = 'VAR-024';
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
+
+  const canManageStatus = currentRole === 'Admin' || currentRole === 'HR';
 
   useEffect(() => {
     getEmployees().then(setEmployees);
@@ -28,7 +80,7 @@ export const DocumentVault: React.FC = () => {
     });
   }, [selectedEmployeeId]);
 
-  // Also, if the role switches from Admin to Employee, lock the dropdown back to the logged in user
+  // Lock back to logged-in user when role switches away from Admin/HR
   useEffect(() => {
     if (currentRole !== 'Admin' && currentRole !== 'HR') {
       setSelectedEmployeeId(loggedInEmployeeId);
@@ -38,6 +90,22 @@ export const DocumentVault: React.FC = () => {
   const handleAction = (docId: string, actionName: string) => {
     trackDocumentAction('admin@varistor.in', actionName, docId);
     console.log(`[Audit Log] admin@varistor.in performed ${actionName} on document ${docId} (Employee: ${selectedEmployeeId})`);
+  };
+
+  const handleStatusChange = async (docId: string, newStatus: DocumentStatus) => {
+    setUpdatingDocId(docId);
+    const result = await updateDocumentStatus(docId, newStatus, 'hr@varistor.in');
+    setUpdatingDocId(null);
+
+    if (result.success) {
+      // Optimistically update local state
+      setDocuments(prev =>
+        prev.map(d => d.id === docId ? { ...d, status: newStatus } : d)
+      );
+      addToast(`Document status updated to "${newStatus}".`, 0, 'credit');
+    } else {
+      addToast(`Failed to update status: ${result.error}`, 0, 'debit');
+    }
   };
 
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
@@ -84,49 +152,80 @@ export const DocumentVault: React.FC = () => {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
           {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="h-48 bg-gray-100 rounded-[12px]"></div>
+            <div key={i} className="h-52 bg-gray-100 rounded-[12px]"></div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {documents.map((doc) => (
-            <div key={doc.id} className="bg-white rounded-[12px] p-5 border border-varistor-border shadow-sm flex flex-col group hover:shadow-md transition-shadow">
-              <div className="h-32 bg-gray-50 rounded-lg flex items-center justify-center mb-4 border border-dashed border-gray-200">
-                <FileText className="text-gray-300" size={40} />
-              </div>
-              
-              <div className="flex-1">
-                <h3 className="font-semibold text-brand-ink text-sm mb-1">{doc.name}</h3>
-                <p className="text-xs text-gray-500 flex items-center gap-2 font-medium">
-                  {doc.type} · {doc.size}
-                </p>
-              </div>
+          {documents.map((doc) => {
+            const docStatus: DocumentStatus = doc.status in STATUS_CONFIG ? doc.status : 'Pending';
+            const isUpdating = updatingDocId === doc.id;
 
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
-                <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide
-                  ${doc.status === 'Verified' ? 'bg-brand-lime-tint text-[#3f5c12]' : 'bg-gray-100 text-gray-500'}
-                `}>
-                  {doc.status}
+            return (
+              <div key={doc.id} className="bg-white rounded-[12px] p-5 border border-varistor-border shadow-sm flex flex-col group hover:shadow-md transition-shadow">
+                <div className="h-32 bg-gray-50 rounded-lg flex items-center justify-center mb-4 border border-dashed border-gray-200">
+                  <FileText className="text-gray-300" size={40} />
                 </div>
-                
-                <div className="flex gap-3 text-xs font-semibold text-gray-500">
-                  <button 
-                    onClick={() => handleAction(doc.id, 'View')}
-                    className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    View
-                  </button>
-                  <span className="text-gray-300">·</span>
-                  <button 
-                    onClick={() => handleAction(doc.id, 'Download')}
-                    className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    Download
-                  </button>
+
+                <div className="flex-1">
+                  <h3 className="font-semibold text-brand-ink text-sm mb-1">{doc.name}</h3>
+                  <p className="text-xs text-gray-500 flex items-center gap-2 font-medium">
+                    {doc.type} · {doc.size}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-50 space-y-3">
+                  {/* Status Row */}
+                  <div className="flex items-center justify-between">
+                    {/* HR/Admin: status dropdown; Employee: static colour badge */}
+                    {canManageStatus ? (
+                      <div className="relative">
+                        <select
+                          value={docStatus}
+                          onChange={e => handleStatusChange(doc.id, e.target.value as DocumentStatus)}
+                          disabled={isUpdating}
+                          className={`
+                            appearance-none text-[10px] font-bold uppercase tracking-wide pr-6 pl-2 py-1 rounded-full border cursor-pointer
+                            transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-varistor-lime
+                            ${STATUS_CONFIG[docStatus]?.className ?? 'bg-gray-100 text-gray-500 border-gray-200'}
+                            ${isUpdating ? 'opacity-60 cursor-not-allowed' : ''}
+                          `}
+                          title="Change document status"
+                        >
+                          {ALL_STATUSES.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                        {/* Chevron indicator */}
+                        <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-current opacity-60">
+                          ▾
+                        </span>
+                      </div>
+                    ) : (
+                      <StatusBadge status={docStatus} />
+                    )}
+
+                    {/* View / Download Actions */}
+                    <div className="flex gap-3 text-xs font-semibold text-gray-500">
+                      <button
+                        onClick={() => handleAction(doc.id, 'View')}
+                        className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        View
+                      </button>
+                      <span className="text-gray-300">·</span>
+                      <button
+                        onClick={() => handleAction(doc.id, 'Download')}
+                        className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
