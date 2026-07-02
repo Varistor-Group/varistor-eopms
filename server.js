@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
+import PDFDocument from 'pdfkit';
 import fs from 'fs/promises';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -271,6 +272,104 @@ app.get('/api/documents/:employeeId', async (req, res) => {
   res.json(docs);
 });
 
+// Generate A4 Salary Slip PDF buffer using pdfkit
+const generateSalarySlipPDF = (slip) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+      const fmt = (n) => 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+      // 1. Header Banner (Lime green)
+      doc.rect(40, 40, 515, 60).fill('#84cc16');
+      doc.fillColor('#ffffff')
+         .fontSize(16)
+         .font('Helvetica-Bold')
+         .text('VARISTOR TECHNOLOGIES PVT LTD', 55, 52);
+      doc.fontSize(10)
+         .font('Helvetica')
+         .text(`Salary Slip - ${month}`, 55, 75);
+
+      // V Logo Badge inside banner
+      doc.circle(510, 70, 20).fill('#ffffff');
+      doc.fillColor('#84cc16')
+         .fontSize(18)
+         .font('Helvetica-Bold')
+         .text('V', 504, 63);
+
+      // 2. Employee Info Grid
+      doc.fillColor('#111111').fontSize(10);
+      
+      const infoY1 = 125;
+      const infoY2 = 145;
+      
+      doc.font('Helvetica-Bold').text('Employee:', 55, infoY1).font('Helvetica').text(slip.name, 140, infoY1);
+      doc.font('Helvetica-Bold').text('Employee ID:', 300, infoY1).font('Helvetica').text(slip.employeeId || '—', 390, infoY1);
+      
+      doc.font('Helvetica-Bold').text('Department:', 55, infoY2).font('Helvetica').text(slip.department || '—', 140, infoY2);
+      doc.font('Helvetica-Bold').text('Monthly CTC:', 300, infoY2).font('Helvetica').text(fmt(slip.ctc), 390, infoY2);
+
+      // Divider line
+      doc.moveTo(40, 175).lineTo(555, 175).strokeColor('#d8ded2').lineWidth(1).stroke();
+
+      // 3. Earnings & Deductions Headers
+      doc.fillColor('#868e80')
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .text('EARNINGS', 55, 195)
+         .text('DEDUCTIONS', 300, 195);
+
+      // 4. Details
+      doc.fillColor('#111111').fontSize(10).font('Helvetica');
+      
+      // Earnings Row 1
+      doc.text('Gross Pay', 55, 215)
+         .font('Helvetica-Bold').text(fmt(slip.ctc), 200, 215, { align: 'right', width: 60 });
+         
+      // Deductions Row 1
+      doc.font('Helvetica').text('Total Deductions', 300, 215)
+         .font('Helvetica-Bold').fillColor('#b91c1c').text(fmt(slip.deductions), 450, 215, { align: 'right', width: 60 });
+
+      // Vertical separator
+      doc.moveTo(280, 195).lineTo(280, 240).strokeColor('#d8ded2').stroke();
+
+      // Divider line
+      doc.moveTo(40, 260).lineTo(555, 260).strokeColor('#d8ded2').stroke();
+
+      // 5. Net Pay Block
+      doc.rect(40, 275, 515, 45).fill('#f7fee7');
+      doc.rect(40, 275, 515, 45).strokeColor('#d9f99d').stroke();
+      
+      doc.fillColor('#365314')
+         .fontSize(12)
+         .font('Helvetica-Bold')
+         .text('Net Pay', 55, 292);
+         
+      doc.fillColor('#3f6212')
+         .fontSize(18)
+         .font('Helvetica-Bold')
+         .text(fmt(netPay), 420, 287, { align: 'right', width: 110 });
+
+      // 6. Footer
+      doc.fillColor('#868e80')
+         .fontSize(8)
+         .font('Helvetica')
+         .text('This is a system-generated salary slip from Varistor EOPMS. No signature required.', 40, 350, { align: 'center', width: 515 });
+      doc.text('Auto-dispatched via scheduled cron - Resend', 40, 365, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
 // ── Modules 11 & 12: Bulk salary slip emails ──────────────────────────────────
 app.post('/api/payroll/send-slips', async (req, res) => {
   try {
@@ -372,11 +471,19 @@ app.post('/api/payroll/send-slips', async (req, res) => {
       }
       try {
         const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const pdfBuffer = await generateSalarySlipPDF(slip);
+
         const result = await resend.emails.send({
           from: 'onboarding@resend.dev',
           to: slip.email,
           subject: `Your Salary Slip – ${month} | Varistor Technologies`,
           html: buildSlipHtml(slip),
+          attachments: [
+            {
+              filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
+              content: pdfBuffer,
+            }
+          ]
         });
         // Resend SDK can return { data, error } or throw
         const resendError = result?.error;
