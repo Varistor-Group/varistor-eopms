@@ -96,6 +96,32 @@ export interface AnnouncementDTO extends Announcement {
   isRead: boolean;
 }
 
+export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+
+export interface ChatChannel {
+  id: ChannelId;
+  name: string;
+  memberCount: number;
+  pinned?: string;
+}
+
+export interface ChatAttachment {
+  name: string;
+  size: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: ChannelId;
+  authorName: string;
+  authorRole: string;
+  authorAvatar: string;
+  isSelf: boolean;
+  text?: string;
+  attachment?: ChatAttachment;
+  timestamp: string;
+}
+
 // ─── Training (Task B) ──────────────────────────────────────────────────────
 
 export type TrainingTrack = 'General' | 'Department' | 'Tech';

@@ -4,6 +4,8 @@ import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
+import { Chat } from './components/Chat';
+import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { Menu, X } from 'lucide-react';
@@ -12,7 +14,6 @@ import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
 import { EngineSimulationConsole } from './components/EngineSimulationConsole';
-import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
@@ -59,6 +60,7 @@ const AppContent: React.FC = () => {
       case 'kanban': return 'Task Board';
       case 'ledger': return 'Points Ledger';
       case 'announcements': return 'Announcements Feed';
+      case 'chat': return 'Team Chat';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
       case 'task-management': return 'Task Management';
@@ -123,7 +125,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Notification Bell */}
-            <NotificationDropdown />
+            <NotificationBell onNavigateToChat={() => setActiveTab('chat')} />
 
             {/* User Profile */}
             <div className="flex items-center gap-2 border-l border-varistor-border pl-4">
@@ -170,6 +172,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'kanban' && <KanbanBoard />}
                 {activeTab === 'ledger' && <PointsLedger />}
                 {activeTab === 'announcements' && <AnnouncementsFeed />}
+                {activeTab === 'chat' && <Chat />}
                 {activeTab === 'vault' && <DocumentVault />}
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
