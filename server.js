@@ -180,189 +180,24 @@ app.post('/api/quiz/submit', async (req, res) => {
   }
 });
 
-// --- Mock Local Database Routes ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DB_PATH = path.join(__dirname, 'db.json');
+// ── Field Tracker (mock endpoints for future real location pings) ─────────────
 
-async function readDB() {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error('Failed to read db.json', err);
-    return { employees: [], documents: [], activity_log: [] };
+// POST /api/field/location
+// Body: { employeeId, lat, lng, accuracy, batteryLevel, status }
+app.post('/api/field/location', (req, res) => {
+  const { employeeId, lat, lng, accuracy, batteryLevel, status } = req.body;
+  if (!employeeId || lat === undefined || lng === undefined) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
-}
-
-async function writeDB(data) {
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
-}
-
-// Employees
-app.get('/api/employees', async (req, res) => {
-  const db = await readDB();
-  res.json(db.employees || []);
+  // In production this would write to Supabase
+  console.log(`[Field Tracker] Location ping from ${employeeId}: (${lat}, ${lng})`);
+  res.json({ success: true, message: 'Location recorded (mock)' });
 });
 
-app.post('/api/employees', async (req, res) => {
-  const db = await readDB();
-  const employee = req.body;
-  if (!db.employees) db.employees = [];
-  
-  const duplicate = db.employees.find(
-    e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
-  );
-  if (duplicate) {
-    return res.status(400).json({ success: false, error: 'Employee ID or email already exists.' });
-  }
-
-  db.employees.push(employee);
-  
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'CREATE_EMPLOYEE',
-    by: 'admin@varistor.in',
-    details: `Created employee ${employee.fullName} (${employee.employeeId})`,
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, employee });
-});
-
-app.put('/api/employees/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  if (!db.employees) db.employees = [];
-
-  const index = db.employees.findIndex(e => e.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Employee not found.' });
-  }
-
-  const safeUpdates = { ...req.body };
-  delete safeUpdates.id;
-  delete safeUpdates.employeeId;
-  delete safeUpdates.personalEmail;
-  delete safeUpdates.createdAt;
-  delete safeUpdates.tempPassword;
-
-  db.employees[index] = { ...db.employees[index], ...safeUpdates };
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'UPDATE_EMPLOYEE',
-    by: 'admin@varistor.in',
-    details: `Updated employee ${db.employees[index].fullName} (${id})`,
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, employee: db.employees[index] });
-});
-
-// Documents
-app.get('/api/documents/:employeeId', async (req, res) => {
-  const db = await readDB();
-  const docs = (db.documents || []).filter(d => d.employeeId === req.params.employeeId);
-  res.json(docs);
-});
-
-// Update document status (HR / Admin)
-app.put('/api/documents/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const { status, performedBy } = req.body;
-
-  if (!status) {
-    return res.status(400).json({ success: false, error: 'status is required' });
-  }
-
-  const index = (db.documents || []).findIndex(d => d.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Document not found.' });
-  }
-
-  db.documents[index].status = status;
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'document_status_changed',
-    by: performedBy || 'hr@varistor.in',
-    details: `Document ${id} status changed to ${status}`,
-    metadata: { documentId: id, newStatus: status },
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, document: db.documents[index] });
-});
-
-// Activity
-app.post('/api/activity', async (req, res) => {
-  const db = await readDB();
-  const log = req.body;
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    ...log,
-    timestamp: new Date().toISOString()
-  });
-  await writeDB(db);
-  res.json({ success: true });
-});
-
-// Policies — GET all
-app.get('/api/policies', async (req, res) => {
-  const db = await readDB();
-  res.json(db.policies || []);
-});
-
-// Policies — POST (add new)
-app.post('/api/policies', async (req, res) => {
-  const db = await readDB();
-  const policy = req.body;
-  if (!policy.title || !policy.content) {
-    return res.status(400).json({ success: false, error: 'title and content are required' });
-  }
-  if (!db.policies) db.policies = [];
-  const newPolicy = {
-    id: `pol-${Date.now()}`,
-    title: policy.title,
-    category: policy.category || 'General',
-    severity: policy.severity || 'standard',
-    content: policy.content,
-    effectiveDate: policy.effectiveDate || new Date().toISOString().split('T')[0],
-    createdAt: new Date().toISOString()
-  };
-  db.policies.push(newPolicy);
-  await writeDB(db);
-  res.json({ success: true, policy: newPolicy });
-});
-
-// Policies — PUT (update by id)
-app.put('/api/policies/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const index = (db.policies || []).findIndex(p => p.id === id);
-  if (index === -1) return res.status(404).json({ success: false, error: 'Policy not found.' });
-  db.policies[index] = { ...db.policies[index], ...req.body, id, updatedAt: new Date().toISOString() };
-  await writeDB(db);
-  res.json({ success: true, policy: db.policies[index] });
-});
-
-// Policies — DELETE
-app.delete('/api/policies/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  if (!db.policies) return res.status(404).json({ success: false, error: 'Policy not found.' });
-  db.policies = db.policies.filter(p => p.id !== id);
-  await writeDB(db);
-  res.json({ success: true });
+// GET /api/field/locations
+app.get('/api/field/locations', (req, res) => {
+  // Mock response — in production fetch from Supabase
+  res.json({ success: true, locations: [] });
 });
 
 app.listen(port, () => {

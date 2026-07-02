@@ -32,7 +32,7 @@ const DEPARTMENTS: Department[] = [
   'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech', 'Digital Marketing',
 ];
 
-const ROLES: UserRole[] = ['Employee', 'Reporting Manager', 'HR', 'Admin'];
+const ROLES: UserRole[] = ['Employee', 'Field Employee', 'Reporting Manager', 'HR', 'Admin'];
 
 export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => void; onSuccess: () => void }> = ({ employee, onCancel, onSuccess }) => {
   const { currentRole } = useVariPoints();

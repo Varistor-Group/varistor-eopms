@@ -17,6 +17,7 @@ import { EngineSimulationConsole } from './components/EngineSimulationConsole';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
+import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
 
 const AppContent: React.FC = () => {
@@ -63,8 +64,6 @@ const AppContent: React.FC = () => {
       case 'chat': return 'Team Chat';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
-      case 'task-management': return 'Task Management';
-      case 'engine-simulation': return 'Engine Simulation Console';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
       default: return 'EOPMS';
@@ -118,6 +117,7 @@ const AppContent: React.FC = () => {
                 title="Switch active role for permission testing"
               >
                 <option value="Employee">Employee</option>
+                <option value="Field Employee">Field Employee</option>
                 <option value="Reporting Manager">Reporting Manager</option>
                 <option value="HR">HR</option>
                 <option value="Admin">Admin</option>
@@ -141,47 +141,23 @@ const AppContent: React.FC = () => {
 
         {/* Dynamic Inner Page Content */}
         <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
-          {(() => {
-            const getAllowedTabs = () => {
-              if (currentRole === 'Admin') {
-                return ['dashboard', 'admin', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
-              } else if (currentRole === 'HR') {
-                // HR participates in Vari Points — ledger is included
-                return ['dashboard', 'admin', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
-              } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
-              } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
-              }
-            };
-
-            const allowedTabs = getAllowedTabs();
-            if (!allowedTabs.includes(activeTab)) {
-              return (
-                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm animate-[fadeInPage_250ms_ease-out]">
-                  <div className="text-red-500 font-bold text-6xl mb-4">403</div>
-                  <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
-                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions to view this page.</p>
-                </div>
-              );
-            }
-
-            return (
-              <>
-                {activeTab === 'dashboard' && <Dashboard />}
-                {activeTab === 'kanban' && <KanbanBoard />}
-                {activeTab === 'ledger' && <PointsLedger />}
-                {activeTab === 'announcements' && <AnnouncementsFeed />}
-                {activeTab === 'chat' && <Chat />}
-                {activeTab === 'vault' && <DocumentVault />}
-                {activeTab === 'task-management' && <TaskManagement />}
-                {activeTab === 'admin' && <EmployeeManagementPortal />}
-                {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
-                {activeTab === 'training' && <TrainingLibrary />}
-                {activeTab === 'policy' && <PolicyPage />}
-              </>
-            );
-          })()}
+          {activeTab === 'dashboard' && <Dashboard />}
+          {activeTab === 'kanban' && <KanbanBoard />}
+          {activeTab === 'ledger' && <PointsLedger />}
+          {activeTab === 'announcements' && <AnnouncementsFeed />}
+          {activeTab === 'vault' && <DocumentVault />}
+          {activeTab === 'training' && <TrainingLibrary />}
+          {activeTab === 'admin' && (
+            (currentRole === 'Admin' || currentRole === 'HR') ? (
+              <EmployeeManagementPortal />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm">
+                <div className="text-red-500 font-bold text-6xl mb-4">403</div>
+                <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
+                <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions (Admin or HR) to view this page.</p>
+              </div>
+            )
+          )}
         </main>
       </div>
 

@@ -298,6 +298,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 onChange={set('role')}
               >
                 <option value="Employee">Employee</option>
+                <option value="Field Employee">Field Employee</option>
                 <option value="Reporting Manager">Reporting Manager</option>
                 <option value="HR">HR</option>
                 <option value="Admin">Admin</option>

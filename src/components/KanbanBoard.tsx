@@ -26,6 +26,7 @@ interface ColumnProps {
 const KanbanColumn: React.FC<ColumnProps> = ({ id, title, tasks, onCardClick }) => {
   const { isOver, setNodeRef } = useDroppable({ id });
   const { approveTask, rejectTask, currentRole } = useKanbanTasks();
+  const canModerate = currentRole !== 'Employee' && currentRole !== 'Field Employee';
 
   return (
     <div 
@@ -49,8 +50,8 @@ const KanbanColumn: React.FC<ColumnProps> = ({ id, title, tasks, onCardClick }) 
             key={task.id} 
             task={task} 
             onClick={() => onCardClick(task)}
-            onApprove={id === 'awaiting_approval' && currentRole !== 'Employee' ? () => approveTask(task.id) : undefined}
-            onReject={id === 'awaiting_approval' && currentRole !== 'Employee' ? () => rejectTask(task.id) : undefined}
+            onApprove={id === 'awaiting_approval' && canModerate ? () => approveTask(task.id) : undefined}
+            onReject={id === 'awaiting_approval' && canModerate ? () => rejectTask(task.id) : undefined}
           />
         ))}
 

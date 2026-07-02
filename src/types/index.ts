@@ -1,4 +1,4 @@
-export type UserRole = 'Employee' | 'Reporting Manager' | 'HR' | 'Admin';
+export type UserRole = 'Employee' | 'Field Employee' | 'Reporting Manager' | 'HR' | 'Admin';
 
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -96,30 +96,22 @@ export interface AnnouncementDTO extends Announcement {
   isRead: boolean;
 }
 
-export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+// ─── Field Tracker ───────────────────────────────────────────────────────────
 
-export interface ChatChannel {
-  id: ChannelId;
-  name: string;
-  memberCount: number;
-  pinned?: string;
-}
-
-export interface ChatAttachment {
-  name: string;
-  size: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  channelId: ChannelId;
-  authorName: string;
-  authorRole: string;
-  authorAvatar: string;
-  isSelf: boolean;
-  text?: string;
-  attachment?: ChatAttachment;
-  timestamp: string;
+export interface FieldEmployeeLocation {
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  lat: number;
+  lng: number;
+  accuracy: number;           // metres
+  batteryLevel: number;       // 0–100
+  status: 'Active' | 'Idle' | 'Offline';
+  lastUpdated: string;        // ISO timestamp
+  todayCheckIn?: string;      // ISO timestamp or undefined
+  todayCheckOut?: string;
+  distanceTravelledKm: number;
+  routeHistory: [number, number][]; // historical [lat, lng] points for today's route
 }
 
 // ─── Training (Task B) ──────────────────────────────────────────────────────
