@@ -48,6 +48,7 @@ const EMPTY_FORM: CreateEmployeeInput = {
   department: '' as Department,
   reportingManager: '',
   role: 'Employee',
+  is_field_employee: false,
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -298,12 +299,30 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 onChange={set('role')}
               >
                 <option value="Employee">Employee</option>
-                <option value="Field Employee">Field Employee</option>
                 <option value="Reporting Manager">Reporting Manager</option>
                 <option value="HR">HR</option>
                 <option value="Admin">Admin</option>
               </select>
             </Field>
+
+            {/* Field Employee Toggle */}
+            <div className="flex flex-col gap-1.5 md:col-span-2 mt-2">
+              <label className="flex items-center gap-3 cursor-pointer p-3 border border-varistor-border rounded-varistor hover:border-varistor-lime transition-colors bg-white">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={form.is_field_employee}
+                    onChange={(e) => setForm(prev => ({ ...prev, is_field_employee: e.target.checked }))}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-varistor-lime"></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-varistor-dark">Field Employee</span>
+                  <span className="text-[10px] text-varistor-muted font-medium">Enable location tracking and field modules for this employee.</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Actions */}

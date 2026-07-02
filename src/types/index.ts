@@ -98,6 +98,20 @@ export interface AnnouncementDTO extends Announcement {
 
 // ─── Field Tracker ───────────────────────────────────────────────────────────
 
+export interface LocationEntry {
+  id: string;
+  employeeId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp: string; // ISO
+}
+
+export interface LatestLocation extends LocationEntry {
+  employeeName: string;
+  department: string;
+}
+
 export interface FieldEmployeeLocation {
   employeeId: string;
   employeeName: string;
