@@ -65,7 +65,7 @@ export const EmployeeDashboardView: React.FC = () => {
 
           {/* Announcements Card */}
           <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md">
-            <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec]">
+            <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark flex items-center gap-1.5">
                 <Megaphone size={16} className="text-varistor-lime" />
                 Announcements
@@ -87,8 +87,8 @@ export const EmployeeDashboardView: React.FC = () => {
                         onClick={() => readAnnouncement(ann.id)}
                         className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${
                           ann.isRead 
-                            ? 'border-[#edf0ec] bg-[#fafbfa] hover:bg-white' 
-                            : 'border-varistor-lime bg-varistor-limeLight hover:bg-white'
+                            ? 'border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface'
+                            : 'border-varistor-lime bg-varistor-limeLight hover:bg-varistor-surface'
                         }`}
                       >
                         {!ann.isRead && (
@@ -97,7 +97,7 @@ export const EmployeeDashboardView: React.FC = () => {
                         <div>
                           <p className="text-xs font-bold text-varistor-dark">{ann.title}</p>
                           <p className="text-[10px] text-varistor-muted mt-0.5 leading-relaxed truncate">{ann.content}</p>
-                          <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-[#f1f3f0] border-dashed">
+                          <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-varistor-border border-dashed">
                             <span className="text-[9px] text-varistor-muted font-semibold uppercase">{ann.author_role} · {formatRelativeTime(ann.created_at)}</span>
                             <button 
                               onClick={(e) => {
@@ -121,8 +121,8 @@ export const EmployeeDashboardView: React.FC = () => {
                       onClick={() => readAnnouncement(ann.id)}
                       className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${
                         ann.isRead 
-                          ? 'border-[#edf0ec] bg-[#fafbfa] hover:bg-white' 
-                          : 'border-[#d2d8ce] bg-white hover:bg-[#fafbfa]'
+                          ? 'border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface'
+                          : 'border-varistor-border bg-varistor-surface hover:bg-varistor-surfaceMuted'
                       }`}
                     >
                       {!ann.isRead && (
@@ -150,7 +150,7 @@ export const EmployeeDashboardView: React.FC = () => {
                               className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border transition-all cursor-pointer ${
                                 r.reactedByUser 
                                   ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText font-bold' 
-                                  : 'bg-[#f8faf7] border-[#eef1ed] text-[#555a52] hover:bg-white hover:border-gray-300'
+                                  : 'bg-varistor-surfaceMuted border-varistor-border text-varistor-muted hover:bg-varistor-surface hover:border-varistor-muted'
                               }`}
                             >
                               <span>{r.emoji}</span>
@@ -171,7 +171,7 @@ export const EmployeeDashboardView: React.FC = () => {
         <div className="space-y-6">
           {/* Leaves Tracker */}
           <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[210px] justify-between transition-varistor hover:shadow-md">
-            <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec]">
+            <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark">Casual leaves</h3>
               <span className="text-xs font-extrabold text-varistor-dark">7 / 12</span>
             </div>
@@ -180,9 +180,9 @@ export const EmployeeDashboardView: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Casual Leaves taken</span>
-                  <span className="font-semibold text-[#111]">5 left</span>
+                  <span className="font-semibold text-varistor-dark">5 left</span>
                 </div>
-                <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
                   <div className="bg-varistor-lime h-full w-[58%]" /> {/* 7 / 12 = 58% */}
                 </div>
               </div>
@@ -190,22 +190,22 @@ export const EmployeeDashboardView: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Sick Leaves taken</span>
-                  <span className="font-semibold text-[#111]">2 left (4/6 taken)</span>
+                  <span className="font-semibold text-varistor-dark">2 left (4/6 taken)</span>
                 </div>
-                <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
                   <div className="bg-amber-400 h-full w-[66%]" />
                 </div>
               </div>
             </div>
 
-            <div className="text-[10px] text-varistor-muted mt-2 pt-2 border-t border-[#edf0ec] flex justify-between">
+            <div className="text-[10px] text-varistor-muted mt-2 pt-2 border-t border-varistor-border flex justify-between">
               <span>Next company holiday:</span>
               <span className="font-semibold text-varistor-dark">26 Jan (Republic Day)</span>
             </div>
           </div>
 
           {/* HR Document Vault Info Box */}
-          <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md bg-gradient-to-tr from-white to-[#fafbfa]">
+          <div className="bg-gradient-to-tr from-varistor-surface to-varistor-surfaceMuted rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md">
             <div>
               <span className="text-[10px] text-varistor-muted font-bold uppercase tracking-wider block">Security Center</span>
               <h3 className="text-sm font-bold text-varistor-dark mt-2">Document Vault Verified</h3>
@@ -213,7 +213,7 @@ export const EmployeeDashboardView: React.FC = () => {
                 All employee compliance records (PAN, Aadhar card, and graduation certificates) are encrypted at rest. Document download URLs expire automatically within 5 minutes.
               </p>
             </div>
-            <div className="bg-[#f1f3f0] border border-[#e1e4e0] rounded-lg p-3 flex items-center justify-between">
+            <div className="bg-varistor-surfaceMuted border border-varistor-border rounded-lg p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-varistor-lime" />
                 <span className="text-xs font-bold text-varistor-dark">All Files Secure</span>
