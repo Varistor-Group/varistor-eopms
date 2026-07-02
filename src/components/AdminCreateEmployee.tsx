@@ -159,7 +159,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
         </div>
 
         {/* Admin-only badge */}
-        <span className="flex-shrink-0 px-3 py-1 bg-[#1a1a1a] text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
+        <span className="flex-shrink-0 px-3 py-1 bg-[#1a1a1a] text-[#ffffff] text-[10px] font-bold uppercase tracking-wider rounded-full">
           Admin / HR only
         </span>
       </div>
