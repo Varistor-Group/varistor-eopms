@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { Leaderboard } from './Leaderboard';
 
 export const PointsLedger: React.FC = () => {
   const { 
@@ -37,6 +38,9 @@ export const PointsLedger: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Leaderboard Section */}
+      <Leaderboard />
 
       {/* Ledger Table Container */}
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
