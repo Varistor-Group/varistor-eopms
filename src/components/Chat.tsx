@@ -100,9 +100,9 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
+    <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
       {/* Channel List */}
-      <aside className="w-56 flex-shrink-0 border-r border-varistor-border flex flex-col bg-[#fafbfa]">
+      <aside className="w-56 flex-shrink-0 border-r border-varistor-border flex flex-col bg-varistor-surfaceMuted">
         <div className="px-4 py-3 border-b border-varistor-border">
           <span className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider">Channels</span>
         </div>
@@ -117,7 +117,7 @@ export const Chat: React.FC = () => {
                 className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-varistor cursor-pointer border-l-[3px] ${
                   isActive
                     ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
-                    : 'text-[#555a52] border-transparent hover:bg-[#eef1ed] hover:text-black'
+                    : 'text-varistor-muted border-transparent hover:bg-black/5 dark:hover:bg-white/5 hover:text-varistor-dark'
                 }`}
               >
                 <span className="flex items-center gap-1.5 truncate">
@@ -160,7 +160,7 @@ export const Chat: React.FC = () => {
           {isLoading ? (
             <div className="space-y-4 animate-pulse">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-12 bg-gray-100 rounded-lg w-2/3" />
+                <div key={i} className="h-12 bg-varistor-surfaceMuted rounded-lg w-2/3" />
               ))}
             </div>
           ) : (
@@ -183,7 +183,7 @@ export const Chat: React.FC = () => {
                   </div>
 
                   {message.attachment ? (
-                    <div className="flex items-center gap-2 bg-[#f1f3f0] border border-varistor-border rounded-lg px-3 py-2 text-xs">
+                    <div className="flex items-center gap-2 bg-varistor-surfaceMuted border border-varistor-border rounded-lg px-3 py-2 text-xs">
                       <FileSpreadsheet size={16} className="text-varistor-lime flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="font-semibold text-varistor-dark truncate">{message.attachment.name}</p>
@@ -195,7 +195,7 @@ export const Chat: React.FC = () => {
                       className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
                         message.isSelf
                           ? 'bg-varistor-lime text-black font-medium'
-                          : 'bg-[#f1f3f0] text-varistor-dark'
+                          : 'bg-varistor-surfaceMuted text-varistor-dark'
                       }`}
                     >
                       {renderMessageText(message.text || '')}
@@ -215,7 +215,7 @@ export const Chat: React.FC = () => {
           <button
             type="button"
             onClick={handleAttachClick}
-            className="p-2 rounded-full hover:bg-[#f1f3f0] text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer flex-shrink-0"
+            className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer flex-shrink-0"
             title="Attach a file"
           >
             <Paperclip size={16} />
@@ -226,26 +226,26 @@ export const Chat: React.FC = () => {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={`Message #${activeChannel.name}...`}
-            className="flex-1 bg-[#f1f3f0] border border-transparent rounded-full px-4 py-2 text-xs focus:outline-none focus:bg-white focus:border-varistor-lime transition-all text-varistor-dark"
+            className="flex-1 bg-varistor-surfaceMuted border border-transparent rounded-full px-4 py-2 text-xs focus:outline-none focus:bg-varistor-surface focus:border-varistor-lime transition-all text-varistor-dark"
           />
 
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowEmojiPicker(prev => !prev)}
-              className="p-2 rounded-full hover:bg-[#f1f3f0] text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
+              className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
               title="Add emoji"
             >
               <Smile size={16} />
             </button>
             {showEmojiPicker && (
-              <div className="absolute bottom-11 right-0 bg-white border border-varistor-border rounded-lg shadow-varistor p-2 flex gap-1 z-10">
+              <div className="absolute bottom-11 right-0 bg-varistor-surface border border-varistor-border rounded-lg shadow-varistor p-2 flex gap-1 z-10">
                 {QUICK_EMOJIS.map(emoji => (
                   <button
                     key={emoji}
                     type="button"
                     onClick={() => insertEmoji(emoji)}
-                    className="text-base p-1 hover:bg-[#f1f3f0] rounded cursor-pointer"
+                    className="text-base p-1 hover:bg-varistor-surfaceMuted rounded cursor-pointer"
                   >
                     {emoji}
                   </button>

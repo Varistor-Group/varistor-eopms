@@ -27,6 +27,15 @@
 }
 
 .dark {
+  /*
+   * Overrides Tailwind's own `white` token, not just our custom varistor-*
+   * tokens. Most cards across the app (including pages this branch doesn't
+   * own) pair literal `bg-white` with `text-varistor-dark` - since that text
+   * token already flips to a light color in dark mode, leaving bg-white
+   * unflipped would make that text unreadable (light-on-white -> near
+   * invisible). This keeps those cards legible without editing every file.
+   */
+  --color-white: #1b1f18;
   --varistor-pageBg: #12140f;
   --varistor-dark: #f2f4ee;
   --varistor-border: #2e332a;
