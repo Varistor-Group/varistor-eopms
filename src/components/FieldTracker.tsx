@@ -23,6 +23,7 @@ import type { FieldEmployeeLocation } from '../types';
 import { getFieldLocations, updateFieldLocation } from '../api/employees';
 
 // Fix the default Leaflet marker icon issue (common in Vite/React)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,

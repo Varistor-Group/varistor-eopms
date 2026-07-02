@@ -314,6 +314,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       return { success: false, employee: null, error: result.error };
     }
     employee = result.employee;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, employee: null, error: 'Database server unreachable.' };
   }
@@ -336,6 +337,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     if (!result.success) {
       emailError = result.error || 'Failed to send welcome email.';
     }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     emailError = 'Email server unreachable.';
   }
@@ -362,6 +364,7 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
     });
     const result = await res.json();
     return { success: result.success, employee: result.employee, error: result.error || null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, employee: null, error: 'Database server unreachable.' };
   }

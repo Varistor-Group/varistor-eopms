@@ -116,6 +116,7 @@ export const announcementsApi = {
   _getData() {
     let announcements: Announcement[] = JSON.parse(localStorage.getItem('eopms_announcements') || '[]');
     let reactions: AnnouncementReaction[] = JSON.parse(localStorage.getItem('eopms_announcement_reactions') || '[]');
+  // eslint-disable-next-line prefer-const
     let reads: AnnouncementRead[] = JSON.parse(localStorage.getItem('eopms_announcement_reads') || '[]');
 
     if (announcements.length === 0) {

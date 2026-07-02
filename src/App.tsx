@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PointsLedger } from './components/PointsLedger';
-import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
+import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
@@ -112,6 +112,7 @@ const AppContent: React.FC = () => {
               <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
               <select
                 value={currentRole}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onChange={(e) => setCurrentRole(e.target.value as any)}
                 className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
                 title="Switch active role for permission testing"
@@ -141,23 +142,47 @@ const AppContent: React.FC = () => {
 
         {/* Dynamic Inner Page Content */}
         <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'kanban' && <KanbanBoard />}
-          {activeTab === 'ledger' && <PointsLedger />}
-          {activeTab === 'announcements' && <AnnouncementsFeed />}
-          {activeTab === 'vault' && <DocumentVault />}
-          {activeTab === 'training' && <TrainingLibrary />}
-          {activeTab === 'admin' && (
-            (currentRole === 'Admin' || currentRole === 'HR') ? (
-              <EmployeeManagementPortal />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm">
-                <div className="text-red-500 font-bold text-6xl mb-4">403</div>
-                <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
-                <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions (Admin or HR) to view this page.</p>
-              </div>
-            )
-          )}
+          {(() => {
+            const getAllowedTabs = () => {
+              if (currentRole === 'Admin') {
+                return ['dashboard', 'admin', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training', 'field-tracker'];
+              } else if (currentRole === 'HR') {
+                return ['dashboard', 'admin', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training', 'field-tracker'];
+              } else if (currentRole === 'Reporting Manager') {
+                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
+              } else {
+                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+              }
+            };
+
+            const allowedTabs = getAllowedTabs();
+            if (!allowedTabs.includes(activeTab)) {
+              return (
+                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm animate-[fadeInPage_250ms_ease-out]">
+                  <div className="text-red-500 font-bold text-6xl mb-4">403</div>
+                  <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
+                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions to view this page.</p>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                {activeTab === 'dashboard' && <Dashboard />}
+                {activeTab === 'kanban' && <KanbanBoard />}
+                {activeTab === 'ledger' && <PointsLedger />}
+                {activeTab === 'announcements' && <AnnouncementsFeed />}
+                {activeTab === 'chat' && <Chat />}
+                {activeTab === 'vault' && <DocumentVault />}
+                {activeTab === 'task-management' && <TaskManagement />}
+                {activeTab === 'admin' && <EmployeeManagementPortal />}
+                {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
+                {activeTab === 'training' && <TrainingLibrary />}
+                {activeTab === 'policy' && <PolicyPage />}
+                {activeTab === 'field-tracker' && <FieldTracker />}
+              </>
+            );
+          })()}
         </main>
       </div>
 

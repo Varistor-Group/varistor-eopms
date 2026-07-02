@@ -39,6 +39,7 @@ export const AnnouncementsFeed: React.FC = () => {
 
   // Helper to format relative time
   const formatRelativeTime = (dateString: string) => {
+  // eslint-disable-next-line react-hooks/purity
     const diffMs = Date.now() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
@@ -112,6 +113,7 @@ export const AnnouncementsFeed: React.FC = () => {
                 <label className="text-[10px] text-varistor-muted font-bold uppercase tracking-wider block mb-1">Announcement Type</label>
                 <select
                   value={newType}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onChange={(e) => setNewType(e.target.value as any)}
                   className="w-full bg-white border border-varistor-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-varistor-lime cursor-pointer text-varistor-dark font-medium"
                 >

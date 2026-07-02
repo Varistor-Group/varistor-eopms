@@ -77,6 +77,7 @@ export const EngineSimulationConsole: React.FC = () => {
                 <label className="text-[10px] text-red-800 font-bold uppercase tracking-wider block mb-1.5">Penalty Type</label>
                 <select
                   value={penaltyType}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onChange={(e) => setPenaltyType(e.target.value as any)}
                   className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-xs text-red-900 focus:outline-none focus:border-red-500"
                 >

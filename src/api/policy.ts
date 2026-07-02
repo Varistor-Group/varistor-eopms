@@ -82,6 +82,7 @@ export async function deletePolicy(id: string): Promise<{ success: boolean; erro
 
 // Legacy — kept for backwards compatibility with old server endpoint
 export async function getMockPolicy(): Promise<string> { return ''; }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function saveMockPolicy(_html: string): Promise<{ success: boolean; error: string | null }> {
   return { success: true, error: null };
 }

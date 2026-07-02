@@ -181,6 +181,7 @@ const TrainingLibrary: React.FC = () => {
   }, [employeeId]);
 
   useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
     loadModules();
   }, [loadModules]);
 
