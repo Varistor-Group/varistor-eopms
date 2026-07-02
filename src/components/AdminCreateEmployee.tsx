@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, ShieldAlert, UserPlus } from 'lucide-react';
-import { createEmployee } from '../api/employees';
-import type { CreateEmployeeInput, Department } from '../api/employees';
+import { createEmployee, getEmployees } from '../api/employees';
+import type { CreateEmployeeInput, Department, Employee } from '../api/employees';
 import { useVariPoints } from '../hooks/useVariPoints';
 
 // ─── Inline shared field components ──────────────────────────────────────────
@@ -57,6 +57,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
 
   const [form, setForm] = useState<CreateEmployeeInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
@@ -68,13 +69,28 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   // Role gate — only Admin / HR can access
   const canAccess = currentRole === 'Admin' || currentRole === 'HR';
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // Fetch employees on mount to lookup department heads
+  useEffect(() => {
+    getEmployees().then(setEmployees);
+  }, []);
 
   const set = (field: keyof CreateEmployeeInput) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setForm(prev => ({ ...prev, [field]: e.target.value }));
       setErrors(prev => ({ ...prev, [field]: undefined }));
     };
+
+  const handleDepartmentChange = (d: Department) => {
+    // A department head is defined as an employee with the 'Reporting Manager' role in that department.
+    const head = employees.find(e => e.department === d && e.role === 'Reporting Manager');
+    
+    setForm(prev => ({
+      ...prev,
+      department: d,
+      reportingManager: head ? head.fullName : ''
+    }));
+    setErrors(prev => ({ ...prev, department: undefined, reportingManager: undefined }));
+  };
 
   const validate = (): boolean => {
     const errs: FormErrors = {};
@@ -237,7 +253,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               <select
                 className={inputCls(!!errors.department)}
                 value={form.department}
-                onChange={set('department')}
+                onChange={e => handleDepartmentChange(e.target.value as Department)}
               >
                 <option value="">Select department…</option>
                 {DEPARTMENTS.map(d => (
@@ -250,7 +266,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                   <button
                     key={d}
                     type="button"
-                    onClick={() => { setForm(p => ({ ...p, department: d })); setErrors(p => ({ ...p, department: undefined })); }}
+                    onClick={() => handleDepartmentChange(d)}
                     className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${
                       form.department === d
                         ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'

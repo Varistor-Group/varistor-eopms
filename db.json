@@ -9,7 +9,7 @@
       "phone": "+91 98765 43210",
       "department": "Operations",
       "reportingManager": "Admin User",
-      "role": "Employee",
+      "role": "Reporting Manager",
       "tempPassword": "Employee@2026!",
       "createdAt": "2026-01-15T09:00:00Z",
       "status": "Active",
@@ -152,6 +152,13 @@
       "by": "admin@varistor.in",
       "details": "Created employee akash kumar (2131)",
       "timestamp": "2026-07-01T07:27:17.048Z"
+    },
+    {
+      "id": "1782975238898",
+      "action": "UPDATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Updated employee Aarav Patel (VAR-024)",
+      "timestamp": "2026-07-02T06:53:58.898Z"
     }
   ],
   "policies": [
@@ -178,22 +185,6 @@
       "severity": "mandatory",
       "content": "All employees must adhere to the non-disclosure agreement signed at the time of joining. Sharing proprietary company data, client information, or internal communications with external parties is strictly prohibited and subject to legal action.",
       "effectiveDate": "2026-01-01"
-    },
-    {
-      "id": "pol-004",
-      "title": "Leave & Attendance",
-      "category": "HR",
-      "severity": "standard",
-      "content": "Employees are entitled to 12 days of paid annual leave, 6 days of sick leave, and applicable public holidays. Leave requests must be submitted at least 3 working days in advance via the system. Unapproved absences will be marked as LOP (Loss of Pay).",
-      "effectiveDate": "2026-01-01"
-    },
-    {
-      "id": "pol-005",
-      "title": "Device & IT Usage Policy",
-      "category": "IT",
-      "severity": "advisory",
-      "content": "Company-issued devices are to be used strictly for work purposes. Installation of unauthorised software is prohibited. Employees must lock their screens when away from their desks. Any security incidents must be reported to IT within 24 hours.",
-      "effectiveDate": "2026-03-01"
     }
   ],
   "policy": {
