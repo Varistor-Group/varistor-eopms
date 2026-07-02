@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { getEmployees } from '../api/employees';
+import { getEmployees, deleteEmployee } from '../api/employees';
 import { mockEmployeeStore } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
-import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Award, ChevronDown } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown } from 'lucide-react';
 import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
@@ -148,7 +148,14 @@ export const EmployeeManagementPortal: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="font-semibold text-varistor-dark text-xs">{emp.employeeId}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-varistor-dark text-xs">{emp.employeeId}</p>
+                      {emp.is_field_employee && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-varistor-lime/20 bg-varistor-limeTint text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
+                          Field
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-varistor-muted mt-0.5">{emp.role}</p>
                   </td>
                   <td className="px-6 py-4">
@@ -175,13 +182,32 @@ export const EmployeeManagementPortal: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => { setSelectedEmployee(emp); setView('edit'); }}
-                      className="p-1.5 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-pageBg rounded-md transition-colors"
-                      title="Edit Employee"
-                    >
-                      <Pencil size={16} />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => { setSelectedEmployee(emp); setView('edit'); }}
+                        className="p-1.5 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-pageBg rounded-md transition-colors"
+                        title="Edit Employee"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to delete ${emp.fullName}? This cannot be undone.`)) {
+                            const { success, error } = await deleteEmployee(emp.id);
+                            if (success) {
+                              addToast(`Successfully deleted ${emp.fullName}`, 0, 'credit');
+                              setEmployees(employees.filter(e => e.id !== emp.id));
+                            } else {
+                              addToast(error || 'Failed to delete employee', 0, 'debit');
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-varistor-muted hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete Employee"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,51 +1,6 @@
 {
   "employees": [
     {
-      "id": "VAR-024",
-      "fullName": "Aarav Patel",
-      "employeeId": "VAR-024",
-      "username": "aarav.patel",
-      "personalEmail": "aarav.patel@gmail.com",
-      "phone": "+91 98765 43210",
-      "department": "Operations",
-      "reportingManager": "Admin User",
-      "role": "Reporting Manager",
-      "tempPassword": "Employee@2026!",
-      "createdAt": "2026-01-15T09:00:00Z",
-      "status": "Active",
-      "variPoints": 1800
-    },
-    {
-      "id": "VAR-001",
-      "fullName": "Admin User",
-      "employeeId": "VAR-001",
-      "username": "admin",
-      "personalEmail": "admin@varistor.in",
-      "phone": "+91 99999 99999",
-      "department": "Ops Heads",
-      "reportingManager": "None",
-      "role": "Admin",
-      "tempPassword": "Admin@2026!",
-      "createdAt": "2025-01-01T09:00:00Z",
-      "status": "Active",
-      "variPoints": 5000
-    },
-    {
-      "id": "VAR-002",
-      "fullName": "HR User",
-      "employeeId": "VAR-002",
-      "username": "hr",
-      "personalEmail": "hr@varistor.in",
-      "phone": "+91 88888 88888",
-      "department": "Operations",
-      "reportingManager": "Admin User",
-      "role": "HR",
-      "tempPassword": "HR@2026!",
-      "createdAt": "2025-01-01T09:00:00Z",
-      "status": "Active",
-      "variPoints": 2000
-    },
-    {
       "fullName": "akash kumar",
       "employeeId": "213",
       "username": "adasd",
@@ -58,7 +13,8 @@
       "tempPassword": "AK@2026!123",
       "createdAt": "2026-07-01T07:19:29.904Z",
       "status": "Active",
-      "variPoints": 0
+      "variPoints": 0,
+      "is_field_employee": false
     },
     {
       "fullName": "akash kumar",
@@ -72,6 +28,39 @@
       "id": "2131",
       "tempPassword": "AK@2026!896",
       "createdAt": "2026-07-01T07:27:17.041Z",
+      "status": "Active",
+      "variPoints": 0,
+      "is_field_employee": false
+    },
+    {
+      "fullName": "sathvik",
+      "employeeId": "2",
+      "username": "sathvikkillspeople",
+      "personalEmail": "sathvik@varistor.in",
+      "phone": "120393132241",
+      "department": "Operations",
+      "reportingManager": "Aarav Patel",
+      "role": "Employee",
+      "is_field_employee": true,
+      "id": "2",
+      "tempPassword": "S@2026!441",
+      "createdAt": "2026-07-02T07:43:56.955Z",
+      "status": "Active",
+      "variPoints": 0
+    },
+    {
+      "fullName": "dia",
+      "employeeId": "2913AS",
+      "username": "IASJSDA",
+      "personalEmail": "dia@varistor.in",
+      "phone": "i2jji123eads",
+      "department": "Sales",
+      "reportingManager": "na",
+      "role": "Reporting Manager",
+      "is_field_employee": true,
+      "id": "2913AS",
+      "tempPassword": "D@2026!870",
+      "createdAt": "2026-07-02T08:06:10.652Z",
       "status": "Active",
       "variPoints": 0
     }
@@ -159,6 +148,34 @@
       "by": "admin@varistor.in",
       "details": "Updated employee Aarav Patel (VAR-024)",
       "timestamp": "2026-07-02T06:53:58.898Z"
+    },
+    {
+      "id": "1782978236957",
+      "action": "CREATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Created employee sathvik (2)",
+      "timestamp": "2026-07-02T07:43:56.957Z"
+    },
+    {
+      "id": "1782979187475",
+      "action": "CREATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Created employee dia (123)",
+      "timestamp": "2026-07-02T07:59:47.475Z"
+    },
+    {
+      "id": "1782979525853",
+      "action": "DELETE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Deleted employee dia (123)",
+      "timestamp": "2026-07-02T08:05:25.853Z"
+    },
+    {
+      "id": "1782979570668",
+      "action": "CREATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Created employee dia (2913AS)",
+      "timestamp": "2026-07-02T08:06:10.668Z"
     }
   ],
   "policies": [

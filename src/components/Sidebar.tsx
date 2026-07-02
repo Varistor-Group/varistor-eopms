@@ -38,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
-      { id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
-      { id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },

@@ -36,8 +36,8 @@ app.post('/api/send-credentials', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: email,
-      subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
+      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
+      subject: `Welcome to Varistor EOPMS - Your Login Credentials (To: ${email})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
           <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -84,8 +84,8 @@ app.post('/api/send-password-reset', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: email,
-      subject: 'Password Reset Request',
+      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
+      subject: `Password Reset Request (To: ${email})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
           <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -163,8 +163,8 @@ app.post('/api/quiz/submit', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: recipients,
-      subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%)`,
+      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
+      subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%) (To: ${recipients.join(', ')})`,
       html,
     });
 
@@ -262,6 +262,31 @@ app.put('/api/employees/:id', async (req, res) => {
 
   await writeDB(db);
   res.json({ success: true, employee: db.employees[index] });
+});
+
+app.delete('/api/employees/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  if (!db.employees) db.employees = [];
+
+  const index = db.employees.findIndex(e => e.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Employee not found.' });
+  }
+
+  const deletedEmployee = db.employees.splice(index, 1)[0];
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'DELETE_EMPLOYEE',
+    by: 'admin@varistor.in',
+    details: `Deleted employee ${deletedEmployee.fullName} (${id})`,
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true });
 });
 
 // Documents

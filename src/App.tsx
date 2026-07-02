@@ -43,7 +43,7 @@ const AppContent: React.FC = () => {
     const channel = new BroadcastChannel('eopms_notifications');
     channel.onmessage = (event) => {
       if (event.data.type === 'TASK_ASSIGNED') {
-        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
+        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
         // Simulating matching assignee to currently logged in user context
         if (event.data.assigneeId === MOCK_CURRENT_USER_ID) {
           setTaskNotification({ title: event.data.title, show: true });
