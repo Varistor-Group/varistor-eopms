@@ -19,6 +19,7 @@ import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
 import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
+import { LeaveManagement } from './components/LeaveManagement';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -69,6 +70,7 @@ const AppContent: React.FC = () => {
       case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
+      case 'leaves': return 'Leave Management';
       default: return 'EOPMS';
     }
   };
@@ -152,7 +154,7 @@ const AppContent: React.FC = () => {
                 // HR participates in Vari Points — ledger is included
                 return ['dashboard', 'admin', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
+                return ['dashboard', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
                 return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
@@ -183,6 +185,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
+                {activeTab === 'leaves' && <LeaveManagement />}
               </>
             );
           })()}

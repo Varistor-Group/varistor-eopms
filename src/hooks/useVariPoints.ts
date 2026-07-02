@@ -20,5 +20,10 @@ export const useVariPoints = () => {
     reactToAnnouncement: context.reactToAnnouncement,
     readAnnouncement: context.readAnnouncement,
     addAnnouncement: context.addAnnouncement,
+    leaveRequests: context.leaveRequests,
+    leaveBalance: context.leaveBalance,
+    submitLeave: context.submitLeave,
+    approveLeave: context.approveLeave,
+    rejectLeave: context.rejectLeave,
   };
 };

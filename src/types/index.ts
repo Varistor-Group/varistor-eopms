@@ -193,3 +193,33 @@ export interface TrainingModuleWithStatus extends TrainingModule {
   latestAttempt: QuizAttempt | null;
 }
 
+// ─── Leave Management ────────────────────────────────────────────────────────
+
+export type LeaveType = 'Casual' | 'Sick' | 'Earned' | 'Unpaid';
+export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface LeaveRequest {
+  id: string;                    // e.g. "LV-0044"
+  employeeId: string;
+  employeeName: string;
+  type: LeaveType;
+  from: string;                  // ISO date "2026-07-03"
+  to: string;                    // ISO date "2026-07-03"
+  days: number;                  // calculated working days
+  reason: string;
+  status: LeaveStatus;
+  reviewerId?: string;           // employee ID of approver
+  reviewerName?: string;         // display name
+  rejectionComment?: string;
+  submittedAt: string;           // ISO timestamp
+  reviewedAt?: string;
+}
+
+export interface LeaveBalance {
+  employeeId: string;
+  casual: { total: number; used: number };
+  sick: { total: number; used: number };
+  earned: { total: number; used: number };
+  unpaidTaken: number;           // days of unpaid leave taken this year
+}
+

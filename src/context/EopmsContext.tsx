@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO } from '../types';
+import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
+import { getLeaveRequests, getLeaveBalance, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -34,6 +35,13 @@ interface EopmsContextType {
   reactToAnnouncement: (announcementId: string, emojiType: string) => void;
   readAnnouncement: (announcementId: string) => void;
   addAnnouncement: (title: string, content: string, type: 'Standard' | 'Birthday' | 'Policy', authorRole?: 'HR' | 'Admin') => void;
+
+  // Leave Management
+  leaveRequests: LeaveRequest[];
+  leaveBalance: LeaveBalance | null;
+  submitLeave: (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => void;
+  approveLeave: (leaveId: string) => void;
+  rejectLeave: (leaveId: string, comment: string) => void;
 }
 
 export const EopmsContext = createContext<EopmsContextType | undefined>(undefined);
@@ -225,6 +233,45 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const MOCK_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
   const [announcements, setAnnouncements] = useState<AnnouncementDTO[]>([]);
+
+  // ── Leave Management state ────────────────────────────────────────────────
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getLeaveRequests());
+  const leaveBalance = getLeaveBalance('VAR-024') ?? null; // hardcoded for now (mock logged-in user)
+
+  const submitLeave = (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => {
+    submitLeaveRequest(input);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request submitted successfully', 0, 'credit');
+
+    // Fire-and-forget manager notification email (same pattern as createEmployee)
+    fetch('http://localhost:3001/api/leave/notify-manager', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeName: input.employeeName,
+        leaveType: input.type,
+        from: input.from,
+        to: input.to,
+        days: input.days,
+        reason: input.reason,
+        managerEmail: 'manager@varistor.in',
+      }),
+    }).catch(() => { /* email server unreachable — ignore in mock mode */ });
+  };
+
+  const approveLeave = (leaveId: string) => {
+    const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
+    approveLeaveRequest(leaveId, reviewerName);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request approved', 0, 'credit');
+  };
+
+  const rejectLeave = (leaveId: string, comment: string) => {
+    const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
+    rejectLeaveRequest(leaveId, reviewerName, comment);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request rejected', 0, 'debit');
+  };
 
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -659,7 +706,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         announcements,
         reactToAnnouncement,
         readAnnouncement,
-        addAnnouncement
+        addAnnouncement,
+        leaveRequests,
+        leaveBalance,
+        submitLeave,
+        approveLeave,
+        rejectLeave
       }}
     >
       {children}

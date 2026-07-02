@@ -385,6 +385,111 @@ app.delete('/api/policies/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Leave Management email notifications ─────────────────────────────────────
+
+// POST /api/leave/notify-manager
+// Sends an email to the reporting manager when an employee submits a leave request
+app.post('/api/leave/notify-manager', async (req, res) => {
+  try {
+    const { employeeName, leaveType, from, to, days, reason, managerEmail } = req.body;
+
+    if (!employeeName || !leaveType || !from || !to || !managerEmail) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: managerEmail,
+      subject: `Leave Request: ${employeeName} – ${leaveType} (${days} day/s)`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">New Leave Request</h1>
+          </div>
+          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+            <p>A leave request is awaiting your review on <strong>Varistor EOPMS</strong>.</p>
+            <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
+              <tr style="background:#f9f9f9;">
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Employee</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${employeeName}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Type</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${leaveType}</td>
+              </tr>
+              <tr style="background:#f9f9f9;">
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Dates</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${from} → ${to} (${days} working day/s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Reason</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${reason || '—'}</td>
+              </tr>
+            </table>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="http://localhost:5173" style="background-color: #84CC16; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">Approve / Reject in EOPMS</a>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send leave notification email' });
+  }
+});
+
+// POST /api/leave/notify-employee
+// Sends email to employee when their leave is approved or rejected
+app.post('/api/leave/notify-employee', async (req, res) => {
+  try {
+    const { employeeEmail, employeeName, leaveId, status, comment } = req.body;
+
+    if (!employeeEmail || !leaveId || !status) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const approved = status === 'Approved';
+    const statusColor = approved ? '#84CC16' : '#ef4444';
+
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: employeeEmail,
+      subject: `Your Leave Request ${leaveId} has been ${status}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <div style="background-color: ${statusColor}; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">Leave ${status}</h1>
+          </div>
+          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+            <p>Hi ${employeeName || ''},</p>
+            <p>Your leave request <strong>${leaveId}</strong> has been <strong style="color:${statusColor};">${status.toLowerCase()}</strong>.</p>
+            ${!approved && comment ? `<p style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:4px; font-size:13px;"><strong>Reviewer comment:</strong> ${comment}</p>` : ''}
+            <p style="font-size:12px; color:#888; margin-top:24px;">This is an automated message from Varistor EOPMS Leave Management.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send leave status email' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`[Email Server] running on http://localhost:${port}`);
 });
