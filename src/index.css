@@ -58,6 +58,16 @@
 }
 
 @layer base {
+  /*
+   * Tells the browser to render native form controls (select dropdowns,
+   * checkboxes, scrollbars) in their dark variant. Without this, a <select>
+   * inherits our dark text color but its native popup keeps a white
+   * background, making unselected options unreadable.
+   */
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
     font-size: 14px;
