@@ -6,6 +6,7 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
+import { RoleSwitcher } from './components/RoleSwitcher';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -109,20 +110,7 @@ const AppContent: React.FC = () => {
 
           <div className="flex items-center gap-4">
             {/* Live Role Switcher */}
-            <div className="flex items-center gap-1.5 bg-varistor-surfaceMuted px-2.5 py-1.5 rounded-full border border-varistor-border">
-              <span className="text-[9px] text-varistor-muted font-bold uppercase tracking-wider hidden md:inline">Role:</span>
-              <select
-                value={currentRole}
-                onChange={(e) => setCurrentRole(e.target.value as any)}
-                className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
-                title="Switch active role for permission testing"
-              >
-                <option value="Employee">Employee</option>
-                <option value="Reporting Manager">Reporting Manager</option>
-                <option value="HR">HR</option>
-                <option value="Admin">Admin</option>
-              </select>
-            </div>
+            <RoleSwitcher currentRole={currentRole} setCurrentRole={setCurrentRole} />
 
             {/* Dark Mode Toggle */}
             <button
