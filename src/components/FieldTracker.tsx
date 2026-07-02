@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -10,7 +9,6 @@ import { MapPin, Clock, RefreshCw, Users } from 'lucide-react';
 import type { LatestLocation, LocationEntry } from '../types';
 import type { Employee } from '../api/employees';
 import { getLatestLocations, getLocationHistory, getEmployees } from '../api/employees';
-import type { Employee } from '../api/employees';
 
 // Fix the default Leaflet marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
