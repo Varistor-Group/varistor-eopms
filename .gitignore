@@ -26,3 +26,6 @@ dist-ssr
 
 # Lint results
 lint-results.*
+
+# Documents
+*.pdf
