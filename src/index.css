@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Clean UI components scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D8DED2;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b3baa8;
+}
+
+/* Keyframes for the performance meter arc */
+@keyframes drawArc {
+  from {
+    stroke-dashoffset: 219.9;
+  }
+  to {
+    stroke-dashoffset: var(--dashoffset);
+  }
+}
+
+.animate-gauge {
+  animation: drawArc 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* General transitions */
+.transition-varistor {
+  transition: all 180ms ease-out;
+}
+
+/* Keyframes for sliding toasts in and out */
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.animate-toast-in {
+  animation: slideInRight 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: slideOutRight 300ms ease-in forwards;
+}
+
+/* ─── Print stylesheet for Salary Slip PDF (A4) ─────────────────────────────── */
+@media print {
+  /* Hide everything except the printable slip */
+  body > * {
+    display: none !important;
+  }
+
+  /* Show only the salary slip overlay when printing */
+  #salary-slip-overlay {
+    display: flex !important;
+    position: static !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+
+  #salary-slip-card {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 auto !important;
+  }
+
+  /* Ensure varistor-lime background prints */
+  .bg-varistor-lime {
+    background-color: #84cc16 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bg-\[#f7fee7\] {
+    background-color: #f7fee7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page settings */
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
