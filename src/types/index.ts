@@ -1,4 +1,4 @@
-export type UserRole = 'Employee' | 'Reporting Manager' | 'HR' | 'Admin';
+export type UserRole = 'Employee' | 'Field Employee' | 'Reporting Manager' | 'HR' | 'Admin';
 
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -90,6 +90,24 @@ export interface AnnouncementRead {
 export interface AnnouncementDTO extends Announcement {
   reactions: { emoji: string; count: number; reactedByUser: boolean }[];
   isRead: boolean;
+}
+
+// ─── Field Tracker ───────────────────────────────────────────────────────────
+
+export interface FieldEmployeeLocation {
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  lat: number;
+  lng: number;
+  accuracy: number;           // metres
+  batteryLevel: number;       // 0–100
+  status: 'Active' | 'Idle' | 'Offline';
+  lastUpdated: string;        // ISO timestamp
+  todayCheckIn?: string;      // ISO timestamp or undefined
+  todayCheckOut?: string;
+  distanceTravelledKm: number;
+  routeHistory: [number, number][]; // historical [lat, lng] points for today's route
 }
 
 // ─── Training (Task B) ──────────────────────────────────────────────────────

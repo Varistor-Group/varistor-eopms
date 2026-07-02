@@ -336,7 +336,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const oldStatus = task.status;
 
     // Block employee manually moving tasks from in_progress to awaiting_approval
-    if (currentRole === 'Employee' && oldStatus === 'in_progress' && newStatus === 'awaiting_approval') {
+    if ((currentRole === 'Employee' || currentRole === 'Field Employee') && oldStatus === 'in_progress' && newStatus === 'awaiting_approval') {
       addToast('Error: Employees cannot manually submit tasks for approval. Complete all checklist items to auto-submit.', 0, 'debit');
       return;
     }
@@ -385,7 +385,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Manager Approval (Restricted to Admin, HR, Reporting Manager)
   const approveTask = (taskId: string) => {
-    if (currentRole === 'Employee') {
+    if (currentRole === 'Employee' || currentRole === 'Field Employee') {
       addToast('Error: Employees do not have permission to approve tasks.', 0, 'debit');
       return;
     }
@@ -417,7 +417,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Manager Rejection (Restricted to Admin, HR, Reporting Manager)
   const rejectTask = (taskId: string) => {
-    if (currentRole === 'Employee') {
+    if (currentRole === 'Employee' || currentRole === 'Field Employee') {
       addToast('Error: Employees do not have permission to reject tasks.', 0, 'debit');
       return;
     }

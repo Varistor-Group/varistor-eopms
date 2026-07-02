@@ -13,6 +13,7 @@ import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
+import { FieldTracker } from './components/FieldTracker';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -28,6 +29,7 @@ const AppContent: React.FC = () => {
       case 'announcements': return 'Announcements Feed';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
+      case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
       default: return 'EOPMS';
     }
@@ -80,6 +82,7 @@ const AppContent: React.FC = () => {
                 title="Switch active role for permission testing"
               >
                 <option value="Employee">Employee</option>
+                <option value="Field Employee">Field Employee</option>
                 <option value="Reporting Manager">Reporting Manager</option>
                 <option value="HR">HR</option>
                 <option value="Admin">Admin</option>
@@ -115,6 +118,17 @@ const AppContent: React.FC = () => {
           {activeTab === 'announcements' && <AnnouncementsFeed />}
           {activeTab === 'vault' && <DocumentVault />}
           {activeTab === 'training' && <TrainingLibrary />}
+          {activeTab === 'field-tracker' && (
+            (currentRole === 'Admin' || currentRole === 'HR') ? (
+              <FieldTracker />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm">
+                <div className="text-red-500 font-bold text-6xl mb-4">403</div>
+                <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
+                <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">Only HR and Admin can access Field Tracker.</p>
+              </div>
+            )
+          )}
           {activeTab === 'admin' && (
             (currentRole === 'Admin' || currentRole === 'HR') ? (
               <EmployeeManagementPortal />

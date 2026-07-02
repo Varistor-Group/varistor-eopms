@@ -9,6 +9,7 @@ import {
   MessageSquare,
   BookOpen,
   Lock,
+  MapPin,
   X,
   Users
 } from 'lucide-react';
@@ -29,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentRole } = useVariPoints();
   const hasAdminAccess = currentRole === 'Admin' || currentRole === 'HR';
-  const isEmployee = currentRole === 'Employee';
+  const isEmployee = currentRole === 'Employee' || currentRole === 'Field Employee';
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
@@ -38,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
     { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
     ...(hasAdminAccess ? [{ id: 'admin', label: 'Employees', icon: Users, enabled: true }] : []),
+    ...(hasAdminAccess ? [{ id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true }] : []),
     { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
     ...(isEmployee ? [] : [{ id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: hasAdminAccess }]),
     { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
