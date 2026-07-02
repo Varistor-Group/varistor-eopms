@@ -9,7 +9,7 @@
       "phone": "+91 98765 43210",
       "department": "Operations",
       "reportingManager": "Admin User",
-      "role": "Employee",
+      "role": "Reporting Manager",
       "tempPassword": "Employee@2026!",
       "createdAt": "2026-01-15T09:00:00Z",
       "status": "Active",
@@ -53,7 +53,12 @@
       "phone": "+917022630114",
       "department": "Finance",
       "reportingManager": "asdasdsa",
-      "role": "Admin"
+      "role": "Admin",
+      "id": "213",
+      "tempPassword": "AK@2026!123",
+      "createdAt": "2026-07-01T07:19:29.904Z",
+      "status": "Active",
+      "variPoints": 0
     },
     {
       "fullName": "akash kumar",
@@ -147,6 +152,43 @@
       "by": "admin@varistor.in",
       "details": "Created employee akash kumar (2131)",
       "timestamp": "2026-07-01T07:27:17.048Z"
+    },
+    {
+      "id": "1782975238898",
+      "action": "UPDATE_EMPLOYEE",
+      "by": "admin@varistor.in",
+      "details": "Updated employee Aarav Patel (VAR-024)",
+      "timestamp": "2026-07-02T06:53:58.898Z"
     }
-  ]
+  ],
+  "policies": [
+    {
+      "id": "pol-001",
+      "title": "Code of Conduct",
+      "category": "HR",
+      "severity": "mandatory",
+      "content": "All employees are expected to maintain professional behaviour at all times. Harassment, discrimination, or any form of workplace misconduct will result in immediate disciplinary action, up to and including termination.",
+      "effectiveDate": "2026-01-01"
+    },
+    {
+      "id": "pol-002",
+      "title": "Work From Home Policy",
+      "category": "Operations",
+      "severity": "standard",
+      "content": "Employees may work from home up to 2 days per week with prior approval from their reporting manager. WFH days must be logged in the system by 9:00 AM. Repeated unapproved WFH will be treated as leave without pay.",
+      "effectiveDate": "2026-02-01"
+    },
+    {
+      "id": "pol-003",
+      "title": "Data Confidentiality & NDA",
+      "category": "Legal",
+      "severity": "mandatory",
+      "content": "All employees must adhere to the non-disclosure agreement signed at the time of joining. Sharing proprietary company data, client information, or internal communications with external parties is strictly prohibited and subject to legal action.",
+      "effectiveDate": "2026-01-01"
+    }
+  ],
+  "policy": {
+    "content": "<p>1.come on time</p><p>2.dont be late</p>",
+    "updatedAt": "2026-07-02T06:16:46.549Z"
+  }
 }

@@ -113,7 +113,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="min-h-screen flex flex-col md:flex-row bg-white w-full">
 
       {/* Brand Panel (Left Side) */}
-      <div className="w-full md:w-1/2 bg-brand-lime p-8 md:p-12 lg:p-20 flex flex-col justify-center">
+      <div className="w-full md:w-1/2 bg-brand-lime p-8 md:p-12 lg:p-20 flex flex-col justify-between">
         <div className="max-w-md mx-auto md:mx-0 w-full">
           <div className="mb-8">
             <div className="inline-block bg-brand-ink p-3 md:p-4 rounded-[16px] shadow-sm border border-brand-ink/20">
@@ -136,88 +136,116 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <span>Chat</span>
           </p>
         </div>
+
+        {/* About Us — bottom-left, desktop only */}
+        <div className="hidden md:block max-w-md mx-auto md:mx-0 w-full mt-12">
+          <div className="bg-white/90 backdrop-blur-sm rounded-[14px] px-5 py-4 shadow-[0_4px_16px_rgba(0,0,0,0.10)] border border-white/50">
+            <p className="text-[10px] font-bold text-varistor-muted uppercase tracking-widest mb-2.5">About Us</p>
+
+            <p className="text-sm font-medium text-varistor-dark leading-snug mb-3">
+              Varistor Technologies — powering operations across every team, every day.
+            </p>
+
+            <a
+              href="https://www.varistor.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-ink hover:text-brand-ink/70 transition-colors duration-150"
+            >
+              Know More
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.5 9.5L9.5 2.5M9.5 2.5H4.5M9.5 2.5V7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Sign-in Form (Right Side) */}
       <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-[#fafafa]">
-        <div className="max-w-md mx-auto w-full bg-white p-8 rounded-[12px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-gray-100 animate-[fadeInPage_250ms_ease-out]">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            SIGN IN
-          </p>
-          <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-8">
-            Welcome back
-          </h2>
+        <div className="max-w-md mx-auto w-full">
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="employee@varistor.in"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: undefined })); }}
-              error={errors.email}
-              autoComplete="email"
-              disabled={lockoutSeconds > 0}
-            />
+          {/* Sign-in Card */}
+          <div className="bg-white p-8 rounded-[12px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-gray-100 animate-[fadeInPage_250ms_ease-out]">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              SIGN IN
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-8">
+              Welcome back
+            </h2>
 
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }}
-              error={errors.password}
-              autoComplete="current-password"
-              disabled={lockoutSeconds > 0}
-            />
+            <form onSubmit={handleLogin} className="space-y-5">
+              <Input
+                label="Email Address"
+                type="email"
+                placeholder="employee@varistor.in"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: undefined })); }}
+                error={errors.email}
+                autoComplete="email"
+                disabled={lockoutSeconds > 0}
+              />
 
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-gray-300 text-brand-lime focus:ring-brand-lime/50 cursor-pointer"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <span className="text-sm font-medium text-gray-600">Remember me</span>
-              </label>
+              <Input
+                label="Password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }}
+                error={errors.password}
+                autoComplete="current-password"
+                disabled={lockoutSeconds > 0}
+              />
 
-              <button
-                type="button"
-                onClick={() => setIsForgotModalOpen(true)}
-                className="text-sm font-medium text-brand-lime hover:text-[#92cc2e] transition-colors cursor-pointer"
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-brand-lime focus:ring-brand-lime/50 cursor-pointer"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span className="text-sm font-medium text-gray-600">Remember me</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-sm font-medium text-brand-lime hover:text-[#92cc2e] transition-colors cursor-pointer"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {errors.general && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600 font-medium">
+                  {errors.general}
+                </div>
+              )}
+
+              {lockoutSeconds > 0 && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700 font-medium">
+                  🔒 Account locked. Try again in {lockoutSeconds}s.
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full mt-6 py-3 text-base"
+                isLoading={isLoading}
+                disabled={lockoutSeconds > 0}
               >
-                Forgot password?
-              </button>
-            </div>
+                {lockoutSeconds > 0 ? `Locked (${lockoutSeconds}s)` : 'Log in'}
+              </Button>
+            </form>
 
-            {errors.general && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600 font-medium">
-                {errors.general}
-              </div>
-            )}
+            <p className="text-center text-xs text-gray-500 mt-8 font-medium">
+              Need access? Contact HR / Admin
+            </p>
+          </div>{/* end sign-in card */}
 
-            {lockoutSeconds > 0 && (
-              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700 font-medium">
-                🔒 Account locked. Try again in {lockoutSeconds}s.
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full mt-6 py-3 text-base"
-              isLoading={isLoading}
-              disabled={lockoutSeconds > 0}
-            >
-              {lockoutSeconds > 0 ? `Locked (${lockoutSeconds}s)` : 'Log in'}
-            </Button>
-          </form>
-
-          <p className="text-center text-xs text-gray-500 mt-8 font-medium">
-            Need access? Contact HR / Admin
-          </p>
-        </div>
-      </div>
+        </div>{/* end space-y-5 wrapper */}
+      </div>{/* end right panel */}
 
       {/* ── Forgot Password Modal ── */}
       <Modal

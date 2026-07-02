@@ -4,6 +4,8 @@ import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
+import { Chat } from './components/Chat';
+import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { Menu, X } from 'lucide-react';
@@ -12,11 +14,11 @@ import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
 import { EngineSimulationConsole } from './components/EngineSimulationConsole';
-import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
 import { FieldTracker } from './components/FieldTracker';
+import { PolicyPage } from './components/PolicyPage';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -59,12 +61,14 @@ const AppContent: React.FC = () => {
       case 'kanban': return 'Task Board';
       case 'ledger': return 'Points Ledger';
       case 'announcements': return 'Announcements Feed';
+      case 'chat': return 'Team Chat';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
       case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
+      case 'policy': return 'Company Policy';
       default: return 'EOPMS';
     }
   };
@@ -124,7 +128,7 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* Notification Bell */}
-            <NotificationDropdown />
+            <NotificationBell onNavigateToChat={() => setActiveTab('chat')} />
 
             {/* User Profile */}
             <div className="flex items-center gap-2 border-l border-varistor-border pl-4">
@@ -142,12 +146,15 @@ const AppContent: React.FC = () => {
         <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
           {(() => {
             const getAllowedTabs = () => {
-              if (currentRole === 'Admin' || currentRole === 'HR') {
-                return ['dashboard', 'admin', 'field-tracker', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+              if (currentRole === 'Admin') {
+                return ['dashboard', 'admin', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+              } else if (currentRole === 'HR') {
+                // HR participates in Vari Points — ledger is included
+                return ['dashboard', 'admin', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'chat', 'training'];
+                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
               } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 
@@ -168,12 +175,14 @@ const AppContent: React.FC = () => {
                 {activeTab === 'kanban' && <KanbanBoard />}
                 {activeTab === 'ledger' && <PointsLedger />}
                 {activeTab === 'announcements' && <AnnouncementsFeed />}
+                {activeTab === 'chat' && <Chat />}
                 {activeTab === 'vault' && <DocumentVault />}
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'field-tracker' && <FieldTracker />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
+                {activeTab === 'policy' && <PolicyPage />}
               </>
             );
           })()}

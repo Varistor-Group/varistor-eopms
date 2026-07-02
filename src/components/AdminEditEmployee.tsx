@@ -41,10 +41,10 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     fullName: employee.fullName,
     phone: employee.phone,
     department: employee.department,
-    reportingManager: employee.reportingManager,
-    role: employee.role,
-    status: employee.status,
-    variPoints: employee.variPoints.toString(),
+    reportingManager: employee.reportingManager || '',
+    role: employee.role || 'Employee',
+    status: employee.status || 'Active',
+    variPoints: (employee.variPoints ?? 0).toString(),
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});

@@ -1,23 +1,23 @@
 /**
  * MOCK VAULT SERVICE
- * 
+ *
  * TODO: Replace with real Supabase Storage + Database queries.
  */
 
-
+import type { DocumentStatus } from '../types';
 
 export async function getVaultDocuments(employeeId: string) {
   try {
     const res = await fetch(`http://localhost:3001/api/documents/${employeeId}`);
     const docs = await res.json();
-    
+
     // Map DB fields back to the UI expected fields
     return docs.map((d: any) => ({
       id: d.id,
       name: d.filename,
       type: d.type,
       size: d.size,
-      status: d.status,
+      status: d.status as DocumentStatus,
       url: '#'
     }));
   } catch (err) {
@@ -42,5 +42,30 @@ export async function trackDocumentAction(userEmail: string, action: string, doc
   } catch (err) {
     console.error('Failed to log activity', err);
     return false;
+  }
+}
+
+/**
+ * Update a document's verification status.
+ * TODO: Replace with Supabase:
+ *   supabase.from('documents').update({ status: newStatus }).eq('id', documentId)
+ *   + log to supabase.from('activity_log').insert(...)
+ */
+export async function updateDocumentStatus(
+  documentId: string,
+  newStatus: DocumentStatus,
+  performedBy: string = 'hr@varistor.in'
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const res = await fetch(`http://localhost:3001/api/documents/${documentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, performedBy })
+    });
+    const result = await res.json();
+    return { success: result.success, error: result.error || null };
+  } catch (err) {
+    console.error('Failed to update document status', err);
+    return { success: false, error: 'Server unreachable.' };
   }
 }

@@ -18,7 +18,7 @@ const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 // CORS middleware to allow requests from Vite frontend
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -271,6 +271,37 @@ app.get('/api/documents/:employeeId', async (req, res) => {
   res.json(docs);
 });
 
+// Update document status (HR / Admin)
+app.put('/api/documents/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  const { status, performedBy } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ success: false, error: 'status is required' });
+  }
+
+  const index = (db.documents || []).findIndex(d => d.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Document not found.' });
+  }
+
+  db.documents[index].status = status;
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'document_status_changed',
+    by: performedBy || 'hr@varistor.in',
+    details: `Document ${id} status changed to ${status}`,
+    metadata: { documentId: id, newStatus: status },
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, document: db.documents[index] });
+});
+
 // Activity
 app.post('/api/activity', async (req, res) => {
   const db = await readDB();
@@ -303,6 +334,55 @@ app.post('/api/field/location', (req, res) => {
 app.get('/api/field/locations', (req, res) => {
   // Mock response — in production fetch from Supabase
   res.json({ success: true, locations: [] });
+});
+
+// Policies — GET all
+app.get('/api/policies', async (req, res) => {
+  const db = await readDB();
+  res.json(db.policies || []);
+});
+
+// Policies — POST (add new)
+app.post('/api/policies', async (req, res) => {
+  const db = await readDB();
+  const policy = req.body;
+  if (!policy.title || !policy.content) {
+    return res.status(400).json({ success: false, error: 'title and content are required' });
+  }
+  if (!db.policies) db.policies = [];
+  const newPolicy = {
+    id: `pol-${Date.now()}`,
+    title: policy.title,
+    category: policy.category || 'General',
+    severity: policy.severity || 'standard',
+    content: policy.content,
+    effectiveDate: policy.effectiveDate || new Date().toISOString().split('T')[0],
+    createdAt: new Date().toISOString()
+  };
+  db.policies.push(newPolicy);
+  await writeDB(db);
+  res.json({ success: true, policy: newPolicy });
+});
+
+// Policies — PUT (update by id)
+app.put('/api/policies/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  const index = (db.policies || []).findIndex(p => p.id === id);
+  if (index === -1) return res.status(404).json({ success: false, error: 'Policy not found.' });
+  db.policies[index] = { ...db.policies[index], ...req.body, id, updatedAt: new Date().toISOString() };
+  await writeDB(db);
+  res.json({ success: true, policy: db.policies[index] });
+});
+
+// Policies — DELETE
+app.delete('/api/policies/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  if (!db.policies) return res.status(404).json({ success: false, error: 'Policy not found.' });
+  db.policies = db.policies.filter(p => p.id !== id);
+  await writeDB(db);
+  res.json({ success: true });
 });
 
 app.listen(port, () => {

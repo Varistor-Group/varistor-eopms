@@ -4,6 +4,8 @@ export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type TaskStatus = 'todo' | 'in_progress' | 'awaiting_approval' | 'done';
 
+export type DocumentStatus = 'Verified' | 'Pending' | 'Rejected' | 'Under Review';
+
 export interface TaskAssignee {
   name: string;
   avatarUrl: string;
@@ -110,6 +112,34 @@ export interface FieldEmployeeLocation {
   todayCheckOut?: string;
   distanceTravelledKm: number;
   routeHistory: [number, number][]; // historical [lat, lng] points for today's route
+}
+
+// ─── Team Chat (Area E) ──────────────────────────────────────────────────────
+
+export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+
+export interface ChatChannel {
+  id: ChannelId;
+  name: string;
+  memberCount: number;
+  pinned?: string;
+}
+
+export interface ChatAttachment {
+  name: string;
+  size: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: ChannelId;
+  authorName: string;
+  authorRole: string;
+  authorAvatar: string;
+  isSelf: boolean;
+  text?: string;
+  attachment?: ChatAttachment;
+  timestamp: string;
 }
 
 // ─── Training (Task B) ──────────────────────────────────────────────────────
