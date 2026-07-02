@@ -31,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsOpenMobile
 }) => {
   const { currentRole } = useVariPoints();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
 
@@ -38,11 +39,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
@@ -53,12 +54,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
@@ -68,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
@@ -82,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }

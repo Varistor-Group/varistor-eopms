@@ -10,7 +10,7 @@
  *  { success: boolean, employee: Employee | null, error: string | null }
  */
 
-import type { UserRole, FieldEmployeeLocation } from '../types';
+import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
 
 export interface Employee {
   id: string;
@@ -26,6 +26,7 @@ export interface Employee {
   createdAt: string;
   status: 'Active' | 'Inactive';
   variPoints: number;
+  is_field_employee?: boolean;
 }
 
 export type Department =
@@ -45,54 +46,26 @@ export interface CreateEmployeeInput {
   department: Department;
   reportingManager: string;
   role: UserRole;
+  is_field_employee?: boolean;
 }
 
 // Temporary mock array for legacy components that haven't been migrated to the JSON DB yet
 export const mockEmployeeStore: Employee[] = [
   {
-    id: 'VAR-024',
-    fullName: 'Aarav Patel',
-    employeeId: 'VAR-024',
-    username: 'aarav.patel',
-    personalEmail: 'aarav.patel@gmail.com',
-    phone: '+91 98765 43210',
-    department: 'Operations',
-    reportingManager: 'VAR-001',
-    role: 'Employee',
-    tempPassword: 'Employee@2026!',
-    createdAt: '2026-01-15T09:00:00Z',
-    status: 'Active',
-    variPoints: 1800,
-  },
-  {
-    id: 'VAR-031',
-    fullName: 'Rohan Deshmukh',
-    employeeId: 'VAR-031',
-    username: 'rohan.deshmukh',
-    personalEmail: 'rohan.deshmukh@gmail.com',
-    phone: '+91 98450 12233',
-    department: 'Sales',
-    reportingManager: 'Aarav Patel',
-    role: 'Field Employee',
-    tempPassword: 'RD@2026!482',
-    createdAt: '2026-02-03T09:30:00Z',
-    status: 'Active',
-    variPoints: 950,
-  },
-  {
-    id: 'VAR-032',
-    fullName: 'Kavya Iyer',
-    employeeId: 'VAR-032',
-    username: 'kavya.iyer',
-    personalEmail: 'kavya.iyer@gmail.com',
-    phone: '+91 99720 45611',
-    department: 'Operations',
-    reportingManager: 'Aarav Patel',
-    role: 'Field Employee',
-    tempPassword: 'KI@2026!917',
-    createdAt: '2026-02-10T10:00:00Z',
-    status: 'Active',
-    variPoints: 1120,
+    fullName: "akash kumar",
+    employeeId: "2131",
+    username: "21331",
+    personalEmail: "cobbstark01@gmail.com",
+    phone: "+917022630114",
+    department: "Operations",
+    reportingManager: "na",
+    role: "Admin",
+    id: "2131",
+    tempPassword: "AK@2026!896",
+    createdAt: "2026-07-01T07:27:17.041Z",
+    status: "Active",
+    variPoints: 0,
+    is_field_employee: false
   },
   {
     id: 'VAR-033',
@@ -138,6 +111,51 @@ export const mockEmployeeStore: Employee[] = [
     createdAt: '2026-03-12T11:20:00Z',
     status: 'Active',
     variPoints: 610,
+  },
+  {
+    id: 'VAR-001',
+    fullName: 'Manager User',
+    employeeId: 'VAR-001',
+    username: 'manager.user',
+    personalEmail: 'manager@example.com',
+    phone: '+91 00000 00000',
+    department: 'Operations',
+    reportingManager: 'Admin User',
+    role: 'Reporting Manager',
+    tempPassword: 'Manager@2026!',
+    createdAt: '2026-01-01T09:00:00Z',
+    status: 'Active',
+    variPoints: 2000,
+  },
+  {
+    id: 'VAR-003',
+    fullName: 'Priya Sharma',
+    employeeId: 'VAR-003',
+    username: 'priya.sharma',
+    personalEmail: 'priya.sharma@gmail.com',
+    phone: '+91 97654 32109',
+    department: 'Finance',
+    reportingManager: 'Admin User',
+    role: 'HR',
+    tempPassword: 'Hr@2026!',
+    createdAt: '2026-01-10T09:00:00Z',
+    status: 'Active',
+    variPoints: 1540,
+  },
+  {
+    id: 'VAR-005',
+    fullName: 'Ravi Kumar',
+    employeeId: 'VAR-005',
+    username: 'ravi.kumar',
+    personalEmail: 'ravi.kumar@gmail.com',
+    phone: '+91 91234 56789',
+    department: 'Finance',
+    reportingManager: 'Admin User',
+    role: 'HR',
+    tempPassword: 'Hr2@2026!',
+    createdAt: '2026-02-01T09:00:00Z',
+    status: 'Active',
+    variPoints: 980,
   },
 ];
 
@@ -256,9 +274,107 @@ export async function getFieldEmployees(): Promise<Employee[]> {
   return mockEmployeeStore.filter(e => e.role === 'Field Employee');
 }
 
+// ─── Location Tracking (Mock Service Layer) ──────────────────────────────────
+
+// In-memory array for locations (as requested for mock state)
+let mockLocationHistory: LocationEntry[] = [];
+
+export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void> {
+  const newEntry: LocationEntry = {
+    ...data,
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+  };
+
+  mockLocationHistory.push(newEntry);
+
+  // Keep only the last 100 entries per employee to avoid memory bloat
+  const employeeEntries = mockLocationHistory.filter(e => e.employeeId === data.employeeId);
+  if (employeeEntries.length > 100) {
+    const sorted = employeeEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const toRemove = sorted.slice(0, sorted.length - 100).map(e => e.id);
+    mockLocationHistory = mockLocationHistory.filter(e => !toRemove.includes(e.id));
+  }
+}
+
+export async function getLatestLocations(): Promise<LatestLocation[]> {
+  const employees = await getEmployees();
+  const latestLocations: LatestLocation[] = [];
+
+  // Group by employeeId to find the latest
+  const latestMap = new Map<string, LocationEntry>();
+  mockLocationHistory.forEach(entry => {
+    const current = latestMap.get(entry.employeeId);
+    if (!current || new Date(entry.timestamp).getTime() > new Date(current.timestamp).getTime()) {
+      latestMap.set(entry.employeeId, entry);
+    }
+  });
+
+  employees.forEach(emp => {
+    if (emp.is_field_employee) {
+      const empId = emp.employeeId || emp.id;
+      let entry = latestMap.get(empId);
+
+      // If no location exists yet, provide and record a temporary starting location in Bangalore
+      if (!entry) {
+        entry = {
+          id: 'temp-' + empId + '-' + Date.now(),
+          employeeId: empId,
+          latitude: 12.9716 + (Math.random() * 0.05 - 0.025), // slight randomization
+          longitude: 77.5946 + (Math.random() * 0.05 - 0.025),
+          accuracy: 50,
+          timestamp: new Date().toISOString()
+        };
+        // Save it to history so it persists during this session
+        mockLocationHistory.push(entry);
+        latestMap.set(empId, entry);
+      }
+
+      latestLocations.push({
+        ...entry,
+        employeeName: emp.fullName,
+        department: emp.department,
+      });
+    }
+  });
+
+  return latestLocations;
+}
+
+export async function getLocationHistory(employeeId: string, from: Date, to: Date): Promise<LocationEntry[]> {
+  const fromTime = from.getTime();
+  const toTime = to.getTime();
+
+  return mockLocationHistory
+    .filter(e => e.employeeId === employeeId)
+    .filter(e => {
+      const time = new Date(e.timestamp).getTime();
+      return time >= fromTime && time <= toTime;
+    })
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+}
+
 export async function getFieldLocations(): Promise<FieldEmployeeLocation[]> {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return mockFieldLocations.map(l => ({ ...l, routeHistory: [...l.routeHistory] }));
+  // Fetch real employees from the DB
+  const employees = await getEmployees();
+
+  // Consider Sales and Operations employees as field staff for the simulation
+  const fieldStaff = employees.filter(e => e.department === 'Sales' || e.department === 'Operations');
+
+  if (fieldStaff.length === 0) {
+    return [];
+  }
+
+  // Map real employees to our mock coordinate routes so the map has data
+  return fieldStaff.map((emp, index) => {
+    const mockLoc = mockFieldLocations[index % mockFieldLocations.length];
+    return {
+      ...mockLoc,
+      employeeId: emp.employeeId,
+      employeeName: emp.fullName,
+      department: emp.department,
+      routeHistory: [...mockLoc.routeHistory]
+    };
+  });
 }
 
 export function updateFieldLocation(employeeId: string, patch: Partial<FieldEmployeeLocation>): void {
@@ -275,6 +391,27 @@ function generateTempPassword(name: string): string {
   const year = new Date().getFullYear();
   const rand = Math.floor(100 + Math.random() * 900);
   return `${initials}@${year}!${rand}`;
+}
+
+export async function updateFieldStatus(employeeId: string, isField: boolean): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const res = await fetch(`http://localhost:3001/api/employees/${employeeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_field_employee: isField })
+    });
+    if (!res.ok) throw new Error('Failed to update field status');
+    return { success: true, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (err) {
+    // Fallback for mock store if DB unreachable
+    const idx = mockEmployeeStore.findIndex(e => e.id === employeeId || e.employeeId === employeeId);
+    if (idx !== -1) {
+      mockEmployeeStore[idx].is_field_employee = isField;
+      return { success: true, error: null };
+    }
+    return { success: false, error: 'Server unreachable and user not in mock store' };
+  }
 }
 
 export async function createEmployee(input: CreateEmployeeInput): Promise<{
@@ -367,5 +504,18 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, employee: null, error: 'Database server unreachable.' };
+  }
+}
+
+export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const res = await fetch(`http://localhost:3001/api/employees/${id}`, {
+      method: 'DELETE'
+    });
+    const result = await res.json();
+    return { success: result.success, error: result.error || null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (err) {
+    return { success: false, error: 'Database server unreachable.' };
   }
 }

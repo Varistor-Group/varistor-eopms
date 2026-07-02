@@ -19,6 +19,8 @@ import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
 import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
+import Payroll from './components/Payroll';
+import { LeaveManagement } from './components/LeaveManagement';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -42,7 +44,7 @@ const AppContent: React.FC = () => {
     const channel = new BroadcastChannel('eopms_notifications');
     channel.onmessage = (event) => {
       if (event.data.type === 'TASK_ASSIGNED') {
-        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
+        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
         // Simulating matching assignee to currently logged in user context
         if (event.data.assigneeId === MOCK_CURRENT_USER_ID) {
           setTaskNotification({ title: event.data.title, show: true });
@@ -64,8 +66,13 @@ const AppContent: React.FC = () => {
       case 'chat': return 'Team Chat';
       case 'vault': return 'Document Vault';
       case 'admin': return 'Employees';
+      case 'task-management': return 'Task Management';
+      case 'engine-simulation': return 'Engine Simulation Console';
+      case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
+      case 'leaves': return 'Leave Management';
+      case 'payroll': return 'Payroll — Salary Engine';
       default: return 'EOPMS';
     }
   };
@@ -112,7 +119,7 @@ const AppContent: React.FC = () => {
               <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
               <select
                 value={currentRole}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onChange={(e) => setCurrentRole(e.target.value as any)}
                 className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
                 title="Switch active role for permission testing"
@@ -145,11 +152,12 @@ const AppContent: React.FC = () => {
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {
-                return ['dashboard', 'admin', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training', 'field-tracker'];
+                return ['dashboard', 'admin', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
-                return ['dashboard', 'admin', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training', 'field-tracker'];
+                // HR participates in Vari Points — ledger is included
+                return ['dashboard', 'admin', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'announcements', 'policy', 'chat', 'training'];
+                return ['dashboard', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
                 return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
@@ -176,10 +184,12 @@ const AppContent: React.FC = () => {
                 {activeTab === 'vault' && <DocumentVault />}
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
+                {activeTab === 'field-tracker' && <FieldTracker />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
-                {activeTab === 'field-tracker' && <FieldTracker />}
+                {activeTab === 'leaves' && <LeaveManagement />}
+                {activeTab === 'payroll' && <Payroll />}
               </>
             );
           })()}

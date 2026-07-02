@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO } from '../types';
+import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
+import { getLeaveRequests, getLeaveBalance, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -34,6 +35,13 @@ interface EopmsContextType {
   reactToAnnouncement: (announcementId: string, emojiType: string) => void;
   readAnnouncement: (announcementId: string) => void;
   addAnnouncement: (title: string, content: string, type: 'Standard' | 'Birthday' | 'Policy', authorRole?: 'HR' | 'Admin') => void;
+
+  // Leave Management
+  leaveRequests: LeaveRequest[];
+  leaveBalance: LeaveBalance | null;
+  submitLeave: (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => void;
+  approveLeave: (leaveId: string) => void;
+  rejectLeave: (leaveId: string, comment: string) => void;
 }
 
   // eslint-disable-next-line react-refresh/only-export-components
@@ -55,15 +63,15 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-30',
     priority: 'critical', // Changed to critical to demonstrate new priority
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c1', text: 'Gather feedback from marketing', completed: false },
       { id: 'c2', text: 'Format financial graphs and charts', completed: true },
       { id: 'c3', text: 'Update partner logo in slide master', completed: false }
     ],
     comments: [
-      { id: 'comm-1', text: 'Please make sure to focus on the performance metrics slide.', author: 'Priya Sharma (COO)', authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60', timestamp: '2026-06-29T14:30:00Z' }
+      { id: 'comm-1', text: 'Please make sure to focus on the performance metrics slide.', author: 'akash kumar (Admin)', authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60', timestamp: '2026-06-29T14:30:00Z' }
     ],
     attachments: [
       { id: 'a1', name: 'demo_template_v1.pptx', size: '2.4 MB', type: 'presentation', url: '#' }
@@ -76,8 +84,8 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-02',
     priority: 'medium',
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c4', text: 'Count warehouse box items in Zone A', completed: false },
       { id: 'c5', text: 'Verify log entries with manager approvals', completed: false }
@@ -92,14 +100,14 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'medium',
     status: 'in_progress',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c6', text: 'Collect signed agreements', completed: true },
       { id: 'c7', text: 'Request company certificate', completed: false }
     ],
     comments: [
-      { id: 'comm-2', text: 'Vendor is asking for a grace period on the SLA terms.', author: 'Aarav Patel', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-28T09:15:00Z' }
+      { id: 'comm-2', text: 'Vendor is asking for a grace period on the SLA terms.', author: 'sathvik', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-28T09:15:00Z' }
     ],
     attachments: []
   },
@@ -110,14 +118,14 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'high',
     status: 'awaiting_approval',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c8', text: 'Review formatting checklist', completed: true },
       { id: 'c9', text: 'Obtain initial draft feedback from team leads', completed: true }
     ],
     comments: [
-      { id: 'comm-3', text: 'Ready for COO review and approval.', author: 'Aarav Patel', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-29T17:40:00Z' }
+      { id: 'comm-3', text: 'Ready for COO review and approval.', author: 'sathvik', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-29T17:40:00Z' }
     ],
     attachments: [
       { id: 'a2', name: 'client_report_draft_v2.pdf', size: '1.8 MB', type: 'pdf', url: '#' }
@@ -130,8 +138,8 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-05',
     priority: 'low',
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
     attachments: []
@@ -143,8 +151,8 @@ const initialTasks: Task[] = [
     dueDate: '2026-06-28', // Past due date!
     priority: 'high',
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
     attachments: []
@@ -156,8 +164,8 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-04',
     priority: 'medium',
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [
       { id: 'c10', text: 'Toggle this item and verify visual checkbox update', completed: false },
       { id: 'c11', text: 'Another checklist item to test toggle behavior', completed: false }
@@ -172,8 +180,8 @@ const initialTasks: Task[] = [
     dueDate: '2026-07-06',
     priority: 'low',
     status: 'todo',
-    assigneeId: 'VAR-024',
-    assignee: { name: 'Aarav Patel', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
+    assigneeId: '2',
+    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: [],
     comments: [],
     attachments: []
@@ -224,8 +232,47 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return (saved as UserRole) || 'Admin'; // Default role is Admin
   });
 
-  const MOCK_USER_ID = currentRole === 'Reporting Manager' ? 'VAR-001' : 'VAR-024';
+  const MOCK_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
   const [announcements, setAnnouncements] = useState<AnnouncementDTO[]>([]);
+
+  // ── Leave Management state ────────────────────────────────────────────────
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getLeaveRequests());
+  const leaveBalance = getLeaveBalance('2') ?? null; // hardcoded for now (mock logged-in user: sathvik)
+
+  const submitLeave = (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => {
+    submitLeaveRequest(input);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request submitted successfully', 0, 'credit');
+
+    // Fire-and-forget manager notification email (same pattern as createEmployee)
+    fetch('http://localhost:3001/api/leave/notify-manager', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeName: input.employeeName,
+        leaveType: input.type,
+        from: input.from,
+        to: input.to,
+        days: input.days,
+        reason: input.reason,
+        managerEmail: 'manager@varistor.in',
+      }),
+    }).catch(() => { /* email server unreachable — ignore in mock mode */ });
+  };
+
+  const approveLeave = (leaveId: string) => {
+    const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
+    approveLeaveRequest(leaveId, reviewerName);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request approved', 0, 'credit');
+  };
+
+  const rejectLeave = (leaveId: string, comment: string) => {
+    const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
+    rejectLeaveRequest(leaveId, reviewerName, comment);
+    setLeaveRequests(getLeaveRequests());
+    addToast('Leave request rejected', 0, 'debit');
+  };
 
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -532,7 +579,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const newComment = {
           id: `comm-${Date.now()}`,
           text,
-          author: 'Aarav Patel',
+          author: 'sathvik',
           authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60',
           timestamp: new Date().toISOString()
         };
@@ -664,7 +711,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         announcements,
         reactToAnnouncement,
         readAnnouncement,
-        addAnnouncement
+        addAnnouncement,
+        leaveRequests,
+        leaveBalance,
+        submitLeave,
+        approveLeave,
+        rejectLeave
       }}
     >
       {children}

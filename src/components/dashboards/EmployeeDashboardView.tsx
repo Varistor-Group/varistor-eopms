@@ -5,12 +5,21 @@ import { PointsBalance } from '../PointsBalance';
 import { TaskSummary } from '../TaskSummary';
 import { BirthdayCard } from '../BirthdayCard';
 
+import { MapPin, AlertCircle } from 'lucide-react';
 import { useKanbanTasks } from '../../hooks/useKanbanTasks';
 import { useVariPoints } from '../../hooks/useVariPoints';
+import { useFieldTracking } from '../../hooks/useFieldTracking';
+import { mockEmployeeStore } from '../../api/employees';
 
 export const EmployeeDashboardView: React.FC = () => {
   const { tasks } = useKanbanTasks();
-  const { announcements, reactToAnnouncement, readAnnouncement } = useVariPoints();
+  const { currentRole, announcements, reactToAnnouncement, readAnnouncement } = useVariPoints();
+
+  // Find the mocked current user based on role
+  const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
+  const currentUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
+
+  const { isTracking } = useFieldTracking(currentUser.employeeId, !!currentUser.is_field_employee);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'done').length;
@@ -38,10 +47,30 @@ export const EmployeeDashboardView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Welcome Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <div>
-          <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, Aarav Patel</h1>
-          <p className="text-xs text-varistor-muted mt-0.5">Operations Team · Role: Operations Executive</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <img 
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.fullName)}&background=84CC16&color=fff&size=64&bold=true`} 
+            alt={currentUser.fullName}
+            className="w-16 h-16 rounded-full border-2 border-varistor-lime/20 shadow-sm"
+          />
+          <div>
+            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser.fullName}</h1>
+            <p className="text-xs text-varistor-muted mt-0.5">{currentUser.department} Team · Role: {currentUser.role}</p>
+            <div className="mt-2 flex items-center">
+            {isTracking ? (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
+                <MapPin size={12} />
+                Location sharing active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                <AlertCircle size={12} />
+                Location sharing unavailable
+              </span>
+            )}
+            </div>
+          </div>
         </div>
         <div className="text-[11px] text-varistor-muted bg-white border border-varistor-border px-3 py-1.5 rounded-full shadow-sm font-semibold">
           Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}

@@ -96,7 +96,40 @@ export interface AnnouncementDTO extends Announcement {
   isRead: boolean;
 }
 
-// ─── Chat ────────────────────────────────────────────────────────────────────
+// ─── Field Tracker ───────────────────────────────────────────────────────────
+
+export interface LocationEntry {
+  id: string;
+  employeeId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp: string; // ISO
+}
+
+export interface LatestLocation extends LocationEntry {
+  employeeName: string;
+  department: string;
+}
+
+export interface FieldEmployeeLocation {
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  lat: number;
+  lng: number;
+  accuracy: number;           // metres
+  batteryLevel: number;       // 0–100
+  status: 'Active' | 'Idle' | 'Offline';
+  lastUpdated: string;        // ISO timestamp
+  todayCheckIn?: string;      // ISO timestamp or undefined
+  todayCheckOut?: string;
+  distanceTravelledKm: number;
+  routeHistory: [number, number][]; // historical [lat, lng] points for today's route
+}
+
+// ─── Team Chat (Area E) ──────────────────────────────────────────────────────
+
 export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
 
 export interface ChatChannel {
@@ -121,24 +154,6 @@ export interface ChatMessage {
   text?: string;
   attachment?: ChatAttachment;
   timestamp: string;
-}
-
-// ─── Field Tracker ───────────────────────────────────────────────────────────
-
-export interface FieldEmployeeLocation {
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  lat: number;
-  lng: number;
-  accuracy: number;           // metres
-  batteryLevel: number;       // 0–100
-  status: 'Active' | 'Idle' | 'Offline';
-  lastUpdated: string;        // ISO timestamp
-  todayCheckIn?: string;      // ISO timestamp or undefined
-  todayCheckOut?: string;
-  distanceTravelledKm: number;
-  routeHistory: [number, number][]; // historical [lat, lng] points for today's route
 }
 
 // ─── Training (Task B) ──────────────────────────────────────────────────────
@@ -190,5 +205,35 @@ export interface TrainingModuleWithStatus extends TrainingModule {
   status: TrainingStatus;
   progress: TrainingProgress | null;
   latestAttempt: QuizAttempt | null;
+}
+
+// ─── Leave Management ────────────────────────────────────────────────────────
+
+export type LeaveType = 'Casual' | 'Sick' | 'Earned' | 'Unpaid';
+export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface LeaveRequest {
+  id: string;                    // e.g. "LV-0044"
+  employeeId: string;
+  employeeName: string;
+  type: LeaveType;
+  from: string;                  // ISO date "2026-07-03"
+  to: string;                    // ISO date "2026-07-03"
+  days: number;                  // calculated working days
+  reason: string;
+  status: LeaveStatus;
+  reviewerId?: string;           // employee ID of approver
+  reviewerName?: string;         // display name
+  rejectionComment?: string;
+  submittedAt: string;           // ISO timestamp
+  reviewedAt?: string;
+}
+
+export interface LeaveBalance {
+  employeeId: string;
+  casual: { total: number; used: number };
+  sick: { total: number; used: number };
+  earned: { total: number; used: number };
+  unpaidTaken: number;           // days of unpaid leave taken this year
 }
 
