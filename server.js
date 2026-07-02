@@ -412,8 +412,248 @@ app.delete('/api/policies/:id', async (req, res) => {
 });
 
 
-// Payroll route imported from Task-D
-
 app.listen(port, () => {
-  console.log(`[Email Server] running on http://localhost:${port}`);
+  console.log
+// Payroll route imported from Task-D
+// Generate A4 Salary Slip PDF buffer using pdfkit
+const generateSalarySlipPDF = (slip) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+      const fmt = (n) => 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+      // 1. Header Banner (Lime green)
+      doc.rect(40, 40, 515, 60).fill('#84cc16');
+      doc.fillColor('#ffffff')
+         .fontSize(16)
+         .font('Helvetica-Bold')
+         .text('VARISTOR TECHNOLOGIES PVT LTD', 55, 52);
+      doc.fontSize(10)
+         .font('Helvetica')
+         .text(`Salary Slip - ${month}`, 55, 75);
+
+      // V Logo Badge inside banner
+      doc.circle(510, 70, 20).fill('#ffffff');
+      doc.fillColor('#84cc16')
+         .fontSize(18)
+         .font('Helvetica-Bold')
+         .text('V', 504, 63);
+
+      // 2. Employee Info Grid
+      doc.fillColor('#111111').fontSize(10);
+      
+      const infoY1 = 125;
+      const infoY2 = 145;
+      
+      doc.font('Helvetica-Bold').text('Employee:', 55, infoY1).font('Helvetica').text(slip.name, 140, infoY1);
+      doc.font('Helvetica-Bold').text('Employee ID:', 300, infoY1).font('Helvetica').text(slip.employeeId || 'ΓÇö', 390, infoY1);
+      
+      doc.font('Helvetica-Bold').text('Department:', 55, infoY2).font('Helvetica').text(slip.department || 'ΓÇö', 140, infoY2);
+      doc.font('Helvetica-Bold').text('Monthly CTC:', 300, infoY2).font('Helvetica').text(fmt(slip.ctc), 390, infoY2);
+
+      // Divider line
+      doc.moveTo(40, 175).lineTo(555, 175).strokeColor('#d8ded2').lineWidth(1).stroke();
+
+      // 3. Earnings & Deductions Headers
+      doc.fillColor('#868e80')
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .text('EARNINGS', 55, 195)
+         .text('DEDUCTIONS', 300, 195);
+
+      // 4. Details
+      doc.fillColor('#111111').fontSize(10).font('Helvetica');
+      
+      // Earnings Row 1
+      doc.text('Gross Pay', 55, 215)
+         .font('Helvetica-Bold').text(fmt(slip.ctc), 200, 215, { align: 'right', width: 60 });
+         
+      // Deductions Row 1
+      doc.font('Helvetica').text('Total Deductions', 300, 215)
+         .font('Helvetica-Bold').fillColor('#b91c1c').text(fmt(slip.deductions), 450, 215, { align: 'right', width: 60 });
+
+      // Vertical separator
+      doc.moveTo(280, 195).lineTo(280, 240).strokeColor('#d8ded2').stroke();
+
+      // Divider line
+      doc.moveTo(40, 260).lineTo(555, 260).strokeColor('#d8ded2').stroke();
+
+      // 5. Net Pay Block
+      doc.rect(40, 275, 515, 45).fill('#f7fee7');
+      doc.rect(40, 275, 515, 45).strokeColor('#d9f99d').stroke();
+      
+      doc.fillColor('#365314')
+         .fontSize(12)
+         .font('Helvetica-Bold')
+         .text('Net Pay', 55, 292);
+         
+      doc.fillColor('#3f6212')
+         .fontSize(18)
+         .font('Helvetica-Bold')
+         .text(fmt(netPay), 420, 287, { align: 'right', width: 110 });
+
+      // 6. Footer
+      doc.fillColor('#868e80')
+         .fontSize(8)
+         .font('Helvetica')
+         .text('This is a system-generated salary slip from Varistor EOPMS. No signature required.', 40, 350, { align: 'center', width: 515 });
+      doc.text('Auto-dispatched via scheduled cron - Resend', 40, 365, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
+// ΓöÇΓöÇ Modules 11 & 12: Bulk salary slip emails ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+app.post('/api/payroll/send-slips', async (req, res) => {
+  try {
+    const { slips } = req.body;
+    if (!Array.isArray(slips) || slips.length === 0) {
+      return res.status(400).json({ success: false, error: 'No slip data provided.' });
+    }
+
+    console.log(`[Payroll] Received request to send ${slips.length} slips`);
+    console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
+
+    const fmt = (n) => 'Γé╣' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+    const buildSlipHtml = (slip) => {
+      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+      return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salary Slip ΓÇô ${month}</title></head>
+<body style="margin:0;padding:0;background:#f4f6f3;font-family:Arial,Helvetica,sans-serif;color:#111;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
+        <tr>
+          <td style="background:#84cc16;padding:24px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <p style="margin:0;color:#fff;font-size:18px;font-weight:700;">VARISTOR TECHNOLOGIES PVT LTD</p>
+                  <p style="margin:4px 0 0;color:#ecfccb;font-size:13px;">Salary Slip &middot; ${month}</p>
+                </td>
+                <td align="right">
+                  <div style="width:44px;height:44px;background:rgba(255,255,255,0.25);border-radius:50%;text-align:center;line-height:44px;font-size:22px;font-weight:900;color:#fff;">V</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+              <tr><td style="color:#868e80;width:120px;">Employee</td><td style="font-weight:700;">${slip.name}</td><td style="color:#868e80;">Employee ID</td><td style="font-weight:600;">${slip.employeeId || 'ΓÇö'}</td></tr>
+              <tr><td style="color:#868e80;">Department</td><td>${slip.department || 'ΓÇö'}</td><td style="color:#868e80;">Monthly CTC</td><td style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding:16px 32px 0;"><hr style="border:none;border-top:1px solid #d8ded2;"></td></tr>
+        <tr>
+          <td style="padding:20px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="50%" valign="top" style="padding-right:16px;">
+                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Earnings</p>
+                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
+                    <tr><td style="color:#555;">Gross Pay</td><td align="right" style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
+                  </table>
+                </td>
+                <td width="50%" valign="top" style="padding-left:16px;border-left:1px solid #d8ded2;">
+                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Deductions</p>
+                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
+                    <tr><td style="color:#555;">Total Deductions</td><td align="right" style="font-weight:600;color:#b91c1c;">${fmt(slip.deductions)}</td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 32px 24px;">
+            <table width="100%" cellpadding="16" cellspacing="0" style="background:#f7fee7;border:1px solid #d9f99d;border-radius:12px;">
+              <tr>
+                <td style="font-size:14px;font-weight:700;color:#365314;">Net Pay</td>
+                <td align="right" style="font-size:24px;font-weight:900;color:#3f6212;">${fmt(netPay)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;font-size:11px;color:#868e80;">
+            <p style="margin:0;">System-generated salary slip ΓÇö Varistor EOPMS</p>
+            <p style="margin:6px 0 0;">&#9993; Auto-dispatched ┬╖ 15th of each month ┬╖ 10:00 IST</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+    };
+
+    const sent = [];
+    const failed = [];
+
+    for (const slip of slips) {
+      if (!slip.email || !slip.name) {
+        failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+        continue;
+      }
+      try {
+        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const pdfBuffer = await generateSalarySlipPDF(slip);
+
+        const result = await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: slip.email,
+          subject: `Your Salary Slip ΓÇô ${month} | Varistor Technologies`,
+          html: buildSlipHtml(slip),
+          attachments: [
+            {
+              filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
+              content: pdfBuffer.toString('base64'),
+            }
+          ]
+        });
+        // Resend SDK can return { data, error } or throw
+        const resendError = result?.error;
+        if (resendError) {
+          const msg = resendError.message || JSON.stringify(resendError);
+          console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
+          failed.push({ email: slip.email, name: slip.name, error: msg });
+        } else {
+          sent.push(slip.email);
+          console.log(`[Payroll] Γ£ô Sent to ${slip.name} <${slip.email}>`);
+        }
+      } catch (err) {
+        console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
+        failed.push({ email: slip.email, name: slip.name, error: err.message });
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
+
+    console.log(`[Payroll] Done ΓÇö ${sent.length} sent, ${failed.length} failed`);
+    return res.json({ success: true, sent: sent.length, failed });
+  } catch (outerErr) {
+    console.error('[Payroll] ROUTE CRASHED:', outerErr);
+    return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
+  }
+});
+
+// Activity
+
+(`[Email Server] running on http://localhost:${port}`);
 });

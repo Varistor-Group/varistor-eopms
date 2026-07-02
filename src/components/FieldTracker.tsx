@@ -7,7 +7,8 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { MapPin, Clock, RefreshCw, Calendar as Users } from 'lucide-react';
 import type { LatestLocation, LocationEntry } from '../types';
-import { getLatestLocations, getLocationHistory, getEmployees, Employee } from '../api/employees';
+import { getLatestLocations, getLocationHistory, getEmployees } from '../api/employees';
+import type { Employee } from '../api/employees';
 
 // Fix the default Leaflet marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
