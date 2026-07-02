@@ -481,7 +481,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
           attachments: [
             {
               filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
-              content: pdfBuffer,
+              content: pdfBuffer.toString('base64'),
             }
           ]
         });
