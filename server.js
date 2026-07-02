@@ -273,18 +273,21 @@ app.get('/api/documents/:employeeId', async (req, res) => {
 
 // ── Modules 11 & 12: Bulk salary slip emails ──────────────────────────────────
 app.post('/api/payroll/send-slips', async (req, res) => {
-  const { slips } = req.body;
-  if (!Array.isArray(slips) || slips.length === 0) {
-    return res.status(400).json({ success: false, error: 'No slip data provided.' });
-  }
+  try {
+    const { slips } = req.body;
+    if (!Array.isArray(slips) || slips.length === 0) {
+      return res.status(400).json({ success: false, error: 'No slip data provided.' });
+    }
 
-  const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    console.log(`[Payroll] Received request to send ${slips.length} slips`);
+    console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
 
-  const buildSlipHtml = (slip) => {
-    const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-    const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
-    return `
-<!DOCTYPE html>
+    const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+    const buildSlipHtml = (slip) => {
+      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+      return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Salary Slip – ${month}</title></head>
@@ -292,143 +295,112 @@ app.post('/api/payroll/send-slips', async (req, res) => {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
-
-        <!-- Header -->
         <tr>
           <td style="background:#84cc16;padding:24px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <p style="margin:0;color:#fff;font-size:18px;font-weight:700;letter-spacing:0.5px;">VARISTOR TECHNOLOGIES PVT LTD</p>
+                  <p style="margin:0;color:#fff;font-size:18px;font-weight:700;">VARISTOR TECHNOLOGIES PVT LTD</p>
                   <p style="margin:4px 0 0;color:#ecfccb;font-size:13px;">Salary Slip &middot; ${month}</p>
                 </td>
                 <td align="right">
-                  <div style="width:44px;height:44px;background:rgba(255,255,255,0.25);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;line-height:44px;text-align:center;">V</div>
+                  <div style="width:44px;height:44px;background:rgba(255,255,255,0.25);border-radius:50%;text-align:center;line-height:44px;font-size:22px;font-weight:900;color:#fff;">V</div>
                 </td>
               </tr>
             </table>
           </td>
         </tr>
-
-        <!-- Employee Info -->
         <tr>
           <td style="padding:24px 32px 0;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td width="50%" style="padding-bottom:8px;">
-                  <p style="margin:0;font-size:11px;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Employee</p>
-                  <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#111;">${slip.name}</p>
-                </td>
-                <td width="50%" style="padding-bottom:8px;">
-                  <p style="margin:0;font-size:11px;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Employee ID</p>
-                  <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#111;">${slip.employeeId || '—'}</p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding-bottom:8px;">
-                  <p style="margin:0;font-size:11px;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Department</p>
-                  <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#111;">${slip.department || '—'}</p>
-                </td>
-                <td style="padding-bottom:8px;">
-                  <p style="margin:0;font-size:11px;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Monthly CTC</p>
-                  <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#111;">${fmt(slip.ctc)}</p>
-                </td>
-              </tr>
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+              <tr><td style="color:#868e80;width:120px;">Employee</td><td style="font-weight:700;">${slip.name}</td><td style="color:#868e80;">Employee ID</td><td style="font-weight:600;">${slip.employeeId || '—'}</td></tr>
+              <tr><td style="color:#868e80;">Department</td><td>${slip.department || '—'}</td><td style="color:#868e80;">Monthly CTC</td><td style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
             </table>
           </td>
         </tr>
-
-        <!-- Divider -->
-        <tr><td style="padding:16px 32px 0;"><hr style="border:none;border-top:1px solid #d8ded2;margin:0;"></td></tr>
-
-        <!-- Earnings & Deductions -->
+        <tr><td style="padding:16px 32px 0;"><hr style="border:none;border-top:1px solid #d8ded2;"></td></tr>
         <tr>
-          <td style="padding:20px 32px 0;">
+          <td style="padding:20px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td width="50%" valign="top" style="padding-right:16px;">
-                  <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Earnings</p>
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:6px 0;font-size:13px;color:#555a52;">Gross Pay</td>
-                      <td align="right" style="padding:6px 0;font-size:13px;font-weight:600;color:#111;">${fmt(slip.ctc)}</td>
-                    </tr>
+                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Earnings</p>
+                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
+                    <tr><td style="color:#555;">Gross Pay</td><td align="right" style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
                   </table>
                 </td>
                 <td width="50%" valign="top" style="padding-left:16px;border-left:1px solid #d8ded2;">
-                  <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;letter-spacing:0.5px;">Deductions</p>
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:6px 0;font-size:13px;color:#555a52;">Total Deductions</td>
-                      <td align="right" style="padding:6px 0;font-size:13px;font-weight:600;color:#b91c1c;">${fmt(slip.deductions)}</td>
-                    </tr>
+                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Deductions</p>
+                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
+                    <tr><td style="color:#555;">Total Deductions</td><td align="right" style="font-weight:600;color:#b91c1c;">${fmt(slip.deductions)}</td></tr>
                   </table>
                 </td>
               </tr>
             </table>
           </td>
         </tr>
-
-        <!-- Net Pay -->
         <tr>
-          <td style="padding:20px 32px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7fee7;border:1px solid #d9f99d;border-radius:12px;">
+          <td style="padding:0 32px 24px;">
+            <table width="100%" cellpadding="16" cellspacing="0" style="background:#f7fee7;border:1px solid #d9f99d;border-radius:12px;">
               <tr>
-                <td style="padding:16px 20px;">
-                  <p style="margin:0;font-size:14px;font-weight:700;color:#365314;">Net Pay</p>
-                </td>
-                <td align="right" style="padding:16px 20px;">
-                  <p style="margin:0;font-size:24px;font-weight:900;color:#3f6212;">${fmt(netPay)}</p>
-                </td>
+                <td style="font-size:14px;font-weight:700;color:#365314;">Net Pay</td>
+                <td align="right" style="font-size:24px;font-weight:900;color:#3f6212;">${fmt(netPay)}</td>
               </tr>
             </table>
           </td>
         </tr>
-
-        <!-- Footer -->
         <tr>
-          <td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;">
-            <p style="margin:0;font-size:11px;color:#868e80;">This is a system-generated salary slip from Varistor EOPMS. No signature required.</p>
-            <p style="margin:6px 0 0;font-size:11px;color:#868e80;">&#9993; Auto-dispatched on the 15th of each month &middot; 10:00 IST</p>
+          <td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;font-size:11px;color:#868e80;">
+            <p style="margin:0;">System-generated salary slip — Varistor EOPMS</p>
+            <p style="margin:6px 0 0;">&#9993; Auto-dispatched · 15th of each month · 10:00 IST</p>
           </td>
         </tr>
-
       </table>
     </td></tr>
   </table>
 </body>
 </html>`;
-  };
+    };
 
-  const sent = [];
-  const failed = [];
+    const sent = [];
+    const failed = [];
 
-  for (const slip of slips) {
-    if (!slip.email || !slip.name) {
-      failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
-      continue;
+    for (const slip of slips) {
+      if (!slip.email || !slip.name) {
+        failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+        continue;
+      }
+      try {
+        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const result = await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: slip.email,
+          subject: `Your Salary Slip – ${month} | Varistor Technologies`,
+          html: buildSlipHtml(slip),
+        });
+        // Resend SDK can return { data, error } or throw
+        const resendError = result?.error;
+        if (resendError) {
+          const msg = resendError.message || JSON.stringify(resendError);
+          console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
+          failed.push({ email: slip.email, name: slip.name, error: msg });
+        } else {
+          sent.push(slip.email);
+          console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
+        }
+      } catch (err) {
+        console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
+        failed.push({ email: slip.email, name: slip.name, error: err.message });
+      }
+      await new Promise(r => setTimeout(r, 120));
     }
-    try {
-      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const { data, error } = await resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: slip.email,
-        subject: `Your Salary Slip – ${month} | Varistor Technologies`,
-        html: buildSlipHtml(slip),
-      });
-      if (error) throw new Error(error.message);
-      sent.push(slip.email);
-      console.log(`[Payroll] Slip sent to ${slip.name} <${slip.email}>`);
-    } catch (err) {
-      console.error(`[Payroll] Failed for ${slip.email}:`, err.message);
-      failed.push({ email: slip.email, name: slip.name, error: err.message });
-    }
-    // Small delay between sends to respect Resend rate limits
-    await new Promise(r => setTimeout(r, 120));
+
+    console.log(`[Payroll] Done — ${sent.length} sent, ${failed.length} failed`);
+    return res.json({ success: true, sent: sent.length, failed });
+  } catch (outerErr) {
+    console.error('[Payroll] ROUTE CRASHED:', outerErr);
+    return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
   }
-
-  console.log(`[Payroll] Bulk dispatch complete: ${sent.length} sent, ${failed.length} failed`);
-  res.json({ success: true, sent: sent.length, failed });
 });
 
 // Activity
