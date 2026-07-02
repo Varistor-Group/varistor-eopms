@@ -258,7 +258,7 @@ export interface BulkSendResult {
  * Calls the Express backend at /api/payroll/send-slips.
  */
 export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
-  const res = await fetch('http://localhost:3001/api/payroll/send-slips', {
+  const res = await fetch('/api/payroll/send-slips', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slips: rows }),
