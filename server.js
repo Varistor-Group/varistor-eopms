@@ -1,3 +1,4 @@
+import PDFDocument from 'pdfkit';
 import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
@@ -409,6 +410,9 @@ app.delete('/api/policies/:id', async (req, res) => {
   await writeDB(db);
   res.json({ success: true });
 });
+
+
+// Payroll route imported from Task-D
 
 app.listen(port, () => {
   console.log(`[Email Server] running on http://localhost:${port}`);

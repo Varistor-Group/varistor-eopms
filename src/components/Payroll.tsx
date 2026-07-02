@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DollarSign, CheckSquare, Square, ChevronDown, ChevronUp,
-  Upload, RefreshCw, ShieldCheck, AlertCircle,
+  RefreshCw, ShieldCheck, AlertCircle,
   FileText, Users, Lock, Unlock, Clock, Eye, Printer,
   TrendingUp, BarChart3, CheckCircle2, Send, Trash2,
   FileSpreadsheet, ArrowRight, X, Mail, AlertTriangle

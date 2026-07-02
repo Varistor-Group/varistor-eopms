@@ -19,6 +19,7 @@ import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
 import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
+import Payroll from './components/Payroll';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -69,6 +70,7 @@ const AppContent: React.FC = () => {
       case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
+      case 'payroll': return 'Payroll — Salary Engine';
       default: return 'EOPMS';
     }
   };
@@ -183,6 +185,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
+                {activeTab === 'payroll' && <Payroll />}
               </>
             );
           })()}
