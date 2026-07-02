@@ -9,6 +9,7 @@ import {
   MessageSquare,
   BookOpen,
   Lock,
+  MapPin,
   X,
   UserPlus,
   ShieldAlert
@@ -31,11 +32,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentRole } = useVariPoints();
 
   let menuItems: any[] = [];
-  
+
   if (currentRole === 'Admin' || currentRole === 'HR') {
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracker', icon: MapPin, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },

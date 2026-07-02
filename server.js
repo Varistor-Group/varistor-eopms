@@ -285,6 +285,26 @@ app.post('/api/activity', async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Field Tracker (mock endpoints for future real location pings) ─────────────
+
+// POST /api/field/location
+// Body: { employeeId, lat, lng, accuracy, batteryLevel, status }
+app.post('/api/field/location', (req, res) => {
+  const { employeeId, lat, lng, accuracy, batteryLevel, status } = req.body;
+  if (!employeeId || lat === undefined || lng === undefined) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+  // In production this would write to Supabase
+  console.log(`[Field Tracker] Location ping from ${employeeId}: (${lat}, ${lng})`);
+  res.json({ success: true, message: 'Location recorded (mock)' });
+});
+
+// GET /api/field/locations
+app.get('/api/field/locations', (req, res) => {
+  // Mock response — in production fetch from Supabase
+  res.json({ success: true, locations: [] });
+});
+
 app.listen(port, () => {
   console.log(`[Email Server] running on http://localhost:${port}`);
 });

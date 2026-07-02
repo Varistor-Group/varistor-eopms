@@ -16,6 +16,7 @@ import { NotificationDropdown } from './components/NotificationDropdown';
 import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
+import { FieldTracker } from './components/FieldTracker';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -62,6 +63,7 @@ const AppContent: React.FC = () => {
       case 'admin': return 'Employees';
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
+      case 'field-tracker': return 'Field Tracker';
       case 'training': return 'Training Library';
       default: return 'EOPMS';
     }
@@ -114,6 +116,7 @@ const AppContent: React.FC = () => {
                 title="Switch active role for permission testing"
               >
                 <option value="Employee">Employee</option>
+                <option value="Field Employee">Field Employee</option>
                 <option value="Reporting Manager">Reporting Manager</option>
                 <option value="HR">HR</option>
                 <option value="Admin">Admin</option>
@@ -140,7 +143,7 @@ const AppContent: React.FC = () => {
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin' || currentRole === 'HR') {
-                return ['dashboard', 'admin', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'field-tracker', 'vault', 'announcements', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 return ['dashboard', 'task-management', 'announcements', 'chat', 'training'];
               } else {
@@ -168,6 +171,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'vault' && <DocumentVault />}
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
+                {activeTab === 'field-tracker' && <FieldTracker />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
               </>
