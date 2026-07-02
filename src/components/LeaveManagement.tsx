@@ -282,8 +282,8 @@ const ApplyLeaveModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
 
     submitLeave({
-      employeeId: 'VAR-024',
-      employeeName: 'Aarav Patel',
+      employeeId: '2',
+      employeeName: 'sathvik',
       type,
       from,
       to,
@@ -482,12 +482,12 @@ export const LeaveManagement: React.FC = () => {
   const isApproverHR = currentRole === 'HR' || currentRole === 'Admin';
   const isManager = currentRole === 'Reporting Manager';
 
-  // Mock logged-in user is always VAR-024 (Aarav Patel) for own balance/history
-  const ownRequests = leaveRequests.filter(r => r.employeeId === 'VAR-024');
+  // Mock logged-in user is always id '2' (sathvik) for own balance/history
+  const ownRequests = leaveRequests.filter(r => r.employeeId === '2');
 
-  // Reporting Manager: direct reports = employees whose reportingManager is 'Admin User'
+  // Reporting Manager: direct reports = employees reporting to the mock manager ('2131' / akash)
   const directReportIds = useMemo(
-    () => new Set(mockEmployeeStore.filter(e => e.reportingManager === 'Admin User').map(e => e.id)),
+    () => new Set(mockEmployeeStore.filter(e => e.reportingManager === '2131' || e.reportingManager === 'Admin User').map(e => e.id)),
     []
   );
   const teamRequests = leaveRequests.filter(r => directReportIds.has(r.employeeId));

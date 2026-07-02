@@ -11,14 +11,14 @@ import type { LeaveRequest, LeaveBalance } from '../types';
 
 export const mockLeaveBalances: LeaveBalance[] = [
   {
-    employeeId: 'VAR-024', // Aarav Patel (the logged-in Employee)
+    employeeId: '2', // sathvik (the logged-in Employee)
     casual:  { total: 12, used: 5 },
     sick:    { total: 10, used: 3 },
     earned:  { total: 15, used: 6 },
     unpaidTaken: 2,
   },
   {
-    employeeId: 'VAR-001', // Manager User
+    employeeId: '2131', // akash kumar (Admin)
     casual:  { total: 12, used: 2 },
     sick:    { total: 10, used: 1 },
     earned:  { total: 15, used: 4 },
@@ -80,8 +80,8 @@ export const mockLeaveBalances: LeaveBalance[] = [
 export const mockLeaveRequests: LeaveRequest[] = [
   {
     id: 'LV-0044',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Casual',
     from: '2026-07-03',
     to: '2026-07-03',
@@ -92,8 +92,8 @@ export const mockLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 'LV-0033',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Sick',
     from: '2026-06-10',
     to: '2026-06-14',
@@ -104,8 +104,8 @@ export const mockLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 'LV-0018',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Sick',
     from: '2026-05-04',
     to: '2026-05-05',
@@ -118,8 +118,8 @@ export const mockLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 'LV-0096',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Casual',
     from: '2026-04-18',
     to: '2026-04-18',
@@ -133,8 +133,8 @@ export const mockLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 'LV-0043',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Casual',
     from: '2026-03-28',
     to: '2026-03-30',
@@ -147,8 +147,8 @@ export const mockLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 'LV-0017',
-    employeeId: 'VAR-024',
-    employeeName: 'Aarav Patel',
+    employeeId: '2',
+    employeeName: 'sathvik',
     type: 'Sick',
     from: '2026-02-12',
     to: '2026-02-12',

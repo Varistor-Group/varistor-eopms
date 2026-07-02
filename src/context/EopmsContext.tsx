@@ -236,7 +236,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // ── Leave Management state ────────────────────────────────────────────────
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getLeaveRequests());
-  const leaveBalance = getLeaveBalance('VAR-024') ?? null; // hardcoded for now (mock logged-in user)
+  const leaveBalance = getLeaveBalance('2') ?? null; // hardcoded for now (mock logged-in user: sathvik)
 
   const submitLeave = (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => {
     submitLeaveRequest(input);
