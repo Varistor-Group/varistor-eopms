@@ -8,7 +8,8 @@ import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
-import { Menu, X } from 'lucide-react';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
@@ -20,6 +21,7 @@ import TrainingLibrary from './components/TrainingLibrary';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -92,23 +94,23 @@ const AppContent: React.FC = () => {
       <div className="flex-1 flex flex-col lg:pl-[220px]">
 
         {/* Top Header bar */}
-        <header className="h-16 bg-white border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
+        <header className="h-16 bg-varistor-surface border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4">
             {/* Mobile Sidebar Toggle Button */}
             <button
               onClick={() => setIsOpenMobile(true)}
-              className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-varistor-dark"
+              className="lg:hidden p-1.5 rounded-lg hover:bg-varistor-surfaceMuted transition-colors text-varistor-dark"
               title="Open menu"
             >
               <Menu size={20} />
             </button>
-            <h2 className="font-bold text-[#111] text-base lg:text-lg">{getPageTitle()}</h2>
+            <h2 className="font-bold text-varistor-dark text-base lg:text-lg">{getPageTitle()}</h2>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Live Role Switcher */}
-            <div className="flex items-center gap-1.5 bg-[#f1f3f0] px-2.5 py-1.5 rounded-full border border-varistor-border">
-              <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
+            <div className="flex items-center gap-1.5 bg-varistor-surfaceMuted px-2.5 py-1.5 rounded-full border border-varistor-border">
+              <span className="text-[9px] text-varistor-muted font-bold uppercase tracking-wider hidden md:inline">Role:</span>
               <select
                 value={currentRole}
                 onChange={(e) => setCurrentRole(e.target.value as any)}
@@ -121,6 +123,15 @@ const AppContent: React.FC = () => {
                 <option value="Admin">Admin</option>
               </select>
             </div>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-varistor-surfaceMuted transition-colors cursor-pointer text-varistor-dark"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
+            </button>
 
             {/* Notification Bell */}
             <NotificationBell onNavigateToChat={() => setActiveTab('chat')} />
@@ -153,7 +164,7 @@ const AppContent: React.FC = () => {
             const allowedTabs = getAllowedTabs();
             if (!allowedTabs.includes(activeTab)) {
               return (
-                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-varistor border border-red-200 shadow-sm animate-[fadeInPage_250ms_ease-out]">
+                <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>
                   <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
                   <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions to view this page.</p>
@@ -184,13 +195,13 @@ const AppContent: React.FC = () => {
 
       {/* Real-time Task Notification Pop-up */}
       {taskNotification && taskNotification.show && (
-        <div className="fixed top-6 right-6 z-50 bg-white border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
+        <div className="fixed top-6 right-6 z-50 bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>
               <p className="text-xs text-varistor-muted mt-1">You have been assigned: <span className="font-semibold text-varistor-dark">{taskNotification.title}</span></p>
             </div>
-            <button onClick={() => setTaskNotification({ ...taskNotification, show: false })} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={() => setTaskNotification({ ...taskNotification, show: false })} className="text-varistor-muted hover:text-varistor-dark transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -214,9 +225,11 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <EopmsProvider>
-      <AppContent />
-    </EopmsProvider>
+    <ThemeProvider>
+      <EopmsProvider>
+        <AppContent />
+      </EopmsProvider>
+    </ThemeProvider>
   );
 };
 

@@ -2,6 +2,51 @@
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
+
+.dark {
+  --varistor-pageBg: #12140f;
+  --varistor-dark: #f2f4ee;
+  --varistor-border: #2e332a;
+  --varistor-muted: #9aa190;
+  --varistor-surface: #1b1f18;
+  --varistor-surfaceMuted: #242820;
+  --varistor-limeLight: #1f2a10;
+  --varistor-limeTint: #28350f;
+  --varistor-limeText: #c8f279;
+  --varistor-successBg: #28350f;
+  --varistor-successText: #c8f279;
+  --varistor-successBorder: #3d5015;
+  --varistor-pendingBg: #242820;
+  --varistor-pendingText: #c4c9bf;
+  --varistor-pendingBorder: #333831;
+  --varistor-dangerBg: #2a1515;
+  --varistor-dangerText: #f87171;
+  --varistor-dangerBorder: #4a1f1f;
+  --brand-ink: #f2f4ee;
+}
 
 @layer base {
   body {
@@ -9,6 +54,7 @@
     font-size: 14px;
     margin: 0;
     padding: 0;
+    transition: background-color 200ms ease-out, color 200ms ease-out;
   }
 }
 
