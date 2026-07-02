@@ -233,3 +233,39 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+// ─── Bulk Slip Email types & API ─────────────────────────────────────────────
+
+/** One row parsed from the uploaded Excel file. */
+export interface SlipRow {
+  name: string;
+  email: string;
+  employeeId?: string;
+  department?: string;
+  month?: string;
+  ctc: number;           // monthly CTC
+  deductions: number;    // total deductions (PF + TDS etc.)
+  netPay: number;        // ctc - deductions
+}
+
+export interface BulkSendResult {
+  sent: number;
+  failed: { email: string; name: string; error: string }[];
+}
+
+/**
+ * Sends individual salary slip emails for every row.
+ * Calls the Express backend at /api/payroll/send-slips.
+ */
+export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
+  const res = await fetch('http://localhost:3001/api/payroll/send-slips', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slips: rows }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
+    throw new Error(err.error || `Server returned ${res.status}`);
+  }
+  return res.json();
+}

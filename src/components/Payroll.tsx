@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DollarSign, CheckSquare, Square, ChevronDown, ChevronUp,
-  Download, Upload, RefreshCw, ShieldCheck, AlertCircle,
+  Upload, RefreshCw, ShieldCheck, AlertCircle,
   FileText, Users, Lock, Unlock, Clock, Eye, Printer,
-  TrendingUp, BarChart3, CheckCircle2
+  TrendingUp, BarChart3, CheckCircle2, Send, Trash2,
+  FileSpreadsheet, ArrowRight, X, Mail, AlertTriangle
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import {
@@ -13,9 +14,15 @@ import {
   createRevision,
   applyFormulaToAll,
   payrollAuditLog,
-  computeNet,
-  type PayrollRecord
+  sendBulkSlips,
+  type PayrollRecord,
+  type SlipRow,
+  type BulkSendResult
 } from '../api/payroll';
+
+// xlsx is loaded via CDN-style dynamic import to avoid bundler issues
+// We import the type only; actual lib loaded at runtime
+declare const XLSX: any;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +30,35 @@ const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
 const MONTH = 'Jun 2026';
-const LOGGED_IN_EMP = 'VAR-024'; // Mock current user
+const LOGGED_IN_EMP = 'VAR-024';
+
+// Column name aliases — tolerant parsing of Excel headers
+const COL_ALIASES: Record<string, string[]> = {
+  name:         ['name', 'full name', 'employee name', 'emp name', 'fullname'],
+  email:        ['email', 'email id', 'mail', 'email address', 'e-mail'],
+  ctc:          ['ctc', 'monthly ctc', 'gross', 'gross salary', 'total ctc'],
+  deductions:   ['deductions', 'total deductions', 'deductibles', 'total deductibles', 'deduction'],
+  employeeId:   ['employee id', 'emp id', 'id', 'employee_id', 'empid', 'var id'],
+  department:   ['department', 'dept', 'division'],
+  month:        ['month', 'pay month', 'salary month'],
+};
+
+function resolveHeader(raw: string): string | null {
+  const lower = raw.trim().toLowerCase();
+  for (const [key, aliases] of Object.entries(COL_ALIASES)) {
+    if (aliases.includes(lower)) return key;
+  }
+  return null;
+}
+
+function parseNumber(val: any): number {
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const n = parseFloat(val.replace(/[₹,\s]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
 
 // ─── Formula Badge ────────────────────────────────────────────────────────────
 
@@ -33,41 +68,30 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
   </span>
 );
 
-// ─── Salary Slip (Employee / Admin preview) ───────────────────────────────────
+// ─── Salary Slip Preview Modal ─────────────────────────────────────────────────
 
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" id="salary-slip-overlay">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto print:shadow-none print:rounded-none print:max-h-none print:overflow-visible" id="salary-slip-card">
-        {/* Print action bar (hidden in print) */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" id="salary-slip-card">
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 print:hidden">
           <span className="text-sm font-semibold text-gray-500">Salary Slip Preview</span>
           <div className="flex gap-2">
             <button
-              onClick={handlePrint}
+              onClick={() => window.print()}
               className="flex items-center gap-1.5 px-4 py-2 bg-varistor-lime text-white text-sm font-semibold rounded-lg hover:bg-[#65a30d] transition-colors"
             >
               <Printer size={15} /> Print / Download PDF
             </button>
             {onClose && (
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
                 Close
               </button>
             )}
           </div>
         </div>
-
-        {/* Slip body */}
-        <div className="p-8 print:p-10 font-sans" id="slip-printable">
-          {/* Lime header strip */}
-          <div className="bg-varistor-lime rounded-xl px-6 py-4 mb-6 flex items-center justify-between print:rounded-none print:-mx-10 print:px-10">
+        <div className="p-8 font-sans">
+          <div className="bg-varistor-lime rounded-xl px-6 py-4 mb-6 flex items-center justify-between">
             <div>
               <p className="text-white font-bold text-lg tracking-wide uppercase">VARISTOR TECHNOLOGIES PVT LTD</p>
               <p className="text-lime-900 text-sm font-medium mt-0.5">Salary Slip · {record.month}</p>
@@ -76,91 +100,412 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
               <span className="text-white font-black text-xl">V</span>
             </div>
           </div>
-
-          {/* Employee info */}
           <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">Employee</span>
-                <span className="font-semibold text-gray-900">{record.employeeName}</span>
+            {[['Employee', record.employeeName], ['ID', record.employeeId], ['Dept', record.department], ['CTC', fmt(record.ctc * 12)]].map(([l, v]) => (
+              <div key={l} className="flex gap-2">
+                <span className="text-gray-500 w-24 flex-shrink-0">{l}</span>
+                <span className="font-semibold text-gray-900">{v}</span>
               </div>
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">ID</span>
-                <span className="font-semibold text-gray-900">{record.employeeId}</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">Dept</span>
-                <span className="font-semibold text-gray-900">{record.department}</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">CTC</span>
-                <span className="font-semibold text-gray-900">{fmt(record.ctc * 12)}</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">Month</span>
-                <span className="font-semibold text-gray-900">{record.month}</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">Status</span>
-                <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${record.status === 'approved' ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-yellow-100 text-yellow-800'}`}>
-                  {record.status === 'approved' ? '✓ Approved' : 'Draft'}
-                </span>
-              </div>
-              {record.approvedBy && (
-                <div className="flex gap-2">
-                  <span className="text-gray-500 w-24 flex-shrink-0">Approved by</span>
-                  <span className="font-semibold text-gray-900 text-xs">{record.approvedBy}</span>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
-
-          {/* Earnings / Deductions */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Earnings</p>
-              <div className="space-y-2 text-sm">
-                {[
-                  { label: 'Basic', val: record.components.basic },
-                  { label: 'HRA', val: record.components.hra },
-                  { label: 'Special Allowance', val: record.components.specialAllowance },
-                ].map(row => (
-                  <div key={row.label} className="flex justify-between">
-                    <span className="text-gray-600">{row.label}</span>
-                    <span className="font-medium text-gray-900 tabular-nums">{fmt(row.val)}</span>
-                  </div>
-                ))}
-              </div>
+              {[['Basic', record.components.basic], ['HRA', record.components.hra], ['Special Allowance', record.components.specialAllowance]].map(([l, v]) => (
+                <div key={String(l)} className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">{l}</span>
+                  <span className="font-medium tabular-nums">{fmt(Number(v))}</span>
+                </div>
+              ))}
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Deductions</p>
-              <div className="space-y-2 text-sm">
+              {[['PF', record.components.pf], ['TDS', record.components.tds]].map(([l, v]) => (
+                <div key={String(l)} className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">{l}</span>
+                  <span className="font-medium text-red-600 tabular-nums">{fmt(Number(v))}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-[#f7fee7] border border-[#d9f99d] rounded-xl px-6 py-4 flex items-center justify-between">
+            <span className="font-bold text-gray-700">Net Pay</span>
+            <span className="font-black text-2xl text-varistor-limeText tabular-nums">{fmt(record.netPay)}</span>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-4 text-center">✉ Auto-mailed on 15 {record.month} · 10:00 IST</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Excel Upload → Preview → Send Panel ──────────────────────────────────────
+
+type SendStep = 'idle' | 'preview' | 'sending' | 'done';
+
+interface ExcelUploadPanelProps {
+  onClose: () => void;
+}
+
+const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
+  const [step, setStep] = useState<SendStep>('idle');
+  const [rows, setRows] = useState<SlipRow[]>([]);
+  const [parseError, setParseError] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [sendResult, setSendResult] = useState<BulkSendResult | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Dynamically load xlsx from CDN if not already available
+  const loadXlsx = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if (typeof (window as any).XLSX !== 'undefined') {
+        resolve((window as any).XLSX);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+      script.onload = () => resolve((window as any).XLSX);
+      script.onerror = () => reject(new Error('Failed to load xlsx library'));
+      document.head.appendChild(script);
+    });
+  };
+
+  const parseFile = async (file: File) => {
+    setParseError('');
+    setFileName(file.name);
+    try {
+      const XLSXLib = await loadXlsx();
+      const buf = await file.arrayBuffer();
+      const wb = XLSXLib.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw: any[][] = XLSXLib.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      if (raw.length < 2) {
+        setParseError('The sheet appears to be empty or has only a header row.');
+        return;
+      }
+
+      // Map header row → canonical key
+      const headers = (raw[0] as any[]).map(h => resolveHeader(String(h)));
+      const missingRequired = ['name', 'email', 'ctc'].filter(r => !headers.includes(r));
+      if (missingRequired.length > 0) {
+        setParseError(`Missing required columns: ${missingRequired.join(', ')}. Check your header row matches: Name, Email, CTC, Deductions.`);
+        return;
+      }
+
+      const parsed: SlipRow[] = [];
+      for (let i = 1; i < raw.length; i++) {
+        const row = raw[i] as any[];
+        if (row.every(cell => String(cell).trim() === '')) continue; // skip blank rows
+        const obj: any = {};
+        headers.forEach((key, idx) => { if (key) obj[key] = row[idx]; });
+        const ctc = parseNumber(obj.ctc);
+        const deductions = parseNumber(obj.deductions ?? 0);
+        parsed.push({
+          name: String(obj.name || '').trim(),
+          email: String(obj.email || '').trim(),
+          employeeId: obj.employeeId ? String(obj.employeeId).trim() : undefined,
+          department: obj.department ? String(obj.department).trim() : undefined,
+          month: obj.month ? String(obj.month).trim() : MONTH,
+          ctc,
+          deductions,
+          netPay: ctc - deductions,
+        });
+      }
+
+      if (parsed.length === 0) {
+        setParseError('No data rows found after parsing. Check the file format.');
+        return;
+      }
+
+      setRows(parsed);
+      setStep('preview');
+    } catch (err: any) {
+      setParseError(`Failed to parse file: ${err.message}`);
+    }
+  };
+
+  const handleFile = (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
+      setParseError('Please upload an .xlsx, .xls, or .csv file.');
+      return;
+    }
+    parseFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const removeRow = (idx: number) => {
+    setRows(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSend = async () => {
+    setStep('sending');
+    setProgress(0);
+
+    // Animate progress while waiting for backend
+    const interval = setInterval(() => {
+      setProgress(p => Math.min(p + 2, 90));
+    }, 200);
+
+    try {
+      const result = await sendBulkSlips(rows);
+      clearInterval(interval);
+      setProgress(100);
+      setSendResult(result);
+      setStep('done');
+    } catch (err: any) {
+      clearInterval(interval);
+      setParseError(`Send failed: ${err.message}`);
+      setStep('preview');
+    }
+  };
+
+  const validRows = rows.filter(r => r.name && r.email);
+  const invalidRows = rows.filter(r => !r.name || !r.email);
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor mb-8 overflow-hidden">
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-varistor-border bg-varistor-limeLight">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet size={18} className="text-varistor-lime" />
+          <span className="font-bold text-varistor-dark text-sm">Excel → Salary Slip → Email Dispatch</span>
+          {step !== 'idle' && (
+            <>
+              <ArrowRight size={14} className="text-varistor-muted" />
+              <span className="text-xs text-varistor-muted font-medium capitalize">
+                {step === 'preview' ? `Preview (${rows.length} rows)` : step === 'sending' ? 'Sending…' : 'Done'}
+              </span>
+            </>
+          )}
+        </div>
+        <button onClick={onClose} className="text-varistor-muted hover:text-varistor-dark p-1 rounded">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="p-6">
+
+        {/* ── Step 1: Upload ── */}
+        {step === 'idle' && (
+          <div>
+            {/* Drop zone */}
+            <div
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-varistor-lime bg-varistor-limeLight'
+                  : 'border-varistor-border hover:border-varistor-lime hover:bg-varistor-limeLight'
+              }`}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+              />
+              <FileSpreadsheet size={40} className={`mx-auto mb-3 ${isDragging ? 'text-varistor-lime' : 'text-varistor-muted'}`} />
+              <p className="font-semibold text-varistor-dark">Drop your Excel file here</p>
+              <p className="text-xs text-varistor-muted mt-1">or click to browse · .xlsx / .xls / .csv</p>
+            </div>
+
+            {/* Column guide */}
+            <div className="mt-5 p-4 bg-varistor-pageBg rounded-lg border border-varistor-border">
+              <p className="text-xs font-bold text-varistor-muted uppercase tracking-wider mb-2">Required Excel columns</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
-                  { label: 'PF', val: record.components.pf },
-                  { label: 'TDS', val: record.components.tds },
-                ].map(row => (
-                  <div key={row.label} className="flex justify-between">
-                    <span className="text-gray-600">{row.label}</span>
-                    <span className="font-medium text-red-600 tabular-nums">{fmt(row.val)}</span>
+                  { col: 'Name', note: 'Full employee name', required: true },
+                  { col: 'Email', note: 'Recipient email', required: true },
+                  { col: 'CTC', note: 'Monthly CTC (₹)', required: true },
+                  { col: 'Deductions', note: 'Total deductions (₹)', required: false },
+                  { col: 'Employee ID', note: 'e.g. VAR-024', required: false },
+                  { col: 'Department', note: 'Finance, Tech…', required: false },
+                  { col: 'Month', note: 'e.g. Jun 2026', required: false },
+                ].map(c => (
+                  <div key={c.col} className="text-xs">
+                    <span className={`font-bold ${c.required ? 'text-varistor-dark' : 'text-varistor-muted'}`}>
+                      {c.required ? '* ' : ''}{c.col}
+                    </span>
+                    <p className="text-varistor-muted">{c.note}</p>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* Net Pay */}
-          <div className="bg-[#f7fee7] border border-[#d9f99d] rounded-xl px-6 py-4 flex items-center justify-between">
-            <span className="font-bold text-gray-700 text-base">Net Pay</span>
-            <span className="font-black text-2xl text-varistor-limeText tabular-nums">{fmt(record.netPay)}</span>
+            {parseError && (
+              <div className="mt-4 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+                {parseError}
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Auto-mail notice */}
-          <p className="text-[11px] text-gray-400 mt-4 text-center">
-            ✉ Auto-mailed on 15 {record.month} · 10:00 IST via scheduled cron
-          </p>
-        </div>
+        {/* ── Step 2: Preview ── */}
+        {step === 'preview' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="font-semibold text-varistor-dark text-sm">
+                  📄 {fileName} — {rows.length} rows parsed
+                </p>
+                {invalidRows.length > 0 && (
+                  <p className="text-xs text-red-600 mt-0.5">
+                    ⚠ {invalidRows.length} row{invalidRows.length > 1 ? 's' : ''} missing name/email — will be skipped
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setStep('idle'); setRows([]); setFileName(''); setParseError(''); }}
+                  className="text-xs px-3 py-1.5 border border-varistor-border rounded-lg hover:bg-gray-50 text-varistor-muted"
+                >
+                  ← Re-upload
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={validRows.length === 0}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-varistor-lime text-white text-sm font-semibold rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-50"
+                >
+                  <Send size={14} /> Generate &amp; Send {validRows.length} Slips
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-varistor-border">
+              <table className="w-full text-sm min-w-[700px]">
+                <thead className="bg-varistor-pageBg text-xs text-varistor-muted border-b border-varistor-border">
+                  <tr>
+                    {['#', 'Name', 'Email', 'Dept', 'CTC', 'Deductions', 'Net Pay', 'Month', ''].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left font-semibold uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-varistor-border">
+                  {rows.map((row, idx) => {
+                    const invalid = !row.name || !row.email;
+                    return (
+                      <tr key={idx} className={`${invalid ? 'bg-red-50' : 'hover:bg-varistor-pageBg'} transition-colors`}>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs">{idx + 1}</td>
+                        <td className="px-4 py-2.5 font-semibold text-varistor-dark">
+                          {row.name || <span className="text-red-500 text-xs">Missing</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs">
+                          {row.email || <span className="text-red-500">Missing</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs">{row.department || '—'}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{fmt(row.ctc)}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-xs font-mono text-red-600">{fmt(row.deductions)}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-xs font-bold text-varistor-limeText">{fmt(row.netPay)}</td>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs">{row.month || MONTH}</td>
+                        <td className="px-4 py-2.5">
+                          <button
+                            onClick={() => removeRow(idx)}
+                            className="text-gray-300 hover:text-red-500 transition-colors"
+                            title="Remove row"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {parseError && (
+              <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+                {parseError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 3: Sending progress ── */}
+        {step === 'sending' && (
+          <div className="py-8 text-center">
+            <div className="w-16 h-16 bg-varistor-limeLight rounded-full flex items-center justify-center mx-auto mb-4">
+              <Send size={28} className="text-varistor-lime animate-pulse" />
+            </div>
+            <p className="font-bold text-varistor-dark mb-1">Generating &amp; sending salary slips…</p>
+            <p className="text-sm text-varistor-muted mb-6">Dispatching {rows.length} emails via Resend · please wait</p>
+            <div className="max-w-xs mx-auto">
+              <div className="w-full bg-varistor-border rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-varistor-lime h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-varistor-muted mt-2">{progress}%</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: Done ── */}
+        {step === 'done' && sendResult && (
+          <div className="py-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 bg-varistor-limeLight rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 size={28} className="text-varistor-lime" />
+              </div>
+              <div>
+                <p className="font-bold text-varistor-dark text-base">Dispatch complete!</p>
+                <p className="text-sm text-varistor-muted mt-0.5">
+                  <span className="text-varistor-limeText font-semibold">{sendResult.sent} slips sent</span>
+                  {sendResult.failed.length > 0 && (
+                    <span className="text-red-600 font-semibold"> · {sendResult.failed.length} failed</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {sendResult.failed.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wider mb-2">Failed deliveries</p>
+                <div className="space-y-1">
+                  {sendResult.failed.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-red-600">
+                      <AlertTriangle size={12} />
+                      <span className="font-semibold">{f.name}</span>
+                      <span className="text-red-400">&lt;{f.email}&gt;</span>
+                      <span className="text-red-400">— {f.error}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setStep('idle'); setRows([]); setFileName(''); setSendResult(null); setProgress(0); }}
+                className="px-4 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight text-varistor-dark"
+              >
+                Upload another file
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -186,11 +531,10 @@ const SalaryEngine: React.FC = () => {
   const [applyingAll, setApplyingAll] = useState(false);
   const [previewRecord, setPreviewRecord] = useState<PayrollRecord | null>(null);
   const [showAudit, setShowAudit] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState('');
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [sortField, setSortField] = useState<keyof PayrollRecord>('employeeName');
   const [sortAsc, setSortAsc] = useState(true);
   const [filterDept, setFilterDept] = useState('All');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,27 +569,20 @@ const SalaryEngine: React.FC = () => {
   };
 
   const toggleAll = () => {
-    if (selectedIds.size === visible.filter(r => r.status === 'draft').length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(visible.filter(r => r.status === 'draft').map(r => r.id)));
-    }
+    const draftIds = visible.filter(r => r.status === 'draft').map(r => r.id);
+    if (selectedIds.size === draftIds.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(draftIds));
   };
 
   const handleCTCChange = async (id: string, value: string) => {
     const ctc = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(ctc)) return;
     const updated = await updatePayrollRecord(id, { ctc });
-    if (updated) {
-      setRecords(prev => prev.map(r => r.id === id ? updated : r));
-    }
+    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
   };
 
   const handleApprove = async () => {
-    const draftSelected = [...selectedIds].filter(id => {
-      const r = records.find(r => r.id === id);
-      return r?.status === 'draft';
-    });
+    const draftSelected = [...selectedIds].filter(id => records.find(r => r.id === id)?.status === 'draft');
     if (!draftSelected.length) return;
     setApproving(true);
     await approvePayroll(draftSelected, 'hr@varistor.in');
@@ -266,19 +603,6 @@ const SalaryEngine: React.FC = () => {
     await load();
   };
 
-  const handleUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadMsg(`Template "${file.name}" uploaded — formulas synced.`);
-      setTimeout(() => setUploadMsg(''), 4000);
-    }
-    e.target.value = '';
-  };
-
   const draftCount = records.filter(r => r.status === 'draft').length;
   const approvedCount = records.filter(r => r.status === 'approved').length;
   const totalNetPay = records.reduce((s, r) => s + r.netPay, 0);
@@ -290,12 +614,8 @@ const SalaryEngine: React.FC = () => {
 
   return (
     <div className="max-w-full pb-20 animate-[fadeInPage_250ms_ease-out]">
-      {/* Preview Modal */}
-      {previewRecord && (
-        <SalarySlip record={previewRecord} onClose={() => setPreviewRecord(null)} />
-      )}
+      {previewRecord && <SalarySlip record={previewRecord} onClose={() => setPreviewRecord(null)} />}
 
-      {/* Audit Modal */}
       {showAudit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
@@ -304,20 +624,19 @@ const SalaryEngine: React.FC = () => {
               <button onClick={() => setShowAudit(false)} className="text-gray-400 hover:text-gray-700">✕</button>
             </div>
             <div className="p-6 space-y-3">
-              {payrollAuditLog.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-6">No audit entries yet.</p>
-              ) : (
-                payrollAuditLog.slice().reverse().map((entry, i) => (
-                  <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-lg text-sm">
-                    <ShieldCheck size={16} className="text-varistor-lime mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-gray-800">{entry.action} · {entry.employeeId}</p>
-                      <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.netPay)}</p>
-                      <p className="text-gray-400 text-[11px]">{new Date(entry.timestamp).toLocaleString('en-IN')}</p>
+              {payrollAuditLog.length === 0
+                ? <p className="text-sm text-gray-500 text-center py-6">No audit entries yet.</p>
+                : payrollAuditLog.slice().reverse().map((entry, i) => (
+                    <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-lg text-sm">
+                      <ShieldCheck size={16} className="text-varistor-lime mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-gray-800">{entry.action} · {entry.employeeId}</p>
+                        <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.netPay)}</p>
+                        <p className="text-gray-400 text-[11px]">{new Date(entry.timestamp).toLocaleString('en-IN')}</p>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+              }
             </div>
           </div>
         </div>
@@ -333,12 +652,15 @@ const SalaryEngine: React.FC = () => {
           <p className="text-sm text-varistor-muted mt-0.5">Excel-driven formula engine · {MONTH} · {records.length} employees</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={onFileSelected} />
           <button
-            onClick={handleUpload}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark"
+            onClick={() => setShowUploadPanel(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${
+              showUploadPanel
+                ? 'bg-varistor-lime text-white border-varistor-lime'
+                : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
+            }`}
           >
-            <Upload size={14} /> Upload xlsx template
+            <Mail size={14} /> {showUploadPanel ? 'Hide Upload Panel' : 'Upload Excel & Send Slips'}
           </button>
           <button
             onClick={handleApplyAll}
@@ -346,7 +668,7 @@ const SalaryEngine: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark disabled:opacity-50"
           >
             {applyingAll ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Apply to all employees
+            Apply formulas to all
           </button>
           <button
             onClick={() => setShowAudit(true)}
@@ -367,15 +689,12 @@ const SalaryEngine: React.FC = () => {
         </div>
       </div>
 
-      {/* Upload success notice */}
-      {uploadMsg && (
-        <div className="mb-4 px-4 py-3 bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg text-sm text-[#15803d] flex items-center gap-2">
-          <CheckCircle2 size={15} /> {uploadMsg}
-          <span className="ml-auto text-xs text-gray-400">· Cron: 15th of each month · 10:00 IST · auto-email slip</span>
-        </div>
+      {/* Excel Upload Panel */}
+      {showUploadPanel && (
+        <ExcelUploadPanel onClose={() => setShowUploadPanel(false)} />
       )}
 
-      {/* Stats bar */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Total Employees', val: records.length, icon: Users, color: 'text-blue-500' },
@@ -395,7 +714,7 @@ const SalaryEngine: React.FC = () => {
         ))}
       </div>
 
-      {/* Formula Reference Card */}
+      {/* Formula Reference */}
       <div className="bg-white rounded-varistor border border-varistor-border p-5 mb-6 shadow-varistor">
         <p className="text-xs font-bold text-varistor-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
           <BarChart3 size={13} /> Payroll Formulas (Excel-driven)
@@ -414,9 +733,7 @@ const SalaryEngine: React.FC = () => {
                 <tr key={row.component} className="hover:bg-varistor-pageBg">
                   <td className="py-2 font-semibold text-varistor-dark">{row.component}</td>
                   <td className="py-2"><FormulaBadge formula={row.formula} /></td>
-                  <td className="py-2 text-center">
-                    <CheckCircle2 size={14} className="text-varistor-lime inline" />
-                  </td>
+                  <td className="py-2 text-center"><CheckCircle2 size={14} className="text-varistor-lime inline" /></td>
                 </tr>
               ))}
             </tbody>
@@ -434,9 +751,7 @@ const SalaryEngine: React.FC = () => {
           {departments.map(d => <option key={d}>{d}</option>)}
         </select>
         <span className="text-xs text-varistor-muted">{visible.length} employees shown</span>
-        {selectedIds.size > 0 && (
-          <span className="text-xs font-semibold text-varistor-lime">{selectedIds.size} selected for approval</span>
-        )}
+        {selectedIds.size > 0 && <span className="text-xs font-semibold text-varistor-lime">{selectedIds.size} selected</span>}
       </div>
 
       {/* Main Table */}
@@ -452,7 +767,7 @@ const SalaryEngine: React.FC = () => {
               <thead className="bg-varistor-pageBg border-b border-varistor-border text-xs text-varistor-muted">
                 <tr>
                   <th className="px-4 py-3 w-10">
-                    <button onClick={toggleAll} className="text-varistor-muted hover:text-varistor-lime">
+                    <button onClick={toggleAll}>
                       {selectedIds.size > 0 ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} />}
                     </button>
                   </th>
@@ -486,31 +801,21 @@ const SalaryEngine: React.FC = () => {
                   const isSelected = selectedIds.has(rec.id);
                   const isApproved = rec.status === 'approved';
                   return (
-                    <tr
-                      key={rec.id}
-                      className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'} ${isApproved ? 'opacity-80' : ''}`}
-                    >
-                      {/* Checkbox */}
+                    <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
                       <td className="px-4 py-3">
                         {!isApproved ? (
                           <button onClick={() => toggleSelect(rec.id)}>
-                            {isSelected
-                              ? <CheckSquare size={15} className="text-varistor-lime" />
-                              : <Square size={15} className="text-gray-300" />
-                            }
+                            {isSelected ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} className="text-gray-300" />}
                           </button>
                         ) : (
                           <Lock size={13} className="text-gray-300 mx-auto" />
                         )}
                       </td>
-                      {/* Name */}
                       <td className="px-4 py-3">
                         <div className="font-semibold text-varistor-dark">{rec.employeeName}</div>
                         <div className="text-[11px] text-varistor-muted">{rec.employeeId}</div>
                       </td>
-                      {/* Dept */}
                       <td className="px-4 py-3 text-varistor-muted">{rec.department}</td>
-                      {/* CTC (editable if draft & Admin) */}
                       <td className="px-4 py-3">
                         {isAdmin && !isApproved ? (
                           <input
@@ -523,17 +828,10 @@ const SalaryEngine: React.FC = () => {
                           <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
                         )}
                       </td>
-                      {/* Formula cells */}
-                      {(['basic', 'hra', 'pf', 'tds'] as const).map(field => (
-                        <td key={field} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">
-                          {fmt(rec.components[field])}
-                        </td>
+                      {(['basic', 'hra', 'pf', 'tds'] as const).map(f => (
+                        <td key={f} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.components[f])}</td>
                       ))}
-                      {/* Net Pay */}
-                      <td className="px-4 py-3">
-                        <span className="font-bold text-varistor-limeText tabular-nums">{fmt(rec.netPay)}</span>
-                      </td>
-                      {/* Status */}
+                      <td className="px-4 py-3"><span className="font-bold text-varistor-limeText tabular-nums">{fmt(rec.netPay)}</span></td>
                       <td className="px-4 py-3">
                         {isApproved ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-varistor-limeTint text-varistor-limeText text-[11px] font-semibold rounded-full">
@@ -545,22 +843,13 @@ const SalaryEngine: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setPreviewRecord(rec)}
-                            className="p-1.5 rounded-lg hover:bg-varistor-limeLight text-varistor-muted hover:text-varistor-lime transition-colors"
-                            title="Preview Slip"
-                          >
+                          <button onClick={() => setPreviewRecord(rec)} className="p-1.5 rounded-lg hover:bg-varistor-limeLight text-varistor-muted hover:text-varistor-lime" title="Preview">
                             <Eye size={14} />
                           </button>
                           {isApproved && isAdmin && (
-                            <button
-                              onClick={() => handleRevision(rec.id)}
-                              className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-400 hover:text-orange-600 transition-colors"
-                              title="Create new revision"
-                            >
+                            <button onClick={() => handleRevision(rec.id)} className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-400 hover:text-orange-600" title="New revision">
                               <RefreshCw size={14} />
                             </button>
                           )}
@@ -586,36 +875,26 @@ const EmployeePayrollView: React.FC = () => {
   const [selected, setSelected] = useState<PayrollRecord | null>(null);
 
   useEffect(() => {
-    getPayrollRecords(LOGGED_IN_EMP).then(data => {
-      setRecords(data);
-      setLoading(false);
-    });
+    getPayrollRecords(LOGGED_IN_EMP).then(data => { setRecords(data); setLoading(false); });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw size={20} className="animate-spin text-varistor-lime" />
-        <span className="ml-2 text-sm text-varistor-muted">Loading your salary slips…</span>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <RefreshCw size={20} className="animate-spin text-varistor-lime" />
+      <span className="ml-2 text-sm text-varistor-muted">Loading your salary slips…</span>
+    </div>
+  );
 
   const rec = records[0];
 
   return (
     <div className="max-w-2xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
       {selected && <SalarySlip record={selected} onClose={() => setSelected(null)} />}
-
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-xl font-bold text-varistor-dark flex items-center gap-2">
-          <FileText size={20} className="text-varistor-lime" />
-          My Salary Slips
+          <FileText size={20} className="text-varistor-lime" /> My Salary Slips
         </h1>
-        <p className="text-sm text-varistor-muted mt-0.5">
-          Read-only · Showing your slips only · {MONTH}
-        </p>
+        <p className="text-sm text-varistor-muted mt-0.5">Read-only · Showing your slips only · {MONTH}</p>
       </div>
 
       {!rec ? (
@@ -625,48 +904,34 @@ const EmployeePayrollView: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Quick summary card */}
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 mb-5">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <p className="font-bold text-varistor-dark text-base">{rec.employeeName}</p>
                 <p className="text-xs text-varistor-muted">{rec.employeeId} · {rec.department}</p>
               </div>
-              {rec.status === 'approved' ? (
-                <span className="flex items-center gap-1 text-xs font-semibold bg-varistor-limeTint text-varistor-limeText px-3 py-1.5 rounded-full">
-                  <ShieldCheck size={12} /> Approved
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs font-semibold bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full border border-yellow-200">
-                  <Clock size={12} /> Pending Approval
-                </span>
-              )}
+              {rec.status === 'approved'
+                ? <span className="flex items-center gap-1 text-xs font-semibold bg-varistor-limeTint text-varistor-limeText px-3 py-1.5 rounded-full"><ShieldCheck size={12} /> Approved</span>
+                : <span className="flex items-center gap-1 text-xs font-semibold bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full border border-yellow-200"><Clock size={12} /> Pending</span>
+              }
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Monthly CTC', val: fmt(rec.ctc), sub: '' },
-                { label: 'Net Pay', val: fmt(rec.netPay), sub: 'After deductions', highlight: true },
-                { label: 'Basic', val: fmt(rec.components.basic), sub: '60% of CTC' },
-                { label: 'HRA', val: fmt(rec.components.hra), sub: '40% of Basic' },
-                { label: 'PF Deduction', val: fmt(rec.components.pf), sub: '12% of Basic', deduct: true },
-                { label: 'TDS Deduction', val: fmt(rec.components.tds), sub: 'Tax slab', deduct: true },
+                { label: 'Monthly CTC', val: fmt(rec.ctc) },
+                { label: 'Net Pay', val: fmt(rec.netPay), highlight: true },
+                { label: 'Basic', val: fmt(rec.components.basic) },
+                { label: 'HRA', val: fmt(rec.components.hra) },
+                { label: 'PF Deduction', val: fmt(rec.components.pf), deduct: true },
+                { label: 'TDS Deduction', val: fmt(rec.components.tds), deduct: true },
               ].map(item => (
-                <div
-                  key={item.label}
-                  className={`rounded-lg p-3 border ${item.highlight ? 'bg-varistor-limeLight border-varistor-lime' : 'bg-varistor-pageBg border-varistor-border'}`}
-                >
+                <div key={item.label} className={`rounded-lg p-3 border ${item.highlight ? 'bg-varistor-limeLight border-varistor-lime' : 'bg-varistor-pageBg border-varistor-border'}`}>
                   <p className="text-[11px] text-varistor-muted">{item.label}</p>
-                  <p className={`font-bold mt-0.5 tabular-nums ${item.deduct ? 'text-red-600' : item.highlight ? 'text-varistor-limeText text-lg' : 'text-varistor-dark text-sm'}`}>
-                    {item.val}
-                  </p>
-                  {item.sub && <p className="text-[10px] text-varistor-muted mt-0.5">{item.sub}</p>}
+                  <p className={`font-bold mt-0.5 tabular-nums ${item.deduct ? 'text-red-600' : item.highlight ? 'text-varistor-limeText text-lg' : 'text-varistor-dark text-sm'}`}>{item.val}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Slips list */}
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
             <div className="px-5 py-4 border-b border-varistor-border flex items-center justify-between">
               <p className="font-semibold text-varistor-dark text-sm">Available Slips</p>
@@ -683,37 +948,27 @@ const EmployeePayrollView: React.FC = () => {
                     <p className="text-[11px] text-varistor-muted">Net: {fmt(r.netPay)} · Rev {r.revision}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {r.status === 'approved'
-                    ? <Lock size={12} className="text-varistor-lime" />
-                    : <Clock size={12} className="text-yellow-500" />
-                  }
-                  <button
-                    onClick={() => setSelected(r)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-varistor-lime text-white text-xs font-semibold rounded-lg hover:bg-[#65a30d] transition-colors"
-                  >
-                    <Download size={12} /> View / Download
-                  </button>
-                </div>
+                <button
+                  onClick={() => setSelected(r)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-varistor-lime text-white text-xs font-semibold rounded-lg hover:bg-[#65a30d] transition-colors"
+                >
+                  <Eye size={12} /> View / Download
+                </button>
               </div>
             ))}
           </div>
-
-          <p className="text-[11px] text-varistor-muted text-center mt-4">
-            ✉ Slip auto-mailed on 15th of each month · 10:00 IST via cron + Resend
-          </p>
+          <p className="text-[11px] text-varistor-muted text-center mt-4">✉ Slip auto-mailed on 15th of each month · 10:00 IST via cron + Resend</p>
         </>
       )}
     </div>
   );
 };
 
-// ─── Root Payroll Component ───────────────────────────────────────────────────
+// ─── Root ──────────────────────────────────────────────────────────────────────
 
 const Payroll: React.FC = () => {
   const { currentRole } = useVariPoints();
-  const isAdminOrHR = currentRole === 'Admin' || currentRole === 'HR';
-  return isAdminOrHR ? <SalaryEngine /> : <EmployeePayrollView />;
+  return (currentRole === 'Admin' || currentRole === 'HR') ? <SalaryEngine /> : <EmployeePayrollView />;
 };
 
 export default Payroll;
