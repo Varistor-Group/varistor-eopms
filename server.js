@@ -210,7 +210,7 @@ app.post('/api/employees', async (req, res) => {
   const db = await readDB();
   const employee = req.body;
   if (!db.employees) db.employees = [];
-  
+
   const duplicate = db.employees.find(
     e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
   );
@@ -219,7 +219,7 @@ app.post('/api/employees', async (req, res) => {
   }
 
   db.employees.push(employee);
-  
+
   if (!db.activity_log) db.activity_log = [];
   db.activity_log.push({
     id: Date.now().toString(),
@@ -411,125 +411,230 @@ app.delete('/api/policies/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Leave Management email notifications ─────────────────────────────────────
+
+// POST /api/leave/notify-manager
+// Sends an email to the reporting manager when an employee submits a leave request
+app.post('/api/leave/notify-manager', async (req, res) => {
+  try {
+    const { employeeName, leaveType, from, to, days, reason, managerEmail } = req.body;
+
+    if (!employeeName || !leaveType || !from || !to || !managerEmail) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: managerEmail,
+      subject: `Leave Request: ${employeeName} – ${leaveType} (${days} day/s)`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">New Leave Request</h1>
+          </div>
+          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+            <p>A leave request is awaiting your review on <strong>Varistor EOPMS</strong>.</p>
+            <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
+              <tr style="background:#f9f9f9;">
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Employee</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${employeeName}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Type</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${leaveType}</td>
+              </tr>
+              <tr style="background:#f9f9f9;">
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Dates</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${from} → ${to} (${days} working day/s)</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Reason</td>
+                <td style="padding:10px 12px; border:1px solid #eee;">${reason || '—'}</td>
+              </tr>
+            </table>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="http://localhost:5173" style="background-color: #84CC16; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">Approve / Reject in EOPMS</a>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send leave notification email' });
+  }
+});
+
+// POST /api/leave/notify-employee
+// Sends email to employee when their leave is approved or rejected
+app.post('/api/leave/notify-employee', async (req, res) => {
+  try {
+    const { employeeEmail, employeeName, leaveId, status, comment } = req.body;
+
+    if (!employeeEmail || !leaveId || !status) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const approved = status === 'Approved';
+    const statusColor = approved ? '#84CC16' : '#ef4444';
+
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: employeeEmail,
+      subject: `Your Leave Request ${leaveId} has been ${status}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <div style="background-color: ${statusColor}; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">Leave ${status}</h1>
+          </div>
+          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+            <p>Hi ${employeeName || ''},</p>
+            <p>Your leave request <strong>${leaveId}</strong> has been <strong style="color:${statusColor};">${status.toLowerCase()}</strong>.</p>
+            ${!approved && comment ? `<p style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:4px; font-size:13px;"><strong>Reviewer comment:</strong> ${comment}</p>` : ''}
+            <p style="font-size:12px; color:#888; margin-top:24px;">This is an automated message from Varistor EOPMS Leave Management.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send leave status email' });
+  }
+});
+
 
 app.listen(port, () => {
   console.log
-// Payroll route imported from Task-D
-// Generate A4 Salary Slip PDF buffer using pdfkit
-const generateSalarySlipPDF = (slip) => {
-  return new Promise((resolve, reject) => {
+  // Payroll route imported from Task-D
+  // Generate A4 Salary Slip PDF buffer using pdfkit
+  const generateSalarySlipPDF = (slip) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const chunks = [];
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', (err) => reject(err));
+
+        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+        const fmt = (n) => 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+        // 1. Header Banner (Lime green)
+        doc.rect(40, 40, 515, 60).fill('#84cc16');
+        doc.fillColor('#ffffff')
+          .fontSize(16)
+          .font('Helvetica-Bold')
+          .text('VARISTOR TECHNOLOGIES PVT LTD', 55, 52);
+        doc.fontSize(10)
+          .font('Helvetica')
+          .text(`Salary Slip - ${month}`, 55, 75);
+
+        // V Logo Badge inside banner
+        doc.circle(510, 70, 20).fill('#ffffff');
+        doc.fillColor('#84cc16')
+          .fontSize(18)
+          .font('Helvetica-Bold')
+          .text('V', 504, 63);
+
+        // 2. Employee Info Grid
+        doc.fillColor('#111111').fontSize(10);
+
+        const infoY1 = 125;
+        const infoY2 = 145;
+
+        doc.font('Helvetica-Bold').text('Employee:', 55, infoY1).font('Helvetica').text(slip.name, 140, infoY1);
+        doc.font('Helvetica-Bold').text('Employee ID:', 300, infoY1).font('Helvetica').text(slip.employeeId || 'ΓÇö', 390, infoY1);
+
+        doc.font('Helvetica-Bold').text('Department:', 55, infoY2).font('Helvetica').text(slip.department || 'ΓÇö', 140, infoY2);
+        doc.font('Helvetica-Bold').text('Monthly CTC:', 300, infoY2).font('Helvetica').text(fmt(slip.ctc), 390, infoY2);
+
+        // Divider line
+        doc.moveTo(40, 175).lineTo(555, 175).strokeColor('#d8ded2').lineWidth(1).stroke();
+
+        // 3. Earnings & Deductions Headers
+        doc.fillColor('#868e80')
+          .fontSize(9)
+          .font('Helvetica-Bold')
+          .text('EARNINGS', 55, 195)
+          .text('DEDUCTIONS', 300, 195);
+
+        // 4. Details
+        doc.fillColor('#111111').fontSize(10).font('Helvetica');
+
+        // Earnings Row 1
+        doc.text('Gross Pay', 55, 215)
+          .font('Helvetica-Bold').text(fmt(slip.ctc), 200, 215, { align: 'right', width: 60 });
+
+        // Deductions Row 1
+        doc.font('Helvetica').text('Total Deductions', 300, 215)
+          .font('Helvetica-Bold').fillColor('#b91c1c').text(fmt(slip.deductions), 450, 215, { align: 'right', width: 60 });
+
+        // Vertical separator
+        doc.moveTo(280, 195).lineTo(280, 240).strokeColor('#d8ded2').stroke();
+
+        // Divider line
+        doc.moveTo(40, 260).lineTo(555, 260).strokeColor('#d8ded2').stroke();
+
+        // 5. Net Pay Block
+        doc.rect(40, 275, 515, 45).fill('#f7fee7');
+        doc.rect(40, 275, 515, 45).strokeColor('#d9f99d').stroke();
+
+        doc.fillColor('#365314')
+          .fontSize(12)
+          .font('Helvetica-Bold')
+          .text('Net Pay', 55, 292);
+
+        doc.fillColor('#3f6212')
+          .fontSize(18)
+          .font('Helvetica-Bold')
+          .text(fmt(netPay), 420, 287, { align: 'right', width: 110 });
+
+        // 6. Footer
+        doc.fillColor('#868e80')
+          .fontSize(8)
+          .font('Helvetica')
+          .text('This is a system-generated salary slip from Varistor EOPMS. No signature required.', 40, 350, { align: 'center', width: 515 });
+        doc.text('Auto-dispatched via scheduled cron - Resend', 40, 365, { align: 'center', width: 515 });
+
+        doc.end();
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
+
+  // ΓöÇΓöÇ Modules 11 & 12: Bulk salary slip emails ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  app.post('/api/payroll/send-slips', async (req, res) => {
     try {
-      const doc = new PDFDocument({ size: 'A4', margin: 40 });
-      const chunks = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', (err) => reject(err));
+      const { slips } = req.body;
+      if (!Array.isArray(slips) || slips.length === 0) {
+        return res.status(400).json({ success: false, error: 'No slip data provided.' });
+      }
 
-      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
-      const fmt = (n) => 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+      console.log(`[Payroll] Received request to send ${slips.length} slips`);
+      console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
 
-      // 1. Header Banner (Lime green)
-      doc.rect(40, 40, 515, 60).fill('#84cc16');
-      doc.fillColor('#ffffff')
-         .fontSize(16)
-         .font('Helvetica-Bold')
-         .text('VARISTOR TECHNOLOGIES PVT LTD', 55, 52);
-      doc.fontSize(10)
-         .font('Helvetica')
-         .text(`Salary Slip - ${month}`, 55, 75);
+      const fmt = (n) => 'Γé╣' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-      // V Logo Badge inside banner
-      doc.circle(510, 70, 20).fill('#ffffff');
-      doc.fillColor('#84cc16')
-         .fontSize(18)
-         .font('Helvetica-Bold')
-         .text('V', 504, 63);
-
-      // 2. Employee Info Grid
-      doc.fillColor('#111111').fontSize(10);
-      
-      const infoY1 = 125;
-      const infoY2 = 145;
-      
-      doc.font('Helvetica-Bold').text('Employee:', 55, infoY1).font('Helvetica').text(slip.name, 140, infoY1);
-      doc.font('Helvetica-Bold').text('Employee ID:', 300, infoY1).font('Helvetica').text(slip.employeeId || 'ΓÇö', 390, infoY1);
-      
-      doc.font('Helvetica-Bold').text('Department:', 55, infoY2).font('Helvetica').text(slip.department || 'ΓÇö', 140, infoY2);
-      doc.font('Helvetica-Bold').text('Monthly CTC:', 300, infoY2).font('Helvetica').text(fmt(slip.ctc), 390, infoY2);
-
-      // Divider line
-      doc.moveTo(40, 175).lineTo(555, 175).strokeColor('#d8ded2').lineWidth(1).stroke();
-
-      // 3. Earnings & Deductions Headers
-      doc.fillColor('#868e80')
-         .fontSize(9)
-         .font('Helvetica-Bold')
-         .text('EARNINGS', 55, 195)
-         .text('DEDUCTIONS', 300, 195);
-
-      // 4. Details
-      doc.fillColor('#111111').fontSize(10).font('Helvetica');
-      
-      // Earnings Row 1
-      doc.text('Gross Pay', 55, 215)
-         .font('Helvetica-Bold').text(fmt(slip.ctc), 200, 215, { align: 'right', width: 60 });
-         
-      // Deductions Row 1
-      doc.font('Helvetica').text('Total Deductions', 300, 215)
-         .font('Helvetica-Bold').fillColor('#b91c1c').text(fmt(slip.deductions), 450, 215, { align: 'right', width: 60 });
-
-      // Vertical separator
-      doc.moveTo(280, 195).lineTo(280, 240).strokeColor('#d8ded2').stroke();
-
-      // Divider line
-      doc.moveTo(40, 260).lineTo(555, 260).strokeColor('#d8ded2').stroke();
-
-      // 5. Net Pay Block
-      doc.rect(40, 275, 515, 45).fill('#f7fee7');
-      doc.rect(40, 275, 515, 45).strokeColor('#d9f99d').stroke();
-      
-      doc.fillColor('#365314')
-         .fontSize(12)
-         .font('Helvetica-Bold')
-         .text('Net Pay', 55, 292);
-         
-      doc.fillColor('#3f6212')
-         .fontSize(18)
-         .font('Helvetica-Bold')
-         .text(fmt(netPay), 420, 287, { align: 'right', width: 110 });
-
-      // 6. Footer
-      doc.fillColor('#868e80')
-         .fontSize(8)
-         .font('Helvetica')
-         .text('This is a system-generated salary slip from Varistor EOPMS. No signature required.', 40, 350, { align: 'center', width: 515 });
-      doc.text('Auto-dispatched via scheduled cron - Resend', 40, 365, { align: 'center', width: 515 });
-
-      doc.end();
-    } catch (e) {
-      reject(e);
-    }
-  });
-};
-
-// ΓöÇΓöÇ Modules 11 & 12: Bulk salary slip emails ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-app.post('/api/payroll/send-slips', async (req, res) => {
-  try {
-    const { slips } = req.body;
-    if (!Array.isArray(slips) || slips.length === 0) {
-      return res.status(400).json({ success: false, error: 'No slip data provided.' });
-    }
-
-    console.log(`[Payroll] Received request to send ${slips.length} slips`);
-    console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
-
-    const fmt = (n) => 'Γé╣' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-
-    const buildSlipHtml = (slip) => {
-      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
-      return `<!DOCTYPE html>
+      const buildSlipHtml = (slip) => {
+        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
+        return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Salary Slip ΓÇô ${month}</title></head>
@@ -602,58 +707,58 @@ app.post('/api/payroll/send-slips', async (req, res) => {
   </table>
 </body>
 </html>`;
-    };
+      };
 
-    const sent = [];
-    const failed = [];
+      const sent = [];
+      const failed = [];
 
-    for (const slip of slips) {
-      if (!slip.email || !slip.name) {
-        failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
-        continue;
-      }
-      try {
-        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-        const pdfBuffer = await generateSalarySlipPDF(slip);
-
-        const result = await resend.emails.send({
-          from: 'onboarding@resend.dev',
-          to: slip.email,
-          subject: `Your Salary Slip ΓÇô ${month} | Varistor Technologies`,
-          html: buildSlipHtml(slip),
-          attachments: [
-            {
-              filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
-              content: pdfBuffer.toString('base64'),
-            }
-          ]
-        });
-        // Resend SDK can return { data, error } or throw
-        const resendError = result?.error;
-        if (resendError) {
-          const msg = resendError.message || JSON.stringify(resendError);
-          console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
-          failed.push({ email: slip.email, name: slip.name, error: msg });
-        } else {
-          sent.push(slip.email);
-          console.log(`[Payroll] Γ£ô Sent to ${slip.name} <${slip.email}>`);
+      for (const slip of slips) {
+        if (!slip.email || !slip.name) {
+          failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+          continue;
         }
-      } catch (err) {
-        console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
-        failed.push({ email: slip.email, name: slip.name, error: err.message });
+        try {
+          const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+          const pdfBuffer = await generateSalarySlipPDF(slip);
+
+          const result = await resend.emails.send({
+            from: 'onboarding@resend.dev',
+            to: slip.email,
+            subject: `Your Salary Slip ΓÇô ${month} | Varistor Technologies`,
+            html: buildSlipHtml(slip),
+            attachments: [
+              {
+                filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
+                content: pdfBuffer.toString('base64'),
+              }
+            ]
+          });
+          // Resend SDK can return { data, error } or throw
+          const resendError = result?.error;
+          if (resendError) {
+            const msg = resendError.message || JSON.stringify(resendError);
+            console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
+            failed.push({ email: slip.email, name: slip.name, error: msg });
+          } else {
+            sent.push(slip.email);
+            console.log(`[Payroll] Γ£ô Sent to ${slip.name} <${slip.email}>`);
+          }
+        } catch (err) {
+          console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
+          failed.push({ email: slip.email, name: slip.name, error: err.message });
+        }
+        await new Promise(r => setTimeout(r, 120));
       }
-      await new Promise(r => setTimeout(r, 120));
+
+      console.log(`[Payroll] Done ΓÇö ${sent.length} sent, ${failed.length} failed`);
+      return res.json({ success: true, sent: sent.length, failed });
+    } catch (outerErr) {
+      console.error('[Payroll] ROUTE CRASHED:', outerErr);
+      return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
     }
+  });
 
-    console.log(`[Payroll] Done ΓÇö ${sent.length} sent, ${failed.length} failed`);
-    return res.json({ success: true, sent: sent.length, failed });
-  } catch (outerErr) {
-    console.error('[Payroll] ROUTE CRASHED:', outerErr);
-    return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
-  }
-});
+  // Activity
 
-// Activity
-
-(`[Email Server] running on http://localhost:${port}`);
+  (`[Email Server] running on http://localhost:${port}`);
 });

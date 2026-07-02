@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { MapPin, Clock, RefreshCw, Calendar as Users } from 'lucide-react';
+import { MapPin, Clock, RefreshCw, Users } from 'lucide-react';
 import type { LatestLocation, LocationEntry } from '../types';
+import type { Employee } from '../api/employees';
 import { getLatestLocations, getLocationHistory, getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
 
@@ -99,7 +101,7 @@ const LiveMapTab: React.FC = () => {
           </Marker>
         ))}
       </MapContainer>
-      
+
       {locations.length === 0 && (
         <div className="absolute inset-0 z-[500] flex items-center justify-center bg-white/70 backdrop-blur-sm pointer-events-none">
           <div className="bg-white px-6 py-4 rounded-lg shadow-sm border border-varistor-border text-center">
@@ -235,10 +237,10 @@ const HistoryTab: React.FC = () => {
                 {history.length > 0 && (
                   <>
                     <FitBoundsOnLoad locations={history.map(l => ({ lat: l.latitude, lng: l.longitude }))} />
-                    <Polyline 
-                      positions={history.map(l => [l.latitude, l.longitude])} 
-                      color="#84cc16" 
-                      weight={4} 
+                    <Polyline
+                      positions={history.map(l => [l.latitude, l.longitude])}
+                      color="#84cc16"
+                      weight={4}
                       opacity={0.8}
                     />
                     {/* Start Marker */}
