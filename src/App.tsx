@@ -159,7 +159,7 @@ const AppContent: React.FC = () => {
               } else if (currentRole === 'Reporting Manager') {
                 return ['dashboard', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'chat', 'training'];
               }
             };
 
