@@ -15,7 +15,7 @@ import { mockEmployeeStore } from './employees';
 const SELF_NAME = 'Aarav Patel';
 const SELF_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60';
 
-const BASE_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
+const DEFAULT_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
   { id: 'all-hands', name: 'all-hands', pinned: 'POSH policy.pdf' },
   { id: 'sales-team', name: 'sales-team' },
   { id: 'operations', name: 'operations' },
@@ -23,9 +23,30 @@ const BASE_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
   { id: 'hr-announcements', name: 'hr-announcements' },
 ];
 
+const CHANNELS_KEY = 'eopms_chat_channels_v1';
+
+function loadChannelList(): Omit<ChatChannel, 'memberCount'>[] {
+  const saved = localStorage.getItem(CHANNELS_KEY);
+  if (saved) return JSON.parse(saved);
+  localStorage.setItem(CHANNELS_KEY, JSON.stringify(DEFAULT_CHANNELS));
+  return DEFAULT_CHANNELS;
+}
+
+function saveChannelList(channels: Omit<ChatChannel, 'memberCount'>[]) {
+  localStorage.setItem(CHANNELS_KEY, JSON.stringify(channels));
+}
+
+function slugify(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function buildChannels(): ChatChannel[] {
   // Member count reflects the actual employee directory, not an invented headcount.
-  return BASE_CHANNELS.map(c => ({ ...c, memberCount: mockEmployeeStore.length }));
+  return loadChannelList().map(c => ({ ...c, memberCount: mockEmployeeStore.length }));
 }
 
 function seedMessages(): ChatMessage[] {
@@ -105,6 +126,40 @@ export const chatApi = {
   deleteMessage(messageId: string) {
     const messages = loadMessages().filter(m => m.id !== messageId);
     saveMessages(messages);
+    notifyUpdated();
+  },
+
+  createChannel(name: string): ChatChannel {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Channel name is required.');
+
+    const id = slugify(trimmed);
+    if (!id) throw new Error('Channel name must contain at least one letter or number.');
+
+    const existing = loadChannelList();
+    if (existing.some(c => c.id === id || c.name.toLowerCase() === trimmed.toLowerCase())) {
+      throw new Error(`#${trimmed} already exists.`);
+    }
+
+    const channel: Omit<ChatChannel, 'memberCount'> = { id, name: trimmed };
+    saveChannelList([...existing, channel]);
+    notifyUpdated();
+
+    return { ...channel, memberCount: mockEmployeeStore.length };
+  },
+
+  deleteChannel(channelId: ChannelId) {
+    const existing = loadChannelList();
+    if (existing.length <= 1) throw new Error('At least one channel must remain.');
+
+    saveChannelList(existing.filter(c => c.id !== channelId));
+
+    // Cascade: a deleted channel takes its messages and read-state with it.
+    saveMessages(loadMessages().filter(m => m.channelId !== channelId));
+    const lastRead = loadLastRead();
+    delete lastRead[channelId];
+    saveLastRead(lastRead);
+
     notifyUpdated();
   },
 

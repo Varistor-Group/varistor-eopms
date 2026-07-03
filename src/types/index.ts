@@ -94,7 +94,7 @@ export interface AnnouncementDTO extends Announcement {
   isRead: boolean;
 }
 
-export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+export type ChannelId = string;
 
 export interface ChatChannel {
   id: ChannelId;

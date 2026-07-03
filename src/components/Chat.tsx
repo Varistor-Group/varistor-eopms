@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2 } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus } from 'lucide-react';
 import { chatApi } from '../api/chat';
 import { useVariPoints } from '../hooks/useVariPoints';
-import type { ChannelId, ChatMessage, ChatAttachment } from '../types';
+import { Modal } from './shared/Modal';
+import { Input } from './shared/Input';
+import { Button } from './shared/Button';
+import type { ChannelId, ChatChannel, ChatMessage, ChatAttachment } from '../types';
 
 type PendingAttachment = Required<Pick<ChatAttachment, 'name' | 'size' | 'type' | 'dataUrl'>>;
 
@@ -45,7 +48,8 @@ function renderMessageText(text: string) {
 export const Chat: React.FC = () => {
   const { currentRole } = useVariPoints();
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
-  const channels = chatApi.getChannels();
+  const canManageChannels = currentRole === 'Admin';
+  const [channels, setChannels] = useState<ChatChannel[]>(() => chatApi.getChannels());
   const [activeChannelId, setActiveChannelId] = useState<ChannelId>('all-hands');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -54,12 +58,16 @@ export const Chat: React.FC = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
+  const [channelError, setChannelError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const activeChannel = channels.find(c => c.id === activeChannelId)!;
+  const activeChannel = channels.find(c => c.id === activeChannelId) ?? channels[0];
 
   const refreshUnread = () => setUnread(chatApi.getUnreadSummary());
+  const refreshChannels = () => setChannels(chatApi.getChannels());
 
   const loadChannelMessages = async (channelId: ChannelId) => {
     setIsLoading(true);
@@ -77,10 +85,20 @@ export const Chat: React.FC = () => {
 
   useEffect(() => {
     refreshUnread();
-    const handler = () => refreshUnread();
+    const handler = () => {
+      refreshUnread();
+      refreshChannels();
+    };
     window.addEventListener(chatApi.CHAT_EVENT, handler);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
   }, []);
+
+  // If the active channel was deleted (by this tab or another), fall back to whatever remains.
+  useEffect(() => {
+    if (channels.length > 0 && !channels.some(c => c.id === activeChannelId)) {
+      setActiveChannelId(channels[0].id);
+    }
+  }, [channels, activeChannelId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,37 +158,88 @@ export const Chat: React.FC = () => {
     setShowEmojiPicker(false);
   };
 
+  const openCreateChannel = () => {
+    setNewChannelName('');
+    setChannelError(null);
+    setShowCreateChannel(true);
+  };
+
+  const handleCreateChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const channel = chatApi.createChannel(newChannelName);
+      refreshChannels();
+      setActiveChannelId(channel.id);
+      setShowCreateChannel(false);
+    } catch (err) {
+      setChannelError(err instanceof Error ? err.message : 'Could not create channel.');
+    }
+  };
+
+  const handleDeleteChannel = (e: React.MouseEvent, channel: ChatChannel) => {
+    e.stopPropagation();
+    const confirmed = window.confirm(`Delete #${channel.name}? This removes it and all its messages for everyone.`);
+    if (!confirmed) return;
+
+    try {
+      chatApi.deleteChannel(channel.id);
+      refreshChannels();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not delete channel.');
+    }
+  };
+
   return (
     <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
       {/* Channel List */}
       <aside className="w-56 flex-shrink-0 border-r border-varistor-border flex flex-col bg-varistor-surfaceMuted">
-        <div className="px-4 py-3 border-b border-varistor-border">
+        <div className="px-4 py-3 border-b border-varistor-border flex items-center justify-between">
           <span className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider">Channels</span>
+          {canManageChannels && (
+            <button
+              onClick={openCreateChannel}
+              title="Create channel"
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
+            >
+              <Plus size={14} />
+            </button>
+          )}
         </div>
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
           {channels.map(channel => {
             const isActive = channel.id === activeChannelId;
             const unreadCount = unread.byChannel[channel.id];
+            const canDeleteChannel = canManageChannels && channels.length > 1;
             return (
-              <button
-                key={channel.id}
-                onClick={() => setActiveChannelId(channel.id)}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-varistor cursor-pointer border-l-[3px] ${
-                  isActive
-                    ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
-                    : 'text-varistor-muted border-transparent hover:bg-black/5 dark:hover:bg-white/5 hover:text-varistor-dark'
-                }`}
-              >
-                <span className="flex items-center gap-1.5 truncate">
-                  <Hash size={13} className="flex-shrink-0" />
-                  <span className="truncate">{channel.name}</span>
-                </span>
-                {!isActive && unreadCount > 0 && (
-                  <span className="flex-shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-varistor-lime text-black text-[9px] font-extrabold flex items-center justify-center">
-                    {unreadCount}
+              <div key={channel.id} className="group relative">
+                <button
+                  onClick={() => setActiveChannelId(channel.id)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-varistor cursor-pointer border-l-[3px] ${
+                    isActive
+                      ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
+                      : 'text-varistor-muted border-transparent hover:bg-black/5 dark:hover:bg-white/5 hover:text-varistor-dark'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Hash size={13} className="flex-shrink-0" />
+                    <span className="truncate">{channel.name}</span>
                   </span>
+                  {!isActive && unreadCount > 0 && (
+                    <span className={`flex-shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-varistor-lime text-black text-[9px] font-extrabold flex items-center justify-center ${canDeleteChannel ? 'group-hover:hidden' : ''}`}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                {canDeleteChannel && (
+                  <button
+                    onClick={(e) => handleDeleteChannel(e, channel)}
+                    title={`Delete #${channel.name}`}
+                    className="hidden group-hover:flex absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-varistor-muted hover:text-varistor-dangerText hover:bg-varistor-dangerBg transition-all cursor-pointer"
+                  >
+                    <Trash2 size={11} />
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </nav>
@@ -386,6 +455,28 @@ export const Chat: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Create Channel Modal - Admin only */}
+      <Modal isOpen={showCreateChannel} onClose={() => setShowCreateChannel(false)} title="Create a channel">
+        <form onSubmit={handleCreateChannel} className="flex flex-col gap-4">
+          <Input
+            label="Channel name"
+            placeholder="e.g. design-team"
+            value={newChannelName}
+            onChange={(e) => setNewChannelName(e.target.value)}
+            error={channelError ?? undefined}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setShowCreateChannel(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={!newChannelName.trim()}>
+              Create channel
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
