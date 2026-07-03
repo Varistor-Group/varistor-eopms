@@ -20,8 +20,8 @@ import TrainingLibrary from './components/TrainingLibrary';
 import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
 import Payroll from './components/Payroll';
-import { LeaveManagement } from './components/LeaveManagement';
 import { Attendance } from './components/Attendance';
+import Leaves from './components/Leaves';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -190,9 +190,9 @@ const AppContent: React.FC = () => {
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
-                {activeTab === 'leaves' && <LeaveManagement />}
                 {activeTab === 'payroll' && <Payroll />}
                 {activeTab === 'attendance' && <Attendance />}
+                {activeTab === 'leaves' && <Leaves />}
               </>
             );
           })()}

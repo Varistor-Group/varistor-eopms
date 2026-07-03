@@ -1,9 +1,8 @@
-import PDFDocument from 'pdfkit';
 import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
+import PDFDocument from 'pdfkit';
 import fs from 'fs/promises';
-import multer from 'multer';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
@@ -21,7 +20,7 @@ const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 // CORS middleware to allow requests from Vite frontend
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -39,8 +38,8 @@ app.post('/api/send-credentials', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
-      subject: `Welcome to Varistor EOPMS - Your Login Credentials (To: ${email})`,
+      to: email,
+      subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
           <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -87,8 +86,8 @@ app.post('/api/send-password-reset', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
-      subject: `Password Reset Request (To: ${email})`,
+      to: email,
+      subject: 'Password Reset Request',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
           <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -166,8 +165,8 @@ app.post('/api/quiz/submit', async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: 'akash@varistor.in', // Forced to verified testing email for Resend free tier
-      subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%) (To: ${recipients.join(', ')})`,
+      to: recipients,
+      subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%)`,
       html,
     });
 
@@ -212,7 +211,7 @@ app.post('/api/employees', async (req, res) => {
   const db = await readDB();
   const employee = req.body;
   if (!db.employees) db.employees = [];
-
+  
   const duplicate = db.employees.find(
     e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
   );
@@ -221,7 +220,7 @@ app.post('/api/employees', async (req, res) => {
   }
 
   db.employees.push(employee);
-
+  
   if (!db.activity_log) db.activity_log = [];
   db.activity_log.push({
     id: Date.now().toString(),
@@ -267,31 +266,6 @@ app.put('/api/employees/:id', async (req, res) => {
   res.json({ success: true, employee: db.employees[index] });
 });
 
-app.delete('/api/employees/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  if (!db.employees) db.employees = [];
-
-  const index = db.employees.findIndex(e => e.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Employee not found.' });
-  }
-
-  const deletedEmployee = db.employees.splice(index, 1)[0];
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'DELETE_EMPLOYEE',
-    by: 'admin@varistor.in',
-    details: `Deleted employee ${deletedEmployee.fullName} (${id})`,
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true });
-});
-
 // Documents
 app.get('/api/documents/:employeeId', async (req, res) => {
   const db = await readDB();
@@ -299,354 +273,553 @@ app.get('/api/documents/:employeeId', async (req, res) => {
   res.json(docs);
 });
 
-// Upload new document (Employee)
-app.post('/api/documents', async (req, res) => {
-  const db = await readDB();
-  const { employeeId, filename, type, size } = req.body;
-  if (!employeeId || !filename) {
-    return res.status(400).json({ success: false, error: 'Missing required fields' });
+const numberToWords = (num) => {
+  if (num === 0) return 'Rupees Zero Only';
+
+  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const doubleDigits = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tensPlace = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convertTwoDigits(n) {
+    if (n < 10) return singleDigits[n];
+    if (n < 20) return doubleDigits[n - 10];
+    const unit = n % 10;
+    const ten = Math.floor(n / 10);
+    return tensPlace[ten] + (unit ? '-' + singleDigits[unit] : '');
   }
 
-  if (!db.documents) db.documents = [];
-  
-  const newDoc = {
-    id: `doc-${Date.now()}`,
-    employeeId,
-    filename,
-    type: type || 'PDF',
-    size: size || '1.2 MB',
-    status: 'Pending',
-    uploadedAt: new Date().toISOString()
-  };
-
-  db.documents.push(newDoc);
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'document_uploaded',
-    by: employeeId,
-    details: `Uploaded document ${filename}`,
-    metadata: { documentId: newDoc.id },
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, document: newDoc });
-});
-
-// Update document status (HR / Admin)
-app.put('/api/documents/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const { status, performedBy } = req.body;
-
-  if (!status) {
-    return res.status(400).json({ success: false, error: 'status is required' });
+  function convertThreeDigits(n) {
+    const hundred = Math.floor(n / 100);
+    const rest = n % 100;
+    let str = '';
+    if (hundred) {
+      str += singleDigits[hundred] + ' Hundred';
+    }
+    if (rest) {
+      if (str) str += ' and ';
+      str += convertTwoDigits(rest);
+    }
+    return str;
   }
 
-  const index = (db.documents || []).findIndex(d => d.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Document not found.' });
-  }
+  const parts = Number(num).toFixed(2).split('.');
+  const rupeesVal = parseInt(parts[0], 10);
+  const paiseVal = parseInt(parts[1], 10);
 
-  db.documents[index].status = status;
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'document_status_changed',
-    by: performedBy || 'hr@varistor.in',
-    details: `Document ${id} status changed to ${status}`,
-    metadata: { documentId: id, newStatus: status },
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, document: db.documents[index] });
-});
-
-// Upload/Replace specific document file (Employee) with Encryption Payload
-app.post('/api/documents/:id/upload', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const { filename, type, size, payload } = req.body;
-
-  const index = (db.documents || []).findIndex(d => d.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Document not found.' });
-  }
-
-  db.documents[index].filename = filename || db.documents[index].filename;
-  db.documents[index].type = type || db.documents[index].type;
-  db.documents[index].size = size || db.documents[index].size;
-  db.documents[index].payload = payload || db.documents[index].payload; // Base64 ciphertext
-  db.documents[index].status = 'Pending';
-  db.documents[index].uploadedAt = new Date().toISOString();
-
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    action: 'document_replaced',
-    by: db.documents[index].employeeId,
-    details: `Uploaded new encrypted file ${filename} for document slot`,
-    metadata: { documentId: id },
-    timestamp: new Date().toISOString()
-  });
-
-  await writeDB(db);
-  res.json({ success: true, document: db.documents[index] });
-});
-
-// Download specific document payload
-app.get('/api/documents/:id/download', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const doc = (db.documents || []).find(d => d.id === id);
-  
-  if (!doc || !doc.payload) {
-    return res.status(404).json({ success: false, error: 'Encrypted payload not found for this document.' });
-  }
-  
-  res.json({ success: true, payload: doc.payload, filename: doc.filename });
-});
-
-// Activity
-app.post('/api/activity', async (req, res) => {
-  const db = await readDB();
-  const log = req.body;
-  if (!db.activity_log) db.activity_log = [];
-  db.activity_log.push({
-    id: Date.now().toString(),
-    ...log,
-    timestamp: new Date().toISOString()
-  });
-  await writeDB(db);
-  res.json({ success: true });
-});
-
-// ── Field Tracker (mock endpoints for future real location pings) ─────────────
-
-// POST /api/field/location
-// Body: { employeeId, lat, lng, accuracy, batteryLevel, status }
-app.post('/api/field/location', (req, res) => {
-  const { employeeId, lat, lng, accuracy, batteryLevel, status } = req.body;
-  if (!employeeId || lat === undefined || lng === undefined) {
-    return res.status(400).json({ success: false, error: 'Missing required fields' });
-  }
-  // In production this would write to Supabase
-  console.log(`[Field Tracker] Location ping from ${employeeId}: (${lat}, ${lng})`);
-  res.json({ success: true, message: 'Location recorded (mock)' });
-});
-
-// GET /api/field/locations
-app.get('/api/field/locations', (req, res) => {
-  // Mock response — in production fetch from Supabase
-  res.json({ success: true, locations: [] });
-});
-
-// Policies — GET all
-app.get('/api/policies', async (req, res) => {
-  const db = await readDB();
-  res.json(db.policies || []);
-});
-
-// Policies — POST (add new)
-app.post('/api/policies', async (req, res) => {
-  const db = await readDB();
-  const policy = req.body;
-  if (!policy.title || !policy.content) {
-    return res.status(400).json({ success: false, error: 'title and content are required' });
-  }
-  if (!db.policies) db.policies = [];
-  const newPolicy = {
-    id: `pol-${Date.now()}`,
-    title: policy.title,
-    category: policy.category || 'General',
-    severity: policy.severity || 'standard',
-    content: policy.content,
-    effectiveDate: policy.effectiveDate || new Date().toISOString().split('T')[0],
-    createdAt: new Date().toISOString()
-  };
-  db.policies.push(newPolicy);
-  await writeDB(db);
-  res.json({ success: true, policy: newPolicy });
-});
-
-// Policies — PUT (update by id)
-app.put('/api/policies/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const index = (db.policies || []).findIndex(p => p.id === id);
-  if (index === -1) return res.status(404).json({ success: false, error: 'Policy not found.' });
-  db.policies[index] = { ...db.policies[index], ...req.body, id, updatedAt: new Date().toISOString() };
-  await writeDB(db);
-  res.json({ success: true, policy: db.policies[index] });
-});
-
-// Policies — DELETE
-app.delete('/api/policies/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  if (!db.policies) return res.status(404).json({ success: false, error: 'Policy not found.' });
-  db.policies = db.policies.filter(p => p.id !== id);
-  await writeDB(db);
-  res.json({ success: true });
-});
-
-// ── Training modules (HR/Admin video uploads — Task C) ───────────────────────
-
-const TRAINING_UPLOAD_DIR = path.join(__dirname, 'server_uploads', 'training');
-fs.mkdir(TRAINING_UPLOAD_DIR, { recursive: true }).catch(err =>
-  console.error('Failed to create training uploads folder', err)
-);
-
-// Serve uploaded videos statically: http://localhost:3001/uploads/training/<id>.mp4
-app.use('/uploads', express.static(path.join(__dirname, 'server_uploads')));
-
-const trainingStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, TRAINING_UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    // Unique generated name derived from the module id — never the original filename
-    const moduleId = `mod-custom-${Date.now()}`;
-    req.generatedModuleId = moduleId;
-    cb(null, `${moduleId}.mp4`);
-  },
-});
-
-const trainingUpload = multer({
-  storage: trainingStorage,
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
-  fileFilter: (req, file, cb) => {
-    const isMp4 =
-      file.mimetype === 'video/mp4' &&
-      path.extname(file.originalname).toLowerCase() === '.mp4';
-    if (!isMp4) return cb(new Error('Only .mp4 video files are accepted.'));
-    cb(null, true);
-  },
-});
-
-// Training modules — GET all
-app.get('/api/training/modules', async (req, res) => {
-  const db = await readDB();
-  res.json(db.training_modules || []);
-});
-
-// Training questions — GET by module id
-app.get('/api/training/questions/:moduleId', async (req, res) => {
-  const db = await readDB();
-  res.json((db.training_questions || {})[req.params.moduleId] || []);
-});
-
-// Training modules — POST (multipart: 'video' file OR video_url + metadata + quiz)
-app.post('/api/training/modules', (req, res) => {
-  trainingUpload.single('video')(req, res, async (err) => {
-    if (err) {
-      const msg =
-        err.code === 'LIMIT_FILE_SIZE'
-          ? 'Video exceeds the 200 MB size limit.'
-          : err.message || 'Upload failed.';
-      return res.status(400).json({ success: false, error: msg });
+  let rupeesStr = '';
+  if (rupeesVal === 0) {
+    rupeesStr = 'Zero';
+  } else {
+    let tempVal = rupeesVal;
+    
+    // Crores
+    const crores = Math.floor(tempVal / 10000000);
+    tempVal %= 10000000;
+    if (crores) {
+      rupeesStr += convertThreeDigits(crores) + ' Crore ';
     }
 
-    const cleanupFile = async () => {
-      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+    // Lakhs
+    const lakhs = Math.floor(tempVal / 100000);
+    tempVal %= 100000;
+    if (lakhs) {
+      rupeesStr += convertTwoDigits(lakhs) + ' Lakh ';
+    }
+
+    // Thousands
+    const thousands = Math.floor(tempVal / 1000);
+    tempVal %= 1000;
+    if (thousands) {
+      rupeesStr += convertTwoDigits(thousands) + ' Thousand ';
+    }
+
+    if (tempVal) {
+      rupeesStr += convertThreeDigits(tempVal);
+    }
+  }
+
+  let paiseStr = '';
+  if (paiseVal > 0) {
+    paiseStr = ' and ' + convertTwoDigits(paiseVal) + ' Paise';
+  }
+
+  return `Rupees ${rupeesStr.trim()}${paiseStr} Only`;
+};
+
+// Generate A4 Salary Slip PDF buffer using pdfkit
+const generateSalarySlipPDF = (slip) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Green checkmark logo
+      doc.lineWidth(3).strokeColor('#84cc16');
+      doc.moveTo(145, 52).lineTo(152, 59).lineTo(167, 43).stroke();
+      doc.fillColor('#111111')
+         .fontSize(20)
+         .font('Helvetica-Bold')
+         .text('Varistor Technologies Pvt. Ltd.', 180, 40);
+
+      // Company details
+      doc.fillColor('#555555')
+         .fontSize(8)
+         .font('Helvetica')
+         .text('No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048', 40, 70, { align: 'center', width: 515 });
+      doc.text('Email - hr@varistor.in, Telephone - 080 4117 8911', 40, 82, { align: 'center', width: 515 });
+
+      // Yellow banner
+      doc.rect(40, 96, 515, 18).fill('#fef08a');
+      doc.fillColor('#000000')
+         .fontSize(10)
+         .font('Helvetica-Bold')
+         .text(`Pay Slip for the Month of ${slip.month || 'June 2026'}`, 40, 101, { align: 'center', width: 515 });
+
+      // Employee Grid Lines
+      doc.lineWidth(1).strokeColor('#cccccc');
+      doc.moveTo(40, 114).lineTo(555, 114).stroke();
+      doc.moveTo(40, 132).lineTo(555, 132).stroke();
+      doc.moveTo(40, 150).lineTo(555, 150).stroke();
+      doc.moveTo(40, 168).lineTo(555, 168).stroke();
+      doc.moveTo(40, 186).lineTo(555, 186).stroke();
+
+      doc.moveTo(40, 114).lineTo(40, 186).stroke();
+      doc.moveTo(150, 114).lineTo(150, 186).stroke();
+      doc.moveTo(297.5, 114).lineTo(297.5, 186).stroke();
+      doc.moveTo(400, 114).lineTo(400, 186).stroke();
+      doc.moveTo(555, 114).lineTo(555, 186).stroke();
+
+      // Employee Details Values
+      doc.fillColor('#111111').fontSize(9);
+      
+      // Row 1
+      doc.font('Helvetica-Bold').text('Emp ID.', 45, 120);
+      doc.font('Helvetica').text(slip.employeeId || '—', 155, 120);
+      doc.font('Helvetica-Bold').text('Designation', 302, 120);
+      doc.font('Helvetica').text(slip.designation || '—', 405, 120);
+
+      // Row 2
+      doc.font('Helvetica-Bold').text('Employee Name', 45, 138);
+      doc.font('Helvetica').text(slip.name || '—', 155, 138);
+      doc.font('Helvetica-Bold').text('Department', 302, 138);
+      doc.font('Helvetica').text(slip.department || '—', 405, 138);
+
+      // Row 3
+      doc.font('Helvetica-Bold').text('No. of Days', 45, 156);
+      doc.font('Helvetica').text(String(slip.totalDays || 30), 155, 156);
+      doc.font('Helvetica-Bold').text('Paid No. of Days', 302, 156);
+      doc.font('Helvetica').text(String(slip.payDays || 30), 405, 156);
+
+      // Row 4
+      doc.font('Helvetica-Bold').text('PF UAN No.', 45, 174);
+      doc.font('Helvetica').text(slip.pfUan || '—', 155, 174);
+      doc.font('Helvetica-Bold').text('CL Balance', 302, 174);
+      doc.font('Helvetica').text(String(slip.clBalance || 0), 405, 174);
+
+      // Table Header Background
+      doc.rect(40, 186, 515, 18).fill('#bfdbfe');
+      
+      // Table Header Text
+      doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
+      doc.text('Earnings', 45, 191);
+      doc.text('Amount (Rs.)', 210, 191, { align: 'right', width: 82 });
+      doc.text('Deductions', 302, 191);
+      doc.text('Amount (Rs.)', 470, 191, { align: 'right', width: 80 });
+
+      // Table Row Content
+      const earnings = [
+        { label: 'Salary', val: slip.monthlySalary },
+        { label: 'Basic', val: slip.basic },
+        { label: 'HRA', val: slip.hra },
+        { label: 'Medical', val: slip.medical },
+        { label: 'TA', val: slip.ta },
+        { label: 'LTA', val: slip.lta },
+        { label: 'Special Allowance', val: slip.specialAllowance },
+        { label: 'Reimbursement', val: slip.reimbursement },
+        { label: 'Incentives', val: slip.incentives },
+        { label: 'OT Hours', val: slip.overtime },
+      ];
+
+      const deductions = [
+        { label: 'PF Employee', val: slip.pfEmployee },
+        { label: 'PF Employer', val: slip.pfEmployer },
+        { label: 'ESI', val: slip.esi },
+        { label: 'PT', val: slip.pt },
+        { label: 'TDS', val: slip.tds },
+        { label: 'Other Deductions', val: slip.otherDeductions },
+        { label: '', val: null },
+        { label: '', val: null },
+        { label: '', val: null },
+        { label: '', val: null },
+      ];
+
+      let currentY = 204;
+      for (let idx = 0; idx < 10; idx++) {
+        const earn = earnings[idx];
+        doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
+        if (earn.label) {
+          doc.text(earn.label, 45, currentY + 3);
+          if (earn.val !== null && earn.val !== undefined) {
+            doc.text(fmt(earn.val), 210, currentY + 3, { align: 'right', width: 82 });
+          }
+        }
+
+        const deduct = deductions[idx];
+        if (deduct.label) {
+          doc.text(deduct.label, 302, currentY + 3);
+          if (deduct.val !== null && deduct.val !== undefined) {
+            doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
+          }
+        }
+
+        // Draw divider
+        doc.lineWidth(1).strokeColor('#e5e7eb');
+        doc.moveTo(40, currentY + 16).lineTo(555, currentY + 16).stroke();
+        currentY += 16;
+      }
+
+      // Vertical lines for the table grid
+      doc.lineWidth(1).strokeColor('#cccccc');
+      doc.moveTo(40, 186).lineTo(40, currentY).stroke();
+      doc.moveTo(210, 186).lineTo(210, currentY).stroke();
+      doc.moveTo(297.5, 186).lineTo(297.5, currentY).stroke();
+      doc.moveTo(470, 186).lineTo(470, currentY).stroke();
+      doc.moveTo(555, 186).lineTo(555, currentY).stroke();
+
+      // Totals Row
+      doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
+      
+      doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
+      doc.text('Total CTC', 45, currentY + 5);
+      doc.text(fmt(slip.ctc), 210, currentY + 5, { align: 'right', width: 82 });
+      
+      doc.text('Total Deduction', 302, currentY + 5);
+      doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
+
+      // Outlines for Totals row
+      doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
+      doc.moveTo(40, currentY + 20).lineTo(555, currentY + 20).stroke();
+      doc.moveTo(40, currentY).lineTo(40, currentY + 20).stroke();
+      doc.moveTo(210, currentY).lineTo(210, currentY + 20).stroke();
+      doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 20).stroke();
+      doc.moveTo(470, currentY).lineTo(470, currentY + 20).stroke();
+      doc.moveTo(555, currentY).lineTo(555, currentY + 20).stroke();
+      
+      currentY += 20;
+
+      // Net Pay Row
+      doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
+      doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
+      
+      doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
+      doc.text('NetPay [In-Hand]', 45, currentY + 13);
+      
+      doc.fontSize(14).font('Helvetica-Bold');
+      doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
+
+      // Number to Words
+      const words = numberToWords(slip.netPay);
+      doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
+      doc.text(words, 305, currentY + 8, { width: 242, align: 'center' });
+
+      // Borders for Net Pay row
+      doc.moveTo(40, currentY + 36).lineTo(555, currentY + 36).stroke();
+      doc.moveTo(40, currentY).lineTo(40, currentY + 36).stroke();
+      doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 36).stroke();
+      doc.moveTo(555, currentY).lineTo(555, currentY + 36).stroke();
+      
+      currentY += 36;
+
+      // Footer
+      doc.fillColor('#555555')
+         .fontSize(8.5)
+         .font('Helvetica-Bold')
+         .text('This is a computer generated payslip no signature is required.', 40, currentY + 12, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
+// ── Modules 11 & 12: Bulk salary slip emails ──────────────────────────────────
+app.post('/api/payroll/send-slips', async (req, res) => {
+  try {
+    const { slips } = req.body;
+    if (!Array.isArray(slips) || slips.length === 0) {
+      return res.status(400).json({ success: false, error: 'No slip data provided.' });
+    }
+
+    console.log(`[Payroll] Received request to send ${slips.length} slips`);
+    console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
+
+    const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+
+    const buildSlipHtml = (slip) => {
+      const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+      const words = numberToWords(slip.netPay);
+      return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salary Slip – ${month}</title></head>
+<body style="margin:0;padding:0;background:#f4f6f3;font-family:Arial,Helvetica,sans-serif;color:#111;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
+        <tr>
+          <td style="padding:24px 32px;text-align:center;border-bottom:1px solid #d8ded2;">
+            <p style="margin:0;color:#111;font-size:22px;font-weight:700;">Varistor Technologies Pvt. Ltd.</p>
+            <p style="margin:6px 0 0;color:#555;font-size:11px;">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
+            <p style="margin:2px 0 0;color:#555;font-size:11px;">Email - hr@varistor.in, Telephone - 080 4117 8911</p>
+          </td>
+        </tr>
+        <tr bgcolor="#fef08a">
+          <td style="padding:10px;text-align:center;font-weight:bold;font-size:13px;color:#111;">
+            Pay Slip for the Month of ${month}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px 0;">
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
+              <tr>
+                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Emp ID.</td>
+                <td width="30%" style="border:1px solid #cccccc;">${slip.employeeId || '—'}</td>
+                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Designation</td>
+                <td width="30%" style="border:1px solid #cccccc;">${slip.designation || '—'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Employee Name</td>
+                <td style="border:1px solid #cccccc;">${slip.name}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Department</td>
+                <td style="border:1px solid #cccccc;">${slip.department || '—'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">No. of Days</td>
+                <td style="border:1px solid #cccccc;">${slip.totalDays || 30}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Paid No. of Days</td>
+                <td style="border:1px solid #cccccc;">${slip.payDays || 30}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">PF UAN No.</td>
+                <td style="border:1px solid #cccccc;">${slip.pfUan || '—'}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">CL Balance</td>
+                <td style="border:1px solid #cccccc;">${slip.clBalance || 0}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;">
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
+              <tr bgcolor="#bfdbfe" style="font-weight:bold;">
+                <td width="35%" style="border:1px solid #cccccc;">Earnings</td>
+                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
+                <td width="35%" style="border:1px solid #cccccc;">Deductions</td>
+                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Salary</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.monthlySalary)}</td>
+                <td style="border:1px solid #cccccc;">PF Employee</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployee)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Basic</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
+                <td style="border:1px solid #cccccc;">PF Employer</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployer)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">HRA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
+                <td style="border:1px solid #cccccc;">ESI</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.esi)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Medical</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
+                <td style="border:1px solid #cccccc;">PT</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pt)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">TA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
+                <td style="border:1px solid #cccccc;">TDS</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.tds)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">LTA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
+                <td style="border:1px solid #cccccc;">Other Deductions</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Special Allowance</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.specialAllowance)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Reimbursement</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.reimbursement)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Incentives</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.incentives)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">OT Hours</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.overtime)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr bgcolor="#f1f5f9" style="font-weight:bold;">
+                <td style="border:1px solid #cccccc;">Total CTC</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ctc)}</td>
+                <td style="border:1px solid #cccccc;">Total Deduction</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.deductions)}</td>
+              </tr>
+              <tr>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">NetPay [In-Hand]</td>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">${fmt(slip.netPay)}</td>
+                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">${words}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;font-size:11px;color:#868e80;">
+            <p style="margin:0;font-weight:bold;">This is a computer generated payslip no signature is required.</p>
+            <p style="margin:6px 0 0;">&#9993; Auto-dispatched via EOPMS Payroll System</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
     };
 
-    try {
-      const {
-        title, description, track, department, prerequisite_id,
-        video_url, duration_seconds, order, questions, visibleToRoles,
-      } = req.body;
+    const sent = [];
+    const failed = [];
 
-      if (!title || !description || !track) {
-        await cleanupFile();
-        return res.status(400).json({ success: false, error: 'title, description and track are required' });
+    for (const slip of slips) {
+      if (!slip.email || !slip.name) {
+        failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+        continue;
       }
-      if (!req.file && !video_url) {
-        await cleanupFile();
-        return res.status(400).json({ success: false, error: 'Provide an MP4 file or a direct MP4 URL.' });
-      }
-
-      let parsedQuestions;
-      let parsedRoles;
       try {
-        parsedQuestions = JSON.parse(questions || '[]');
-        parsedRoles = JSON.parse(visibleToRoles || '[]');
-      } catch {
-        await cleanupFile();
-        return res.status(400).json({ success: false, error: 'questions and visibleToRoles must be valid JSON' });
+        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        const pdfBuffer = await generateSalarySlipPDF(slip);
+
+        const result = await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: slip.email,
+          subject: `Your Salary Slip – ${month} | Varistor Technologies`,
+          html: buildSlipHtml(slip),
+          attachments: [
+            {
+              filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
+              content: pdfBuffer.toString('base64'),
+            }
+          ]
+        });
+        // Resend SDK can return { data, error } or throw
+        const resendError = result?.error;
+        if (resendError) {
+          const msg = resendError.message || JSON.stringify(resendError);
+          console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
+          failed.push({ email: slip.email, name: slip.name, error: msg });
+        } else {
+          sent.push(slip.email);
+          console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
+        }
+      } catch (err) {
+        console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
+        failed.push({ email: slip.email, name: slip.name, error: err.message });
       }
-      if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
-        await cleanupFile();
-        return res.status(400).json({ success: false, error: 'At least one quiz question is required.' });
-      }
-
-      const moduleId = req.generatedModuleId || `mod-custom-${Date.now()}`;
-      const finalVideoUrl = req.file
-        ? `http://localhost:${port}/uploads/training/${req.file.filename}`
-        : video_url;
-
-      const newModule = {
-        id: moduleId,
-        title,
-        description,
-        track,
-        ...(department ? { department } : {}),
-        duration_seconds: Math.max(1, Math.round(Number(duration_seconds) || 0)),
-        thumbnail_url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=640&fit=crop&q=60',
-        video_url: finalVideoUrl,
-        order: Number(order) || 999,
-        prerequisite_id: prerequisite_id || null,
-        visibleToRoles: Array.isArray(parsedRoles) ? parsedRoles : [],
-        uploaded: !!req.file,
-        createdAt: new Date().toISOString(),
-      };
-
-      const newQuestions = parsedQuestions.map((q, i) => ({
-        id: `q-${moduleId}-${i + 1}`,
-        module_id: moduleId,
-        question: q.question,
-        options: q.options,
-        correct_index: q.correct_index,
-      }));
-
-      const db = await readDB();
-      if (!db.training_modules) db.training_modules = [];
-      if (!db.training_questions) db.training_questions = {};
-      db.training_modules.push(newModule);
-      db.training_questions[moduleId] = newQuestions;
-      await writeDB(db);
-
-      res.json({ success: true, module: newModule });
-    } catch (e) {
-      console.error('Failed to create training module', e);
-      await cleanupFile();
-      res.status(500).json({ success: false, error: 'Failed to create training module' });
+      await new Promise(r => setTimeout(r, 120));
     }
-  });
-});
 
-// Training modules — DELETE (also removes the uploaded file from disk)
-app.delete('/api/training/modules/:id', async (req, res) => {
-  const db = await readDB();
-  const id = req.params.id;
-  const index = (db.training_modules || []).findIndex(m => m.id === id);
-  if (index === -1) return res.status(404).json({ success: false, error: 'Module not found.' });
-
-  const [removed] = db.training_modules.splice(index, 1);
-  if (db.training_questions) delete db.training_questions[id];
-
-  if (removed.uploaded) {
-    const filePath = path.join(TRAINING_UPLOAD_DIR, `${path.basename(id)}.mp4`);
-    await fs.unlink(filePath).catch(() => {});
+    console.log(`[Payroll] Done — ${sent.length} sent, ${failed.length} failed`);
+    return res.json({ success: true, sent: sent.length, failed });
+  } catch (outerErr) {
+    console.error('[Payroll] ROUTE CRASHED:', outerErr);
+    return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
   }
-
-  await writeDB(db);
-  res.json({ success: true });
 });
 
-// ── Leave Management email notifications ─────────────────────────────────────
+// Leaves Routes
+app.get('/api/leaves', async (req, res) => {
+  const db = await readDB();
+  res.json(db.leaves || []);
+});
+
+app.post('/api/leaves', async (req, res) => {
+  try {
+    const db = await readDB();
+    if (!db.leaves) db.leaves = [];
+    const newLeave = {
+      id: 'leave-' + Date.now().toString(),
+      ...req.body,
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+    db.leaves.push(newLeave);
+
+    // Also add to activity log
+    if (!db.activity_log) db.activity_log = [];
+    db.activity_log.push({
+      id: Date.now().toString(),
+      action: 'APPLY_LEAVE',
+      by: newLeave.employeeName,
+      details: `${newLeave.employeeName} applied for ${newLeave.type} from ${newLeave.startDate} to ${newLeave.endDate}`,
+      timestamp: new Date().toISOString()
+    });
+
+    await writeDB(db);
+    res.json({ success: true, leave: newLeave });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/leaves/:id', async (req, res) => {
+  try {
+    const db = await readDB();
+    if (!db.leaves) db.leaves = [];
+    const index = db.leaves.findIndex(l => l.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ success: false, error: 'Leave request not found.' });
+    }
+    db.leaves[index].status = req.body.status;
+
+    // Log activity
+    if (!db.activity_log) db.activity_log = [];
+    db.activity_log.push({
+      id: Date.now().toString(),
+      action: `LEAVE_${req.body.status.toUpperCase()}`,
+      by: 'hr@varistor.in',
+      details: `${req.body.status} leave request for ${db.leaves[index].employeeName}`,
+      timestamp: new Date().toISOString()
+    });
+
+    await writeDB(db);
+    res.json({ success: true, leave: db.leaves[index] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // POST /api/leave/notify-manager
 // Sends an email to the reporting manager when an employee submits a leave request
@@ -752,248 +925,17 @@ app.post('/api/leave/notify-employee', async (req, res) => {
 });
 
 
-app.listen(port, () => {
-  console.log
-  // Payroll route imported from Task-D
-  // Generate A4 Salary Slip PDF buffer using pdfkit
-  const generateSalarySlipPDF = (slip) => {
-    return new Promise((resolve, reject) => {
-      try {
-        const doc = new PDFDocument({ size: 'A4', margin: 40 });
-        const chunks = [];
-        doc.on('data', (chunk) => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', (err) => reject(err));
 
-        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-        const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
-        const fmt = (n) => 'Rs ' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-        // 1. Header Banner (Lime green)
-        doc.rect(40, 40, 515, 60).fill('#84cc16');
-        doc.fillColor('#ffffff')
-          .fontSize(16)
-          .font('Helvetica-Bold')
-          .text('VARISTOR TECHNOLOGIES PVT LTD', 55, 52);
-        doc.fontSize(10)
-          .font('Helvetica')
-          .text(`Salary Slip - ${month}`, 55, 75);
+// In-memory cache for BIO PARK D-01 DEVICE BRIDGE
+let _deviceStatus = { online: false, lastSync: '—' };
+let _liveFeed = [];
+const MOCK_EMPLOYEE_NAMES = {
+  'VAR-024': 'Aarav Patel',
+  'VAR-001': 'Admin User',
+  'VAR-002': 'HR User'
+};
 
-        // V Logo Badge inside banner
-        doc.circle(510, 70, 20).fill('#ffffff');
-        doc.fillColor('#84cc16')
-          .fontSize(18)
-          .font('Helvetica-Bold')
-          .text('V', 504, 63);
-
-        // 2. Employee Info Grid
-        doc.fillColor('#111111').fontSize(10);
-
-        const infoY1 = 125;
-        const infoY2 = 145;
-
-        doc.font('Helvetica-Bold').text('Employee:', 55, infoY1).font('Helvetica').text(slip.name, 140, infoY1);
-        doc.font('Helvetica-Bold').text('Employee ID:', 300, infoY1).font('Helvetica').text(slip.employeeId || 'ΓÇö', 390, infoY1);
-
-        doc.font('Helvetica-Bold').text('Department:', 55, infoY2).font('Helvetica').text(slip.department || 'ΓÇö', 140, infoY2);
-        doc.font('Helvetica-Bold').text('Monthly CTC:', 300, infoY2).font('Helvetica').text(fmt(slip.ctc), 390, infoY2);
-
-        // Divider line
-        doc.moveTo(40, 175).lineTo(555, 175).strokeColor('#d8ded2').lineWidth(1).stroke();
-
-        // 3. Earnings & Deductions Headers
-        doc.fillColor('#868e80')
-          .fontSize(9)
-          .font('Helvetica-Bold')
-          .text('EARNINGS', 55, 195)
-          .text('DEDUCTIONS', 300, 195);
-
-        // 4. Details
-        doc.fillColor('#111111').fontSize(10).font('Helvetica');
-
-        // Earnings Row 1
-        doc.text('Gross Pay', 55, 215)
-          .font('Helvetica-Bold').text(fmt(slip.ctc), 200, 215, { align: 'right', width: 60 });
-
-        // Deductions Row 1
-        doc.font('Helvetica').text('Total Deductions', 300, 215)
-          .font('Helvetica-Bold').fillColor('#b91c1c').text(fmt(slip.deductions), 450, 215, { align: 'right', width: 60 });
-
-        // Vertical separator
-        doc.moveTo(280, 195).lineTo(280, 240).strokeColor('#d8ded2').stroke();
-
-        // Divider line
-        doc.moveTo(40, 260).lineTo(555, 260).strokeColor('#d8ded2').stroke();
-
-        // 5. Net Pay Block
-        doc.rect(40, 275, 515, 45).fill('#f7fee7');
-        doc.rect(40, 275, 515, 45).strokeColor('#d9f99d').stroke();
-
-        doc.fillColor('#365314')
-          .fontSize(12)
-          .font('Helvetica-Bold')
-          .text('Net Pay', 55, 292);
-
-        doc.fillColor('#3f6212')
-          .fontSize(18)
-          .font('Helvetica-Bold')
-          .text(fmt(netPay), 420, 287, { align: 'right', width: 110 });
-
-        // 6. Footer
-        doc.fillColor('#868e80')
-          .fontSize(8)
-          .font('Helvetica')
-          .text('This is a system-generated salary slip from Varistor EOPMS. No signature required.', 40, 350, { align: 'center', width: 515 });
-        doc.text('Auto-dispatched via scheduled cron - Resend', 40, 365, { align: 'center', width: 515 });
-
-        doc.end();
-      } catch (e) {
-        reject(e);
-      }
-    });
-  };
-
-  // ΓöÇΓöÇ Modules 11 & 12: Bulk salary slip emails ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  app.post('/api/payroll/send-slips', async (req, res) => {
-    try {
-      const { slips } = req.body;
-      if (!Array.isArray(slips) || slips.length === 0) {
-        return res.status(400).json({ success: false, error: 'No slip data provided.' });
-      }
-
-      console.log(`[Payroll] Received request to send ${slips.length} slips`);
-      console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
-
-      const fmt = (n) => 'Γé╣' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-
-      const buildSlipHtml = (slip) => {
-        const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-        const netPay = slip.netPay ?? (slip.ctc - slip.deductions);
-        return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Salary Slip ΓÇô ${month}</title></head>
-<body style="margin:0;padding:0;background:#f4f6f3;font-family:Arial,Helvetica,sans-serif;color:#111;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
-        <tr>
-          <td style="background:#84cc16;padding:24px 32px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td>
-                  <p style="margin:0;color:#fff;font-size:18px;font-weight:700;">VARISTOR TECHNOLOGIES PVT LTD</p>
-                  <p style="margin:4px 0 0;color:#ecfccb;font-size:13px;">Salary Slip &middot; ${month}</p>
-                </td>
-                <td align="right">
-                  <div style="width:44px;height:44px;background:rgba(255,255,255,0.25);border-radius:50%;text-align:center;line-height:44px;font-size:22px;font-weight:900;color:#fff;">V</div>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 32px 0;">
-            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
-              <tr><td style="color:#868e80;width:120px;">Employee</td><td style="font-weight:700;">${slip.name}</td><td style="color:#868e80;">Employee ID</td><td style="font-weight:600;">${slip.employeeId || 'ΓÇö'}</td></tr>
-              <tr><td style="color:#868e80;">Department</td><td>${slip.department || 'ΓÇö'}</td><td style="color:#868e80;">Monthly CTC</td><td style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td style="padding:16px 32px 0;"><hr style="border:none;border-top:1px solid #d8ded2;"></td></tr>
-        <tr>
-          <td style="padding:20px 32px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td width="50%" valign="top" style="padding-right:16px;">
-                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Earnings</p>
-                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
-                    <tr><td style="color:#555;">Gross Pay</td><td align="right" style="font-weight:600;">${fmt(slip.ctc)}</td></tr>
-                  </table>
-                </td>
-                <td width="50%" valign="top" style="padding-left:16px;border-left:1px solid #d8ded2;">
-                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#868e80;text-transform:uppercase;">Deductions</p>
-                  <table width="100%" cellpadding="4" cellspacing="0" style="font-size:13px;">
-                    <tr><td style="color:#555;">Total Deductions</td><td align="right" style="font-weight:600;color:#b91c1c;">${fmt(slip.deductions)}</td></tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:0 32px 24px;">
-            <table width="100%" cellpadding="16" cellspacing="0" style="background:#f7fee7;border:1px solid #d9f99d;border-radius:12px;">
-              <tr>
-                <td style="font-size:14px;font-weight:700;color:#365314;">Net Pay</td>
-                <td align="right" style="font-size:24px;font-weight:900;color:#3f6212;">${fmt(netPay)}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;font-size:11px;color:#868e80;">
-            <p style="margin:0;">System-generated salary slip ΓÇö Varistor EOPMS</p>
-            <p style="margin:6px 0 0;">&#9993; Auto-dispatched ┬╖ 15th of each month ┬╖ 10:00 IST</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-      };
-
-      const sent = [];
-      const failed = [];
-
-      for (const slip of slips) {
-        if (!slip.email || !slip.name) {
-          failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
-          continue;
-        }
-        try {
-          const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-          const pdfBuffer = await generateSalarySlipPDF(slip);
-
-          const result = await resend.emails.send({
-            from: 'onboarding@resend.dev',
-            to: slip.email,
-            subject: `Your Salary Slip ΓÇô ${month} | Varistor Technologies`,
-            html: buildSlipHtml(slip),
-            attachments: [
-              {
-                filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
-                content: pdfBuffer.toString('base64'),
-              }
-            ]
-          });
-          // Resend SDK can return { data, error } or throw
-          const resendError = result?.error;
-          if (resendError) {
-            const msg = resendError.message || JSON.stringify(resendError);
-            console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
-            failed.push({ email: slip.email, name: slip.name, error: msg });
-          } else {
-            sent.push(slip.email);
-            console.log(`[Payroll] Γ£ô Sent to ${slip.name} <${slip.email}>`);
-          }
-        } catch (err) {
-          console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
-          failed.push({ email: slip.email, name: slip.name, error: err.message });
-        }
-        await new Promise(r => setTimeout(r, 120));
-      }
-
-      console.log(`[Payroll] Done ΓÇö ${sent.length} sent, ${failed.length} failed`);
-      return res.json({ success: true, sent: sent.length, failed });
-    } catch (outerErr) {
-      console.error('[Payroll] ROUTE CRASHED:', outerErr);
-      return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
-    }
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════
   // BIO PARK D-01 DEVICE BRIDGE — Attendance Module
   // ZKTeco ADMS protocol over TCP port 4370 at 192.168.1.42
   // Gracefully falls back to mock data when device is offline.
@@ -1229,7 +1171,21 @@ app.listen(port, () => {
   // parsed data from the binary packet stream.
   app._processPunchEvent = processPunchEvent;
 
-  // Activity
 
-  (`[Email Server] running on http://localhost:${port}`);
+// Activity
+app.post('/api/activity', async (req, res) => {
+  const db = await readDB();
+  const log = req.body;
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    ...log,
+    timestamp: new Date().toISOString()
+  });
+  await writeDB(db);
+  res.json({ success: true });
+});
+
+app.listen(port, () => {
+  console.log(`[Email Server] running on http://localhost:${port}`);
 });

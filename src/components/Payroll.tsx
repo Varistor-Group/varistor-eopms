@@ -15,6 +15,7 @@ import {
   applyFormulaToAll,
   payrollAuditLog,
   sendBulkSlips,
+  numberToWords,
   type PayrollRecord,
   type SlipRow,
   type BulkSendResult
@@ -35,13 +36,24 @@ const LOGGED_IN_EMP = 'VAR-024';
 
 // Column name aliases — tolerant parsing of Excel headers
 const COL_ALIASES: Record<string, string[]> = {
-  name:         ['name', 'full name', 'employee name', 'emp name', 'fullname'],
-  email:        ['email', 'email id', 'mail', 'email address', 'e-mail'],
-  ctc:          ['ctc', 'monthly ctc', 'gross', 'gross salary', 'total ctc'],
-  deductions:   ['deductions', 'total deductions', 'deductibles', 'total deductibles', 'deduction'],
-  employeeId:   ['employee id', 'emp id', 'id', 'employee_id', 'empid', 'var id'],
-  department:   ['department', 'dept', 'division'],
-  month:        ['month', 'pay month', 'salary month'],
+  name:            ['name', 'full name', 'employee name', 'emp name', 'fullname'],
+  email:           ['email', 'email id', 'mail', 'email address', 'e-mail'],
+  monthlySalary:   ['salary', 'monthly salary', 'monthly_salary', 'monthly salary (rs.)', 'salary amount'],
+  ctc:             ['ctc', 'monthly ctc', 'total ctc', 'ctc amount'],
+  totalDays:       ['total days', 'total_days', 'no. of days', 'no of days', 'days in month'],
+  payDays:         ['pay days', 'pay_days', 'paid days', 'paid no of days', 'paid no. of days', 'paid number of days', 'days present'],
+  designation:     ['designation', 'role', 'job title', 'post'],
+  department:      ['department', 'dept', 'division'],
+  pfUan:           ['pf uan', 'pf uan no.', 'uan', 'uan no', 'pf uan no'],
+  clBalance:       ['cl balance', 'cl_balance', 'casual leave balance', 'cl'],
+  medical:         ['medical', 'medical allowance', 'medical allowance (rs.)'],
+  ta:              ['ta', 'travel allowance', 'travel allowance (rs.)', 'transport allowance'],
+  lta:             ['lta', 'leave travel allowance', 'leave travel allowance (rs.)'],
+  reimbursement:   ['reimbursement', 'reimbursements'],
+  incentives:      ['incentive', 'incentives'],
+  overtime:        ['overtime', 'ot', 'ot hours', 'ot pay'],
+  tds:             ['tds', 'tax deducted at source', 'income tax'],
+  otherDeductions: ['other deductions', 'other_deductions', 'deductions', 'total deductions']
 };
 
 function resolveHeader(raw: string): string | null {
@@ -73,9 +85,33 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
 // ─── Salary Slip Preview Modal ─────────────────────────────────────────────────
 
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
+  const netPayWords = numberToWords(record.netPay);
+
+  const c = record.components || {};
+  const monthlySalary = record.monthlySalary ?? record.ctc ?? 0;
+  const basic = c.basic ?? 0;
+  const hra = c.hra ?? 0;
+  const medical = c.medical ?? 1250;
+  const ta = c.ta ?? 2500;
+  const lta = c.lta ?? 3500;
+  const specialAllowance = c.specialAllowance ?? 0;
+  const reimbursement = c.reimbursement ?? 0;
+  const incentives = c.incentives ?? 0;
+  const overtime = c.overtime ?? 0;
+
+  const pfEmployee = c.pfEmployee ?? 0;
+  const pfEmployer = c.pfEmployer ?? 0;
+  const esi = c.esi ?? 0;
+  const pt = c.pt ?? 0;
+  const tds = c.tds ?? 0;
+  const otherDeductions = c.otherDeductions ?? 0;
+
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" id="salary-slip-overlay">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" id="salary-slip-card">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto print:max-h-full print:shadow-none print:rounded-none" id="salary-slip-card">
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 print:hidden">
           <span className="text-sm font-semibold text-gray-500">Salary Slip Preview</span>
           <div className="flex gap-2">
@@ -92,49 +128,138 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
             )}
           </div>
         </div>
-        <div className="p-8 font-sans">
-          <div className="bg-varistor-lime rounded-xl px-6 py-4 mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-white font-bold text-lg tracking-wide uppercase">VARISTOR TECHNOLOGIES PVT LTD</p>
-              <p className="text-lime-900 text-sm font-medium mt-0.5">Salary Slip · {record.month}</p>
+        <div className="p-8 font-sans text-gray-900 leading-normal">
+          {/* Header Banner */}
+          <div className="text-center mb-4 relative pb-4 border-b border-gray-200">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <svg className="w-6 h-6 text-varistor-lime" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">Varistor Technologies Pvt. Ltd.</h1>
             </div>
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-white font-black text-xl">V</span>
+            <p className="text-[11px] text-gray-500">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
+            <p className="text-[11px] text-gray-500">Email - hr@varistor.in, Telephone - 080 4117 8911</p>
+          </div>
+
+          {/* Yellow Month Bar */}
+          <div className="bg-[#fef08a] text-center py-1.5 font-bold text-sm text-gray-900 border border-yellow-300 rounded mb-4">
+            Pay Slip for the Month of {record.month}
+          </div>
+
+          {/* Employee Details Grid */}
+          <div className="grid grid-cols-4 border border-gray-300 rounded text-xs mb-4 divide-x divide-y divide-gray-300">
+            <div className="p-2 font-bold bg-gray-50">Emp ID.</div>
+            <div className="p-2">{record.employeeId || '—'}</div>
+            <div className="p-2 font-bold bg-gray-50">Designation</div>
+            <div className="p-2">{record.designation || 'WELDER'}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">Employee Name</div>
+            <div className="p-2 border-t-0">{record.employeeName}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">Department</div>
+            <div className="p-2 border-t-0">{record.department || '—'}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">No. of Days</div>
+            <div className="p-2 border-t-0">{record.totalDays ?? 30}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">Paid No. of Days</div>
+            <div className="p-2 border-t-0">{record.payDays ?? 30}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">PF UAN No.</div>
+            <div className="p-2 border-t-0">{record.pfUan || '—'}</div>
+            <div className="p-2 font-bold bg-gray-50 border-t-0">CL Balance</div>
+            <div className="p-2 border-t-0">{record.clBalance ?? 0}</div>
+          </div>
+
+          {/* Earnings & Deductions Table */}
+          <table className="w-full text-xs border border-gray-300 border-collapse mb-4 divide-y divide-gray-300">
+            <thead>
+              <tr className="bg-blue-100 divide-x divide-gray-300 font-bold">
+                <th className="p-2 text-left">Earnings</th>
+                <th className="p-2 text-right w-28">Amount (Rs.)</th>
+                <th className="p-2 text-left">Deductions</th>
+                <th className="p-2 text-right w-28">Amount (Rs.)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Salary</td>
+                <td className="p-2 text-right font-mono">{fmt(monthlySalary)}</td>
+                <td className="p-2">PF Employee</td>
+                <td className="p-2 text-right font-mono">{fmt(pfEmployee)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Basic</td>
+                <td className="p-2 text-right font-mono">{fmt(basic)}</td>
+                <td className="p-2">PF Employer</td>
+                <td className="p-2 text-right font-mono">{fmt(pfEmployer)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">HRA</td>
+                <td className="p-2 text-right font-mono">{fmt(hra)}</td>
+                <td className="p-2">ESI</td>
+                <td className="p-2 text-right font-mono">{fmt(esi)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Medical</td>
+                <td className="p-2 text-right font-mono">{fmt(medical)}</td>
+                <td className="p-2">PT</td>
+                <td className="p-2 text-right font-mono">{fmt(pt)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">TA</td>
+                <td className="p-2 text-right font-mono">{fmt(ta)}</td>
+                <td className="p-2">TDS</td>
+                <td className="p-2 text-right font-mono">{fmt(tds)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">LTA</td>
+                <td className="p-2 text-right font-mono">{fmt(lta)}</td>
+                <td className="p-2">Other Deductions</td>
+                <td className="p-2 text-right font-mono">{fmt(otherDeductions)}</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Special Allowance</td>
+                <td className="p-2 text-right font-mono">{fmt(specialAllowance)}</td>
+                <td className="p-2">&nbsp;</td>
+                <td className="p-2 text-right font-mono">&nbsp;</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Reimbursement</td>
+                <td className="p-2 text-right font-mono">{fmt(reimbursement)}</td>
+                <td className="p-2">&nbsp;</td>
+                <td className="p-2 text-right font-mono">&nbsp;</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">Incentives</td>
+                <td className="p-2 text-right font-mono">{fmt(incentives)}</td>
+                <td className="p-2">&nbsp;</td>
+                <td className="p-2 text-right font-mono">&nbsp;</td>
+              </tr>
+              <tr className="divide-x divide-gray-300">
+                <td className="p-2">OT Hours</td>
+                <td className="p-2 text-right font-mono">{fmt(overtime)}</td>
+                <td className="p-2">&nbsp;</td>
+                <td className="p-2 text-right font-mono">&nbsp;</td>
+              </tr>
+              <tr className="bg-gray-100 font-bold divide-x divide-gray-300 border-t border-gray-300">
+                <td className="p-2">Total CTC</td>
+                <td className="p-2 text-right font-mono">{fmt(totalCtc)}</td>
+                <td className="p-2">Total Deduction</td>
+                <td className="p-2 text-right font-mono">{fmt(totalDeductions)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Net Pay Block */}
+          <div className="grid grid-cols-2 border border-gray-300 rounded overflow-hidden text-sm font-bold divide-x divide-gray-300 mb-4">
+            <div className="bg-green-50 p-3 flex justify-between items-center">
+              <span className="text-gray-700">NetPay [In-Hand]</span>
+              <span className="text-xl text-varistor-limeText font-black">{fmt(record.netPay)}</span>
+            </div>
+            <div className="bg-gray-50 p-3 flex items-center justify-center text-center text-xs text-gray-700 leading-tight">
+              {netPayWords}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-            {[['Employee', record.employeeName], ['ID', record.employeeId], ['Dept', record.department], ['CTC', fmt(record.ctc * 12)]].map(([l, v]) => (
-              <div key={l} className="flex gap-2">
-                <span className="text-gray-500 w-24 flex-shrink-0">{l}</span>
-                <span className="font-semibold text-gray-900">{v}</span>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Earnings</p>
-              {[['Basic', record.components.basic], ['HRA', record.components.hra], ['Special Allowance', record.components.specialAllowance]].map(([l, v]) => (
-                <div key={String(l)} className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">{l}</span>
-                  <span className="font-medium tabular-nums">{fmt(Number(v))}</span>
-                </div>
-              ))}
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Deductions</p>
-              {[['PF', record.components.pf], ['TDS', record.components.tds]].map(([l, v]) => (
-                <div key={String(l)} className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">{l}</span>
-                  <span className="font-medium text-red-600 tabular-nums">{fmt(Number(v))}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-[#f7fee7] border border-[#d9f99d] rounded-xl px-6 py-4 flex items-center justify-between">
-            <span className="font-bold text-gray-700">Net Pay</span>
-            <span className="font-black text-2xl text-varistor-limeText tabular-nums">{fmt(record.netPay)}</span>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-4 text-center">✉ Auto-mailed on 15 {record.month} · 10:00 IST</p>
+
+          <p className="text-[10px] text-gray-400 text-center font-semibold mt-4">
+            This is a computer generated payslip no signature is required.
+          </p>
         </div>
       </div>
     </div>
@@ -197,9 +322,11 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       // Map header row → canonical key
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const headers = (raw[0] as any[]).map(h => resolveHeader(String(h)));
-      const missingRequired = ['name', 'email', 'ctc'].filter(r => !headers.includes(r));
-      if (missingRequired.length > 0) {
-        setParseError(`Missing required columns: ${missingRequired.join(', ')}. Check your header row matches: Name, Email, CTC, Deductions.`);
+      const hasName = headers.includes('name');
+      const hasEmail = headers.includes('email');
+      const hasSalary = headers.includes('monthlySalary') || headers.includes('ctc');
+      if (!hasName || !hasEmail || !hasSalary) {
+        setParseError(`Missing required columns. Please check your Excel header row contains Name, Email, and either Salary or CTC.`);
         return;
       }
 
@@ -211,17 +338,77 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const obj: any = {};
         headers.forEach((key, idx) => { if (key) obj[key] = row[idx]; });
-        const ctc = parseNumber(obj.ctc);
-        const deductions = parseNumber(obj.deductions ?? 0);
+        
+        const name = String(obj.name || '').trim();
+        const email = String(obj.email || '').trim();
+        const employeeId = obj.employeeId ? String(obj.employeeId).trim() : `VAR-${String(i).padStart(3, '0')}`;
+        const department = obj.department ? String(obj.department).trim() : 'Operation';
+        const designation = obj.designation ? String(obj.designation).trim() : 'WELDER';
+        const month = obj.month ? String(obj.month).trim() : MONTH;
+        
+        const monthlySalary = parseNumber(obj.monthlySalary ?? obj.ctc ?? 0);
+        const ctc = parseNumber(obj.ctc ?? obj.monthlySalary ?? 0);
+        const totalDays = parseNumber(obj.totalDays ?? 30) || 30;
+        const payDays = parseNumber(obj.payDays ?? totalDays ?? 30);
+        const clBalance = parseNumber(obj.clBalance ?? 0);
+        const pfUan = obj.pfUan ? String(obj.pfUan).trim() : '—';
+        
+        const medical = parseNumber(obj.medical ?? 1250);
+        const ta = parseNumber(obj.ta ?? 2500);
+        const lta = parseNumber(obj.lta ?? 3500);
+        
+        const reimbursement = parseNumber(obj.reimbursement ?? 0);
+        const incentives = parseNumber(obj.incentives ?? 0);
+        const overtime = parseNumber(obj.overtime ?? 0);
+        const tds = parseNumber(obj.tds ?? 0);
+        const otherDeductions = parseNumber(obj.otherDeductions ?? 0);
+
+        // Run calculations
+        const prorata = Math.round((monthlySalary / totalDays) * payDays);
+        const basic = Math.round(prorata * 0.5);
+        const hra = Math.round(basic * 0.5);
+        const specialAllowance = prorata - (basic + hra + medical + ta + lta);
+        
+        const pfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
+        const pfEmployer = pfEmployee;
+        
+        const gross = prorata;
+        const esi = ctc > 21000 ? 0 : Math.ceil(gross * 0.0325);
+        const pt = gross >= 15001 ? 200 : 0;
+        
+        const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+        const netPay = gross - totalDeductions + reimbursement + incentives + overtime;
+
         parsed.push({
-          name: String(obj.name || '').trim(),
-          email: String(obj.email || '').trim(),
-          employeeId: obj.employeeId ? String(obj.employeeId).trim() : undefined,
-          department: obj.department ? String(obj.department).trim() : undefined,
-          month: obj.month ? String(obj.month).trim() : MONTH,
+          name,
+          email,
+          employeeId,
+          department,
+          designation,
+          month,
+          monthlySalary,
+          totalDays,
+          payDays,
+          clBalance,
+          pfUan,
+          medical,
+          ta,
+          lta,
+          reimbursement,
+          incentives,
+          overtime,
+          tds,
+          otherDeductions,
+          basic,
+          hra,
+          specialAllowance,
+          pfEmployee,
+          pfEmployer,
+          esi,
+          pt,
           ctc,
-          deductions,
-          netPay: ctc - deductions,
+          deductions: totalDeductions,
+          netPay
         });
       }
 
@@ -401,7 +588,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               <table className="w-full text-sm min-w-[700px]">
                 <thead className="bg-varistor-pageBg text-xs text-varistor-muted border-b border-varistor-border">
                   <tr>
-                    {['#', 'Name', 'Email', 'Dept', 'CTC', 'Deductions', 'Net Pay', 'Month', ''].map(h => (
+                    {['#', 'Name', 'Email', 'Dept/Desg', 'Days (Tot/Pd)', 'Salary', 'Deductions', 'Net Pay', 'Month', ''].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left font-semibold uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -418,8 +605,14 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
                         <td className="px-4 py-2.5 text-varistor-muted text-xs">
                           {row.email || <span className="text-red-500">Missing</span>}
                         </td>
-                        <td className="px-4 py-2.5 text-varistor-muted text-xs">{row.department || '—'}</td>
-                        <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{fmt(row.ctc)}</td>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs">
+                          <div>{row.department || '—'}</div>
+                          <div className="text-[10px] text-gray-400">{row.designation || '—'}</div>
+                        </td>
+                        <td className="px-4 py-2.5 text-varistor-muted text-xs font-mono">
+                          {row.totalDays || 30} / {row.payDays || 30}
+                        </td>
+                        <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{fmt(row.monthlySalary)}</td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-mono text-red-600">{fmt(row.deductions)}</td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-bold text-varistor-limeText">{fmt(row.netPay)}</td>
                         <td className="px-4 py-2.5 text-varistor-muted text-xs">{row.month || MONTH}</td>
@@ -526,10 +719,12 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
 // ─── Admin Salary Engine ──────────────────────────────────────────────────────
 
 const FORMULAS = [
-  { component: 'Basic', formula: '= CTC * 0.6', auto: true },
-  { component: 'HRA', formula: '= Basic * 0.4', auto: true },
-  { component: 'PF', formula: '= Basic * 0.12', auto: true },
-  { component: 'TDS', formula: '= slab(Gross)', auto: true },
+  { component: 'Prorata', formula: '= round((monthly_salary / total_days) * pay_days)', auto: true },
+  { component: 'Basic', formula: '= round(prorata * 50%)', auto: true },
+  { component: 'HRA', formula: '= round(basic * 50%)', auto: true },
+  { component: 'PF Employee', formula: '= 1800 if basic >= 15000 else round(basic * 12%)', auto: true },
+  { component: 'ESI', formula: '= 0 if monthly_ctc > 21000 else ceil(gross * 3.25%)', auto: true },
+  { component: 'PT', formula: '= 200 if gross >= 15001 else 0', auto: true },
 ];
 
 const SalaryEngine: React.FC = () => {
@@ -844,7 +1039,7 @@ const SalaryEngine: React.FC = () => {
                           <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
                         )}
                       </td>
-                      {(['basic', 'hra', 'pf', 'tds'] as const).map(f => (
+                      {(['basic', 'hra', 'pfEmployee', 'tds'] as const).map(f => (
                         <td key={f} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.components[f])}</td>
                       ))}
                       <td className="px-4 py-3"><span className="font-bold text-varistor-limeText tabular-nums">{fmt(rec.netPay)}</span></td>
@@ -937,7 +1132,7 @@ const EmployeePayrollView: React.FC = () => {
                 { label: 'Net Pay', val: fmt(rec.netPay), highlight: true },
                 { label: 'Basic', val: fmt(rec.components.basic) },
                 { label: 'HRA', val: fmt(rec.components.hra) },
-                { label: 'PF Deduction', val: fmt(rec.components.pf), deduct: true },
+                { label: 'PF Deduction', val: fmt(rec.components.pfEmployee), deduct: true },
                 { label: 'TDS Deduction', val: fmt(rec.components.tds), deduct: true },
               ].map(item => (
                 <div key={item.label} className={`rounded-lg p-3 border ${item.highlight ? 'bg-varistor-limeLight border-varistor-lime' : 'bg-varistor-pageBg border-varistor-border'}`}>

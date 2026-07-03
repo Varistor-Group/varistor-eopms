@@ -1,6 +1,51 @@
 {
   "employees": [
     {
+      "id": "VAR-024",
+      "fullName": "Aarav Patel",
+      "employeeId": "VAR-024",
+      "username": "aarav.patel",
+      "personalEmail": "aarav.patel@gmail.com",
+      "phone": "+91 98765 43210",
+      "department": "Operations",
+      "reportingManager": "Admin User",
+      "role": "Employee",
+      "tempPassword": "Employee@2026!",
+      "createdAt": "2026-01-15T09:00:00Z",
+      "status": "Active",
+      "variPoints": 1800
+    },
+    {
+      "id": "VAR-001",
+      "fullName": "Admin User",
+      "employeeId": "VAR-001",
+      "username": "admin",
+      "personalEmail": "admin@varistor.in",
+      "phone": "+91 99999 99999",
+      "department": "Ops Heads",
+      "reportingManager": "None",
+      "role": "Admin",
+      "tempPassword": "Admin@2026!",
+      "createdAt": "2025-01-01T09:00:00Z",
+      "status": "Active",
+      "variPoints": 5000
+    },
+    {
+      "id": "VAR-002",
+      "fullName": "HR User",
+      "employeeId": "VAR-002",
+      "username": "hr",
+      "personalEmail": "hr@varistor.in",
+      "phone": "+91 88888 88888",
+      "department": "Operations",
+      "reportingManager": "Admin User",
+      "role": "HR",
+      "tempPassword": "HR@2026!",
+      "createdAt": "2025-01-01T09:00:00Z",
+      "status": "Active",
+      "variPoints": 2000
+    },
+    {
       "fullName": "akash kumar",
       "employeeId": "213",
       "username": "adasd",
@@ -8,13 +53,7 @@
       "phone": "+917022630114",
       "department": "Finance",
       "reportingManager": "asdasdsa",
-      "role": "Admin",
-      "id": "213",
-      "tempPassword": "AK@2026!123",
-      "createdAt": "2026-07-01T07:19:29.904Z",
-      "status": "Active",
-      "variPoints": 0,
-      "is_field_employee": false
+      "role": "Admin"
     },
     {
       "fullName": "akash kumar",
@@ -29,39 +68,6 @@
       "tempPassword": "AK@2026!896",
       "createdAt": "2026-07-01T07:27:17.041Z",
       "status": "Active",
-      "variPoints": 0,
-      "is_field_employee": false
-    },
-    {
-      "fullName": "sathvik",
-      "employeeId": "2",
-      "username": "sathvikkillspeople",
-      "personalEmail": "sathvik@varistor.in",
-      "phone": "120393132241",
-      "department": "Operations",
-      "reportingManager": "Aarav Patel",
-      "role": "Employee",
-      "is_field_employee": true,
-      "id": "2",
-      "tempPassword": "S@2026!441",
-      "createdAt": "2026-07-02T07:43:56.955Z",
-      "status": "Active",
-      "variPoints": 0
-    },
-    {
-      "fullName": "dia",
-      "employeeId": "2913AS",
-      "username": "IASJSDA",
-      "personalEmail": "dia@varistor.in",
-      "phone": "i2jji123eads",
-      "department": "Sales",
-      "reportingManager": "na",
-      "role": "Reporting Manager",
-      "is_field_employee": true,
-      "id": "2913AS",
-      "tempPassword": "D@2026!870",
-      "createdAt": "2026-07-02T08:06:10.652Z",
-      "status": "Active",
       "variPoints": 0
     }
   ],
@@ -74,7 +80,7 @@
       "size": "1.2 MB",
       "uploadDate": "2026-01-15",
       "verified": true,
-      "status": "Rejected"
+      "status": "Verified"
     },
     {
       "id": "doc-2",
@@ -94,18 +100,17 @@
       "size": "2.1 MB",
       "uploadDate": "2026-01-16",
       "verified": false,
-      "status": "Under Review"
+      "status": "Pending"
     },
     {
       "id": "doc-4",
       "employeeId": "VAR-024",
-      "filename": "er_schema.md",
-      "type": "MD",
-      "size": "0.0 MB",
+      "filename": "Experience_Letter_Prev.pdf",
+      "type": "PDF",
+      "size": "1.5 MB",
       "uploadDate": "2026-01-16",
       "verified": true,
-      "status": "Pending",
-      "uploadedAt": "2026-07-02T09:55:31.069Z"
+      "status": "Verified"
     },
     {
       "id": "doc-5",
@@ -126,15 +131,6 @@
       "uploadDate": "2026-01-17",
       "verified": true,
       "status": "Verified"
-    },
-    {
-      "id": "doc-1782985533791",
-      "employeeId": "VAR-024",
-      "filename": "er_schema.md",
-      "type": "MD",
-      "size": "0.0 MB",
-      "status": "Pending",
-      "uploadedAt": "2026-07-02T09:45:33.791Z"
     }
   ],
   "activity_log": [
@@ -279,6 +275,13 @@
         "documentId": "doc-4"
       },
       "timestamp": "2026-07-02T09:55:31.069Z"
+    },
+    {
+      "id": "1783070208727",
+      "action": "APPLY_LEAVE",
+      "by": "Aarav Patel",
+      "details": "Aarav Patel applied for Casual Leave from 2026-07-22 to 2026-07-23",
+      "timestamp": "2026-07-03T09:16:48.727Z"
     }
   ],
   "policies": [
@@ -311,6 +314,32 @@
     "content": "<p>1.come on time</p><p>2.dont be late</p>",
     "updatedAt": "2026-07-02T06:16:46.549Z"
   },
-  "training_modules": [],
-  "training_questions": {}
+  "leaves": [
+    {
+      "id": "leave-1",
+      "employeeId": "VAR-024",
+      "employeeName": "Aarav Patel",
+      "department": "Operations",
+      "type": "Casual Leave",
+      "startDate": "2026-07-10",
+      "endDate": "2026-07-12",
+      "days": 3,
+      "reason": "Family gathering out of station",
+      "status": "Pending",
+      "createdAt": "2026-07-01T10:00:00Z"
+    },
+    {
+      "id": "leave-1783070208727",
+      "employeeId": "VAR-024",
+      "employeeName": "Aarav Patel",
+      "department": "Operations",
+      "type": "Casual Leave",
+      "startDate": "2026-07-22",
+      "endDate": "2026-07-23",
+      "days": 2,
+      "reason": "sick",
+      "status": "Pending",
+      "createdAt": "2026-07-03T09:16:48.727Z"
+    }
+  ]
 }
