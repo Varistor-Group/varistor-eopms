@@ -132,6 +132,10 @@ let _records: PayrollRecord[] = seedRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
+  // TODO: Payroll Integration Point — replace manual payable days with attendance-driven data:
+  //   import { getPayrollAttendanceSnapshot } from './attendance';
+  //   const snapshot = await getPayrollAttendanceSnapshot('YYYY-MM');
+  //   Use snapshot[n].payableDays in place of the hardcoded working-days assumption below.
   if (employeeId) {
     return _records.filter(r => r.employeeId === employeeId);
   }

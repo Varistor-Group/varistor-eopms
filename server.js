@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import multer from 'multer';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import net from 'net';
 
 dotenv.config();
 
@@ -991,6 +992,232 @@ app.listen(port, () => {
       return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BIO PARK D-01 DEVICE BRIDGE — Attendance Module
+  // ZKTeco ADMS protocol over TCP port 4370 at 192.168.1.42
+  // Gracefully falls back to mock data when device is offline.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ─── In-memory cache ───────────────────────────────────────────────────────
+
+  const MAX_FEED_EVENTS = 20;
+  const DEVICE_IP = '192.168.1.42';
+  const DEVICE_PORT = 4370;
+  const POLL_INTERVAL_MS = 60000;
+
+  // Punch dedup: map of employeeId → last punch timestamp (ms)
+  const lastPunchTs = new Map();
+  const DEDUP_WINDOW_MS = 30000; // 30-second guard
+
+  // ─── Seed mock feed on startup (device offline) ────────────────────────────
+
+  async function seedMockFeed() {
+    try {
+      const data = await fs.readFile(path.join(process.cwd(), 'db.json'), 'utf-8');
+      const db = JSON.parse(data);
+      const emps = db.employees || [];
+      const now = Date.now();
+      _liveFeed = emps.slice(0, 15).map((emp, i) => ({
+        id: `pev-seed-${i}`,
+        timestamp: new Date(now - (15 - i) * 13 * 60000).toISOString(),
+        employeeId: emp.employeeId,
+        employeeName: emp.fullName,
+        type: i % 3 === 2 ? 'out' : 'in',
+        confidence: parseFloat((85 + Math.random() * 12).toFixed(1)),
+        success: true,
+      }));
+    } catch (err) {
+      console.warn('[Device Bridge] Could not seed mock feed from db.json:', err.message);
+    }
+  }
+
+  seedMockFeed();
+
+  // ─── ZKTeco ADMS TCP punch pull ────────────────────────────────────────────
+
+  /**
+   * ZKTeco ADMS protocol handshake and attendance record pull over TCP.
+   * If the device is unreachable, marks device as offline and logs the error.
+   * TODO: Implement full ZKTeco ADMS command set for production:
+   *   CMD_CONNECT (0x03E8) → CMD_ATTLOG (0x000D) → parse binary attendance records
+   */
+  function pollDevice() {
+    const socket = new net.Socket();
+    let connected = false;
+    let buffer = Buffer.alloc(0);
+
+    socket.setTimeout(5000);
+
+    socket.connect(DEVICE_PORT, DEVICE_IP, () => {
+      connected = true;
+      console.log(`[Device Bridge] Connected to Bio Park D-01 at ${DEVICE_IP}:${DEVICE_PORT}`);
+      // TODO: Send ZKTeco CMD_CONNECT handshake packet
+      // TODO: Request attendance log via CMD_ATTLOG
+      // For now: mark device online and update status
+      _deviceStatus = {
+        ipAddress: DEVICE_IP,
+        enrolledFaces: 40,
+        lastSync: new Date().toISOString(),
+        firmware: 'ZKTeco v6.60',
+        uptime: '—',
+        online: true,
+      };
+      socket.end();
+    });
+
+    socket.on('data', (data) => {
+      buffer = Buffer.concat([buffer, data]);
+      // TODO: Parse ZKTeco ADMS binary packet format
+      // Each attendance record: userId(9B) + timestamp(4B) + type(1B) + ...
+      // processDevicePacket(buffer);
+    });
+
+    socket.on('timeout', () => {
+      console.warn(`[Device Bridge] TCP timeout — ${DEVICE_IP}:${DEVICE_PORT}`);
+      socket.destroy();
+      markDeviceOffline();
+    });
+
+    socket.on('error', (err) => {
+      if (connected) return;
+      // Expected in dev — device not on this LAN
+      console.warn(`[Device Bridge] ${DEVICE_IP}:${DEVICE_PORT} unreachable — running in mock mode. (${err.code})`);
+      markDeviceOffline();
+    });
+
+    socket.on('close', () => {
+      // nothing
+    });
+  }
+
+  function markDeviceOffline() {
+    _deviceStatus = {
+      ..._deviceStatus,
+      online: false,
+      lastSync: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Process a parsed punch event from the device.
+   * Guards against duplicate punches within 30 seconds.
+   */
+  function processPunchEvent(employeeId, type, confidence) {
+    const now = Date.now();
+    const lastTs = lastPunchTs.get(employeeId);
+    if (lastTs && now - lastTs < DEDUP_WINDOW_MS) {
+      console.log(`[Device Bridge] Dedup: ignored punch for ${employeeId} (within 30s window)`);
+      return;
+    }
+    lastPunchTs.set(employeeId, now);
+
+    const event = {
+      id: `pev-${now}-${employeeId}`,
+      timestamp: new Date().toISOString(),
+      employeeId,
+      employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
+      type,
+      confidence: parseFloat(confidence.toFixed(1)),
+      success: true,
+    };
+
+    _liveFeed.unshift(event);
+    if (_liveFeed.length > MAX_FEED_EVENTS) {
+      _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
+    }
+
+    console.log(`[Device Bridge] ✓ ${employeeId} ${type.toUpperCase()} confidence=${confidence}%`);
+  }
+
+  // Start polling on server boot
+  pollDevice();
+  setInterval(pollDevice, POLL_INTERVAL_MS);
+
+  // ─── Attendance API routes ─────────────────────────────────────────────────
+
+  app.get('/api/attendance/live-feed', (req, res) => {
+    res.json(_liveFeed);
+  });
+
+  app.get('/api/attendance/device-status', (req, res) => {
+    res.json(_deviceStatus);
+  });
+
+  app.post('/api/attendance/force-resync', (req, res) => {
+    console.log('[Device Bridge] Force re-sync triggered via API');
+    pollDevice();
+    res.json({ success: true, message: 'Re-sync triggered', timestamp: new Date().toISOString() });
+  });
+
+  // ─── Attendance PDF export ─────────────────────────────────────────────────
+
+  app.post('/api/attendance/export-pdf', (req, res) => {
+    try {
+      const { rows = [], month = 'Report', type = 'monthly' } = req.body;
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const bufs = [];
+      doc.on('data', d => bufs.push(d));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(bufs);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="attendance_${month.replace(/\s+/g, '_')}.pdf"`);
+        res.send(pdfBuffer);
+      });
+
+      // Header
+      doc.fontSize(18).fillColor('#111111').text(`Varistor EOPMS — Attendance Report`, { align: 'center' });
+      doc.fontSize(11).fillColor('#868e80').text(`Month: ${month} · Generated: ${new Date().toLocaleDateString('en-IN')}`, { align: 'center' });
+      doc.moveDown(1);
+
+      // Table header
+      const cols = type === 'monthly'
+        ? ['Employee', 'Dept', 'Present', 'Leaves', 'W.O', 'Holidays', 'Total Hrs', 'Payable Days']
+        : ['Employee', 'Dept', 'Date', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status'];
+      const colWidths = type === 'monthly'
+        ? [110, 90, 50, 50, 45, 60, 60, 60]
+        : [110, 90, 65, 80, 80, 55, 55];
+
+      let x = doc.page.margins.left;
+      const rowH = 20;
+
+      // Header row
+      doc.rect(x, doc.y, doc.page.width - 80, rowH).fill('#84CC16');
+      doc.fillColor('#111111').fontSize(9);
+      cols.forEach((col, i) => {
+        doc.text(col, x + 4, doc.y - rowH + 5, { width: colWidths[i], lineBreak: false });
+        x += colWidths[i];
+      });
+      doc.moveDown(0.2);
+
+      // Data rows — 25 per page
+      rows.forEach((row, idx) => {
+        if (idx > 0 && idx % 25 === 0) doc.addPage();
+        x = doc.page.margins.left;
+        const y = doc.y;
+        if (idx % 2 === 0) doc.rect(x, y, doc.page.width - 80, rowH).fill('#f7fee7');
+        doc.fillColor('#111111').fontSize(8);
+        const values = type === 'monthly'
+          ? [row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.totalHrs, row.payableDays]
+          : [row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+        values.forEach((val, i) => {
+          doc.text(String(val ?? ''), x + 4, y + 5, { width: colWidths[i], lineBreak: false });
+          x += colWidths[i];
+        });
+        doc.moveDown(0.2);
+      });
+
+      doc.end();
+    } catch (err) {
+      console.error('[Attendance PDF]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ─── Expose processPunchEvent for future device integration ───────────────
+  // When the ZKTeco ADMS parser is complete, call processPunchEvent() with
+  // parsed data from the binary packet stream.
+  app._processPunchEvent = processPunchEvent;
 
   // Activity
 

@@ -13,7 +13,8 @@ import {
   X,
   UserPlus,
   ShieldAlert,
-  ScrollText
+  ScrollText,
+  ClipboardCheck
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -39,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
@@ -54,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
@@ -68,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (currentRole === 'Reporting Manager') {
     menuItems = [
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
@@ -80,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
