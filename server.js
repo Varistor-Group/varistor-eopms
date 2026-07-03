@@ -1010,6 +1010,16 @@ app.listen(port, () => {
   const lastPunchTs = new Map();
   const DEDUP_WINDOW_MS = 30000; // 30-second guard
 
+  let _liveFeed = [];
+  let _deviceStatus = {
+    ipAddress: DEVICE_IP,
+    enrolledFaces: 40,
+    lastSync: null,
+    firmware: 'ZKTeco v6.60',
+    uptime: '—',
+    online: false,
+  };
+
   // ─── Seed mock feed on startup (device offline) ────────────────────────────
 
   async function seedMockFeed() {
