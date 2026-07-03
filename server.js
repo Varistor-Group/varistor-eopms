@@ -927,9 +927,6 @@ app.post('/api/leave/notify-employee', async (req, res) => {
 
 
 
-// In-memory cache for BIO PARK D-01 DEVICE BRIDGE
-let _deviceStatus = { online: false, lastSync: '—' };
-let _liveFeed = [];
 const MOCK_EMPLOYEE_NAMES = {
   'VAR-024': 'Aarav Patel',
   'VAR-001': 'Admin User',
