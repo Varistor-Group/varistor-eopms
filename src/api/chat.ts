@@ -88,6 +88,7 @@ function saveLastRead(map: Record<string, string>) {
 
 export const chatApi = {
   CHAT_EVENT,
+  SELF_NAME,
 
   getChannels(): ChatChannel[] {
     return buildChannels();
@@ -125,6 +126,30 @@ export const chatApi = {
 
   deleteMessage(messageId: string) {
     const messages = loadMessages().filter(m => m.id !== messageId);
+    saveMessages(messages);
+    notifyUpdated();
+  },
+
+  // WhatsApp-style: one reaction per person per message. Picking a new emoji
+  // swaps it; picking the same emoji again clears it.
+  toggleReaction(messageId: string, emoji: string) {
+    const messages = loadMessages();
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index === -1) return;
+
+    const reactions = messages[index].reactions ?? [];
+    const ownIndex = reactions.findIndex(r => r.userName === SELF_NAME);
+    let nextReactions: typeof reactions;
+
+    if (ownIndex !== -1 && reactions[ownIndex].emoji === emoji) {
+      nextReactions = reactions.filter((_, i) => i !== ownIndex);
+    } else if (ownIndex !== -1) {
+      nextReactions = reactions.map((r, i) => (i === ownIndex ? { ...r, emoji } : r));
+    } else {
+      nextReactions = [...reactions, { emoji, userName: SELF_NAME }];
+    }
+
+    messages[index] = { ...messages[index], reactions: nextReactions };
     saveMessages(messages);
     notifyUpdated();
   },

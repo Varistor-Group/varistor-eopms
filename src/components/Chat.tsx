@@ -61,6 +61,7 @@ export const Chat: React.FC = () => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [channelError, setChannelError] = useState<string | null>(null);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -156,6 +157,12 @@ export const Chat: React.FC = () => {
   const insertEmoji = (emoji: string) => {
     setDraft(prev => `${prev}${emoji}`);
     setShowEmojiPicker(false);
+  };
+
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    chatApi.toggleReaction(messageId, emoji);
+    setMessages(await chatApi.fetchMessages(activeChannelId));
+    setReactionPickerFor(null);
   };
 
   const openCreateChannel = () => {
@@ -283,7 +290,7 @@ export const Chat: React.FC = () => {
                   alt={message.authorName}
                   className="w-8 h-8 rounded-full object-cover border border-varistor-border flex-shrink-0"
                 />
-                <div className={`max-w-[70%] ${message.isSelf ? 'items-end' : 'items-start'} flex flex-col`}>
+                <div className={`relative max-w-[70%] ${message.isSelf ? 'items-end' : 'items-start'} flex flex-col`}>
                   <div className={`flex items-center gap-1.5 mb-1 ${message.isSelf ? 'flex-row-reverse' : ''}`}>
                     <span className="text-[11px] font-bold text-varistor-dark">
                       {message.isSelf ? 'You' : message.authorName}
@@ -292,6 +299,13 @@ export const Chat: React.FC = () => {
                       <span className="text-[9px] text-varistor-muted font-semibold uppercase">{message.authorRole}</span>
                     )}
                     <span className="text-[9px] text-varistor-muted">{formatTime(message.timestamp)}</span>
+                    <button
+                      onClick={() => setReactionPickerFor(prev => (prev === message.id ? null : message.id))}
+                      title="React"
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-varistor-muted hover:text-varistor-dark hover:bg-varistor-surfaceMuted transition-all cursor-pointer"
+                    >
+                      <Smile size={11} />
+                    </button>
                     {canDelete && (
                       <button
                         onClick={() => handleDeleteMessage(message)}
@@ -352,6 +366,53 @@ export const Chat: React.FC = () => {
                       }`}
                     >
                       {renderMessageText(message.text)}
+                    </div>
+                  )}
+
+                  {message.reactions && message.reactions.length > 0 && (
+                    <div className={`flex flex-wrap gap-1 mt-1 ${message.isSelf ? 'justify-end' : 'justify-start'}`}>
+                      {Object.entries(
+                        message.reactions.reduce<Record<string, string[]>>((groups, r) => {
+                          (groups[r.emoji] ??= []).push(r.userName === chatApi.SELF_NAME ? 'You' : r.userName);
+                          return groups;
+                        }, {})
+                      ).map(([emoji, names]) => {
+                        const selfReacted = names.includes('You');
+                        return (
+                          <button
+                            key={emoji}
+                            onClick={() => handleToggleReaction(message.id, emoji)}
+                            title={names.join(', ')}
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] border transition-colors cursor-pointer ${
+                              selfReacted
+                                ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
+                                : 'bg-varistor-surfaceMuted border-varistor-border text-varistor-muted hover:text-varistor-dark'
+                            }`}
+                          >
+                            <span>{emoji}</span>
+                            <span className="font-semibold">{names.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {reactionPickerFor === message.id && (
+                    <div
+                      className={`absolute top-full mt-1 z-10 bg-varistor-surface border border-varistor-border rounded-lg shadow-varistor p-1.5 flex gap-1 ${
+                        message.isSelf ? 'right-0' : 'left-0'
+                      }`}
+                    >
+                      {QUICK_EMOJIS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleToggleReaction(message.id, emoji)}
+                          className="text-sm p-1 hover:bg-varistor-surfaceMuted rounded cursor-pointer"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>

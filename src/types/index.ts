@@ -110,6 +110,11 @@ export interface ChatAttachment {
   dataUrl?: string;
 }
 
+export interface ChatReaction {
+  emoji: string;
+  userName: string;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: ChannelId;
@@ -119,6 +124,7 @@ export interface ChatMessage {
   isSelf: boolean;
   text?: string;
   attachment?: ChatAttachment;
+  reactions?: ChatReaction[];
   timestamp: string;
 }
 
