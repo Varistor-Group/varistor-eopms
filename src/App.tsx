@@ -21,6 +21,7 @@ import { FieldTracker } from './components/FieldTracker';
 import { PolicyPage } from './components/PolicyPage';
 import Payroll from './components/Payroll';
 import { LeaveManagement } from './components/LeaveManagement';
+import { Attendance } from './components/Attendance';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -73,6 +74,7 @@ const AppContent: React.FC = () => {
       case 'policy': return 'Company Policy';
       case 'leaves': return 'Leave Management';
       case 'payroll': return 'Payroll — Salary Engine';
+      case 'attendance': return 'Attendance';
       default: return 'EOPMS';
     }
   };
@@ -152,14 +154,14 @@ const AppContent: React.FC = () => {
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {
-                return ['dashboard', 'admin', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
-                // HR participates in Vari Points — ledger is included
-                return ['dashboard', 'admin', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
+                return ['dashboard', 'attendance', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                // Employee and Field Employee
+                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 
@@ -190,6 +192,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'policy' && <PolicyPage />}
                 {activeTab === 'leaves' && <LeaveManagement />}
                 {activeTab === 'payroll' && <Payroll />}
+                {activeTab === 'attendance' && <Attendance />}
               </>
             );
           })()}
