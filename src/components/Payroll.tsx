@@ -7,6 +7,8 @@ import {
   FileSpreadsheet, ArrowRight, X, Mail, AlertTriangle
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { getMonthlyReport } from '../api/attendance';
+import { getEmployees } from '../api/employees';
 import {
   getPayrollRecords,
   updatePayrollRecord,
@@ -16,6 +18,7 @@ import {
   payrollAuditLog,
   sendBulkSlips,
   numberToWords,
+  computeNet,
   type PayrollRecord,
   type SlipRow,
   type BulkSendResult
@@ -284,6 +287,98 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const handleCalculateFromAttendance = async () => {
+    setParseError('');
+    try {
+      const emps = await getEmployees();
+      const payrollRecords = await getPayrollRecords();
+      const attendanceReport = await getMonthlyReport(MONTH);
+
+      const parsed: SlipRow[] = [];
+      attendanceReport.forEach(att => {
+        const emp = emps.find(e => e.employeeId === att.employee_id);
+        const email = emp?.personalEmail || `${att.employee_id.toLowerCase()}@varistor.in`;
+        const payRec = payrollRecords.find(r => r.employeeId === att.employee_id);
+        
+        const monthlySalary = payRec?.monthlySalary ?? 30000;
+        const ctc = payRec?.ctc ?? monthlySalary;
+        const pfUan = payRec?.pfUan || '—';
+        const clBalance = payRec?.clBalance ?? 0;
+        const designation = payRec?.designation || 'EMPLOYEE';
+        
+        const totalDays = att.present + att.late + att.halfDay + att.absent + att.weekOff + att.holidays + att.leaves || 30;
+        const payDays = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
+
+        const medical = payRec?.components?.medical ?? 1250;
+        const ta = payRec?.components?.ta ?? 2500;
+        const lta = payRec?.components?.lta ?? 3500;
+        
+        const reimbursement = payRec?.components?.reimbursement ?? 0;
+        const incentives = payRec?.components?.incentives ?? 0;
+        const overtime = payRec?.components?.overtime ?? 0;
+        const tds = payRec?.components?.tds ?? 0;
+        const otherDeductions = payRec?.components?.otherDeductions ?? 0;
+
+        const comp = computeNet({
+          monthlySalary,
+          totalDays,
+          payDays,
+          medical,
+          ta,
+          lta,
+          reimbursement,
+          incentives,
+          overtime,
+          tds,
+          otherDeductions,
+        });
+
+        parsed.push({
+          name: att.employeeName,
+          email,
+          employeeId: att.employee_id,
+          department: att.department,
+          designation,
+          month: MONTH,
+          monthlySalary,
+          totalDays,
+          payDays,
+          clBalance,
+          pfUan,
+          medical: comp.medical,
+          ta: comp.ta,
+          lta: comp.lta,
+          reimbursement: comp.reimbursement,
+          incentives: comp.incentives,
+          overtime: comp.overtime,
+          tds: comp.tds,
+          otherDeductions: comp.otherDeductions,
+          basic: comp.basic,
+          hra: comp.hra,
+          specialAllowance: comp.specialAllowance,
+          pfEmployee: comp.pfEmployee,
+          pfEmployer: comp.pfEmployer,
+          esi: comp.esi,
+          pt: comp.pt,
+          ctc,
+          deductions: comp.totalDeductions,
+          netPay: comp.netPay,
+        });
+      });
+
+      if (parsed.length === 0) {
+        setParseError('No employees found in the attendance report.');
+        return;
+      }
+
+      setRows(parsed);
+      setFileName(`Attendance Tab data (${MONTH})`);
+      setStep('preview');
+    } catch (err: any) {
+      setParseError(`Failed to fetch attendance data: ${err.message}`);
+    }
+  };
+
   // Dynamically load xlsx from CDN if not already available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const loadXlsx = (): Promise<any> => {
@@ -520,6 +615,19 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               <p className="font-semibold text-varistor-dark">Drop your Excel file here</p>
               <p className="text-xs text-varistor-muted mt-1">or click to browse · .xlsx / .xls / .csv</p>
             </div>
+
+            <div className="flex items-center my-5">
+              <div className="flex-1 border-t border-varistor-border"></div>
+              <span className="px-3 text-[10px] text-varistor-muted uppercase tracking-wider font-bold">Or calculate automatically</span>
+              <div className="flex-1 border-t border-varistor-border"></div>
+            </div>
+
+            <button
+              onClick={handleCalculateFromAttendance}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border-2 border-varistor-lime text-varistor-limeText hover:bg-varistor-limeLight font-bold text-xs rounded-xl transition-all shadow-sm hover:shadow-md"
+            >
+              <Clock size={14} className="text-varistor-lime" /> Load Days Present from Attendance Tab
+            </button>
 
             {/* Column guide */}
             <div className="mt-5 p-4 bg-varistor-pageBg rounded-lg border border-varistor-border">
