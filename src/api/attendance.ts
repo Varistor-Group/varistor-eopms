@@ -373,7 +373,6 @@ export async function updateAttendance(
 
   // Find existing entry via overrides or generate
   const existing = await (async () => {
-    const parts = ledgerId.replace('atl-', '').split('-');
     // id format: atl-{empId}-{YYYY-MM-DD}
     const dateMatch = ledgerId.match(/(\d{4}-\d{2}-\d{2})$/);
     if (!dateMatch) return null;

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ClipboardCheck, Users, Clock, Calendar, TrendingUp,
-  Upload, Check, X, AlertCircle, Eye, Download, FileSpreadsheet,
-  Camera, RefreshCw, Wifi, WifiOff, Edit2, ChevronDown,
+  Upload, Check, X, AlertCircle, Eye, FileSpreadsheet,
+  Camera, RefreshCw, Wifi, WifiOff, Edit2,
   Shield, CheckCircle2, ArrowRight, Plus, Info, Printer,
-  ToggleLeft, ToggleRight, MapPin, Building2
+  ToggleLeft, ToggleRight, MapPin
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Modal } from './shared/Modal';
