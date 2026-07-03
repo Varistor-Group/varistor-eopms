@@ -102,6 +102,12 @@ export const chatApi = {
     return message;
   },
 
+  deleteMessage(messageId: string) {
+    const messages = loadMessages().filter(m => m.id !== messageId);
+    saveMessages(messages);
+    notifyUpdated();
+  },
+
   markChannelRead(channelId: ChannelId) {
     const map = loadLastRead();
     map[channelId] = new Date().toISOString();

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2 } from 'lucide-react';
 import { chatApi } from '../api/chat';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { ChannelId, ChatMessage, ChatAttachment } from '../types';
 
 type PendingAttachment = Required<Pick<ChatAttachment, 'name' | 'size' | 'type' | 'dataUrl'>>;
@@ -42,6 +43,8 @@ function renderMessageText(text: string) {
 }
 
 export const Chat: React.FC = () => {
+  const { currentRole } = useVariPoints();
+  const canModerate = currentRole === 'Admin' || currentRole === 'HR';
   const channels = chatApi.getChannels();
   const [activeChannelId, setActiveChannelId] = useState<ChannelId>('all-hands');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -121,6 +124,17 @@ export const Chat: React.FC = () => {
 
   const removePendingAttachment = () => setPendingAttachment(null);
 
+  const handleDeleteMessage = (message: ChatMessage) => {
+    const confirmed = window.confirm(
+      message.isSelf ? 'Delete this message?' : `Delete this message from ${message.authorName}?`
+    );
+    if (!confirmed) return;
+
+    chatApi.deleteMessage(message.id);
+    setMessages(prev => prev.filter(m => m.id !== message.id));
+    refreshUnread();
+  };
+
   const insertEmoji = (emoji: string) => {
     setDraft(prev => `${prev}${emoji}`);
     setShowEmojiPicker(false);
@@ -191,8 +205,10 @@ export const Chat: React.FC = () => {
               ))}
             </div>
           ) : (
-            messages.map(message => (
-              <div key={message.id} className={`flex gap-3 ${message.isSelf ? 'flex-row-reverse' : ''}`}>
+            messages.map(message => {
+              const canDelete = message.isSelf || canModerate;
+              return (
+              <div key={message.id} className={`group flex gap-3 ${message.isSelf ? 'flex-row-reverse' : ''}`}>
                 <img
                   src={message.authorAvatar}
                   alt={message.authorName}
@@ -207,6 +223,15 @@ export const Chat: React.FC = () => {
                       <span className="text-[9px] text-varistor-muted font-semibold uppercase">{message.authorRole}</span>
                     )}
                     <span className="text-[9px] text-varistor-muted">{formatTime(message.timestamp)}</span>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteMessage(message)}
+                        title={message.isSelf ? 'Delete message' : `Remove message (${currentRole} moderation)`}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-varistor-muted hover:text-varistor-dangerText hover:bg-varistor-dangerBg transition-all cursor-pointer"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
                   </div>
 
                   {message.attachment && (
@@ -262,7 +287,8 @@ export const Chat: React.FC = () => {
                   )}
                 </div>
               </div>
-            ))
+              );
+            })
           )}
 
           <div ref={messagesEndRef} />
