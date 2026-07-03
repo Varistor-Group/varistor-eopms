@@ -1,110 +1,42 @@
 import type { ChatChannel, ChatMessage, ChannelId } from '../types';
+import { mockEmployeeStore } from './employees';
 
 /**
  * MOCK CHAT SERVICE
  *
  * TODO: Replace with Supabase Realtime (or Ably) channels + /storage/chat/:channelId/:file uploads.
+ *
+ * Membership and message authors are constrained to mockEmployeeStore, the
+ * same employee directory Document Vault and Employee Management read from.
+ * There is no separate cast of chat-only "teammates" - if someone isn't a
+ * real employee record, they can't appear here.
  */
 
 const SELF_NAME = 'Aarav Patel';
 const SELF_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60';
 
-const TEAMMATES: Record<ChannelId, { name: string; role: string; avatar: string }> = {
-  'all-hands': { name: 'Priya Sharma', role: 'HR', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&fit=crop&q=60' },
-  'sales-team': { name: 'Karan Verma', role: 'Sales', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&fit=crop&q=60' },
-  'operations': { name: 'Rohit Mehta', role: 'Ops', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&fit=crop&q=60' },
-  'tech-dev': { name: 'Sana Khan', role: 'Tech', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' },
-  'hr-announcements': { name: 'Priya Sharma', role: 'HR', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&fit=crop&q=60' },
-};
-
-export const CHANNELS: ChatChannel[] = [
-  { id: 'all-hands', name: 'all-hands', memberCount: 40, pinned: 'POSH policy.pdf' },
-  { id: 'sales-team', name: 'sales-team', memberCount: 12 },
-  { id: 'operations', name: 'operations', memberCount: 14 },
-  { id: 'tech-dev', name: 'tech-dev', memberCount: 4 },
-  { id: 'hr-announcements', name: 'hr-announcements', memberCount: 40 },
+const BASE_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
+  { id: 'all-hands', name: 'all-hands', pinned: 'POSH policy.pdf' },
+  { id: 'sales-team', name: 'sales-team' },
+  { id: 'operations', name: 'operations' },
+  { id: 'tech-dev', name: 'tech-dev' },
+  { id: 'hr-announcements', name: 'hr-announcements' },
 ];
 
-function seedMessages(): ChatMessage[] {
-  const now = Date.now();
-  const minsAgo = (m: number) => new Date(now - m * 60 * 1000).toISOString();
-
-  return [
-    {
-      id: 'msg-1',
-      channelId: 'all-hands',
-      authorName: 'Priya Sharma',
-      authorRole: 'HR',
-      authorAvatar: TEAMMATES['all-hands'].avatar,
-      isSelf: false,
-      text: 'Reminder: submit timesheets by EOD.',
-      timestamp: minsAgo(46),
-    },
-    {
-      id: 'msg-2',
-      channelId: 'all-hands',
-      authorName: SELF_NAME,
-      authorRole: 'Operations',
-      authorAvatar: SELF_AVATAR,
-      isSelf: true,
-      text: 'On it 👍',
-      timestamp: minsAgo(44),
-    },
-    {
-      id: 'msg-3',
-      channelId: 'all-hands',
-      authorName: 'Rohit Mehta',
-      authorRole: 'Ops',
-      authorAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&fit=crop&q=60',
-      isSelf: false,
-      attachment: { name: 'vendor-quotes-Q3.xlsx', size: '184 KB' },
-      timestamp: minsAgo(40),
-    },
-    {
-      id: 'msg-4',
-      channelId: 'sales-team',
-      authorName: 'Karan Verma',
-      authorRole: 'Sales',
-      authorAvatar: TEAMMATES['sales-team'].avatar,
-      isSelf: false,
-      text: 'Q3 pitch deck draft is ready for review.',
-      timestamp: minsAgo(120),
-    },
-    {
-      id: 'msg-5',
-      channelId: 'operations',
-      authorName: 'Rohit Mehta',
-      authorRole: 'Ops',
-      authorAvatar: TEAMMATES['operations'].avatar,
-      isSelf: false,
-      text: 'Warehouse Zone A inventory count starts tomorrow 9 AM.',
-      timestamp: minsAgo(200),
-    },
-    {
-      id: 'msg-6',
-      channelId: 'tech-dev',
-      authorName: 'Sana Khan',
-      authorRole: 'Tech',
-      authorAvatar: TEAMMATES['tech-dev'].avatar,
-      isSelf: false,
-      text: 'Staging deploy is green ✅',
-      timestamp: minsAgo(300),
-    },
-    {
-      id: 'msg-7',
-      channelId: 'hr-announcements',
-      authorName: 'Priya Sharma',
-      authorRole: 'HR',
-      authorAvatar: TEAMMATES['hr-announcements'].avatar,
-      isSelf: false,
-      text: 'New POSH policy v2.1 has been published — please review.',
-      timestamp: minsAgo(600),
-    },
-  ];
+function buildChannels(): ChatChannel[] {
+  // Member count reflects the actual employee directory, not an invented headcount.
+  return BASE_CHANNELS.map(c => ({ ...c, memberCount: mockEmployeeStore.length }));
 }
 
-const MESSAGES_KEY = 'eopms_chat_messages';
-const LAST_READ_KEY = 'eopms_chat_last_read';
+function seedMessages(): ChatMessage[] {
+  // No fabricated conversation history. A fresh company chat starts empty -
+  // messages only ever come from the logged-in user or real created employees.
+  return [];
+}
+
+// v2: bumped so browsers with the old fabricated-teammate seed data reload clean
+const MESSAGES_KEY = 'eopms_chat_messages_v2';
+const LAST_READ_KEY = 'eopms_chat_last_read_v2';
 const CHAT_EVENT = 'varistor-chat-updated';
 
 const delay = (ms = 150) => new Promise(resolve => setTimeout(resolve, ms));
@@ -137,7 +69,7 @@ export const chatApi = {
   CHAT_EVENT,
 
   getChannels(): ChatChannel[] {
-    return CHANNELS;
+    return buildChannels();
   },
 
   async fetchMessages(channelId: ChannelId): Promise<ChatMessage[]> {
@@ -183,7 +115,7 @@ export const chatApi = {
     const byChannel: Record<string, number> = {};
     let total = 0;
 
-    for (const channel of CHANNELS) {
+    for (const channel of buildChannels()) {
       const lastReadTime = lastRead[channel.id] ? new Date(lastRead[channel.id]).getTime() : 0;
       const unread = messages.filter(
         m => m.channelId === channel.id && !m.isSelf && new Date(m.timestamp).getTime() > lastReadTime
