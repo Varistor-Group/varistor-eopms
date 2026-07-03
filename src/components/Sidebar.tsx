@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
@@ -60,8 +60,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
-      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: false },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];

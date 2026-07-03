@@ -18,6 +18,7 @@ import { TaskManagement } from './components/TaskManagement';
 import { ResetPassword } from './components/ResetPassword';
 import TrainingLibrary from './components/TrainingLibrary';
 import Payroll from './components/Payroll';
+import Leaves from './components/Leaves';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -176,6 +177,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'payroll' && <Payroll />}
+                {activeTab === 'leaves' && <Leaves />}
               </>
             );
           })()}

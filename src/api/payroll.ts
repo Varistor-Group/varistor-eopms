@@ -18,9 +18,19 @@
 export interface SalaryComponents {
   basic: number;
   hra: number;
-  pf: number;
+  pfEmployee: number;
+  pfEmployer: number;
+  esi: number;
+  pt: number;
   tds: number;
   specialAllowance: number;
+  medical: number;
+  ta: number;
+  lta: number;
+  reimbursement: number;
+  incentives: number;
+  overtime: number;
+  otherDeductions: number;
 }
 
 export interface PayrollRecord {
@@ -28,6 +38,7 @@ export interface PayrollRecord {
   employeeId: string;
   employeeName: string;
   department: string;
+  designation: string;
   month: string; // e.g. "Jun 2026"
   ctc: number;
   components: SalaryComponents;
@@ -37,6 +48,11 @@ export interface PayrollRecord {
   approvedBy?: string;
   approvedAt?: string;
   autoFormula: boolean;
+  totalDays: number;
+  payDays: number;
+  clBalance: number;
+  pfUan: string;
+  monthlySalary: number;
 }
 
 export interface PayrollAuditEntry {
@@ -49,31 +65,145 @@ export interface PayrollAuditEntry {
 
 // ─── Shared formula util ─────────────────────────────────────────────────────
 
-/** Single source of truth for all payroll calculations. */
-export function computeNet(ctc: number): SalaryComponents & { netPay: number } {
-  const basic = Math.round(ctc * 0.6);
-  const hra = Math.round(basic * 0.4);
-  const pf = Math.round(basic * 0.12);
-  const gross = basic + hra;
-  const tds = computeTDS(gross * 12); // annual gross → annual TDS → monthly
-  const specialAllowance = ctc - basic - hra - pf;
-  const netPay = basic + hra + specialAllowance - pf - tds;
-  return { basic, hra, pf, tds, specialAllowance, netPay };
+export function numberToWords(num: number): string {
+  if (num === 0) return 'Rupees Zero Only';
+
+  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const doubleDigits = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tensPlace = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convertTwoDigits(n: number): string {
+    if (n < 10) return singleDigits[n];
+    if (n < 20) return doubleDigits[n - 10];
+    const unit = n % 10;
+    const ten = Math.floor(n / 10);
+    return tensPlace[ten] + (unit ? '-' + singleDigits[unit] : '');
+  }
+
+  function convertThreeDigits(n: number): string {
+    const hundred = Math.floor(n / 100);
+    const rest = n % 100;
+    let str = '';
+    if (hundred) {
+      str += singleDigits[hundred] + ' Hundred';
+    }
+    if (rest) {
+      if (str) str += ' and ';
+      str += convertTwoDigits(rest);
+    }
+    return str;
+  }
+
+  const parts = num.toFixed(2).split('.');
+  const rupeesVal = parseInt(parts[0], 10);
+  const paiseVal = parseInt(parts[1], 10);
+
+  let rupeesStr = '';
+  if (rupeesVal === 0) {
+    rupeesStr = 'Zero';
+  } else {
+    let tempVal = rupeesVal;
+    
+    // Crores
+    const crores = Math.floor(tempVal / 10000000);
+    tempVal %= 10000000;
+    if (crores) {
+      rupeesStr += convertThreeDigits(crores) + ' Crore ';
+    }
+
+    // Lakhs
+    const lakhs = Math.floor(tempVal / 100000);
+    tempVal %= 100000;
+    if (lakhs) {
+      rupeesStr += convertTwoDigits(lakhs) + ' Lakh ';
+    }
+
+    // Thousands
+    const thousands = Math.floor(tempVal / 1000);
+    tempVal %= 1000;
+    if (thousands) {
+      rupeesStr += convertTwoDigits(thousands) + ' Thousand ';
+    }
+
+    if (tempVal) {
+      rupeesStr += convertThreeDigits(tempVal);
+    }
+  }
+
+  let paiseStr = '';
+  if (paiseVal > 0) {
+    paiseStr = ' and ' + convertTwoDigits(paiseVal) + ' Paise';
+  }
+
+  return `Rupees ${rupeesStr.trim()}${paiseStr} Only`;
 }
 
-/** Simple TDS slab (monthly TDS based on annual gross) */
-function computeTDS(annualGross: number): number {
-  let annualTDS = 0;
-  if (annualGross <= 250000) {
-    annualTDS = 0;
-  } else if (annualGross <= 500000) {
-    annualTDS = (annualGross - 250000) * 0.05;
-  } else if (annualGross <= 1000000) {
-    annualTDS = 12500 + (annualGross - 500000) * 0.2;
-  } else {
-    annualTDS = 112500 + (annualGross - 1000000) * 0.3;
-  }
-  return Math.round(annualTDS / 12);
+/** Single source of truth for all payroll calculations. */
+export function computeNet(params: {
+  monthlySalary: number;
+  totalDays?: number;
+  payDays?: number;
+  medical?: number;
+  ta?: number;
+  lta?: number;
+  reimbursement?: number;
+  incentives?: number;
+  overtime?: number;
+  tds?: number;
+  otherDeductions?: number;
+  monthlyCtc?: number;
+}) {
+  const totalDays = params.totalDays ?? 30;
+  const payDays = params.payDays ?? 30;
+  const medical = params.medical ?? 1250;
+  const ta = params.ta ?? 2500;
+  const lta = params.lta ?? 3500;
+  const reimbursement = params.reimbursement ?? 0;
+  const incentives = params.incentives ?? 0;
+  const overtime = params.overtime ?? 0;
+  const tds = params.tds ?? 0;
+  const otherDeductions = params.otherDeductions ?? 0;
+  const monthlySalary = params.monthlySalary;
+
+  const prorata = Math.round((monthlySalary / totalDays) * payDays);
+  const basic = Math.round(prorata * 0.5);
+  const hra = Math.round(basic * 0.5);
+  const specialAllowance = prorata - (basic + hra + medical + ta + lta);
+  const pfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
+  const pfEmployer = pfEmployee; // matches PF Employee
+
+  const gross = prorata;
+  const monthlyCtc = params.monthlyCtc ?? monthlySalary;
+  const esi = monthlyCtc > 21000 ? 0 : Math.ceil(gross * 0.0325);
+  const pt = gross >= 15001 ? 200 : 0;
+
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  const netPay = gross - totalDeductions + reimbursement + incentives + overtime;
+
+  return {
+    monthlySalary,
+    totalDays,
+    payDays,
+    prorata,
+    basic,
+    hra,
+    medical,
+    ta,
+    lta,
+    specialAllowance,
+    pfEmployee,
+    pfEmployer,
+    esi,
+    pt,
+    tds,
+    otherDeductions,
+    totalDeductions,
+    reimbursement,
+    incentives,
+    overtime,
+    netPay,
+    gross
+  };
 }
 
 // ─── Mock audit log ──────────────────────────────────────────────────────────
@@ -98,21 +228,41 @@ const CTC_RANGE = [360000, 420000, 480000, 540000, 600000, 660000, 720000, 84000
 
 function seedRecords(): PayrollRecord[] {
   return NAMES.map((name, i) => {
-    const ctc = Math.round(CTC_RANGE[i % CTC_RANGE.length] / 12); // Monthly CTC
-    const comp = computeNet(ctc);
+    const monthlySalary = Math.round(CTC_RANGE[i % CTC_RANGE.length] / 12); // Monthly Salary
+    const comp = computeNet({
+      monthlySalary,
+      totalDays: 30,
+      payDays: 30
+    });
     return {
       id: `pay-${String(i + 1).padStart(3, '0')}`,
       employeeId: i === 0 ? 'VAR-024' : `VAR-${String(i + 1).padStart(3, '0')}`,
       employeeName: name,
       department: DEPARTMENTS[i % DEPARTMENTS.length],
+      designation: i % 2 === 0 ? 'DEVELOPER' : 'WELDER',
       month: 'Jun 2026',
-      ctc,
+      ctc: monthlySalary,
+      monthlySalary,
+      totalDays: 30,
+      payDays: 30,
+      clBalance: 0,
+      pfUan: '101234567890',
       components: {
         basic: comp.basic,
         hra: comp.hra,
-        pf: comp.pf,
+        pfEmployee: comp.pfEmployee,
+        pfEmployer: comp.pfEmployer,
+        esi: comp.esi,
+        pt: comp.pt,
         tds: comp.tds,
         specialAllowance: comp.specialAllowance,
+        medical: comp.medical,
+        ta: comp.ta,
+        lta: comp.lta,
+        reimbursement: comp.reimbursement,
+        incentives: comp.incentives,
+        overtime: comp.overtime,
+        otherDeductions: comp.otherDeductions,
       },
       netPay: comp.netPay,
       status: i < 5 ? 'approved' : 'draft',
@@ -139,7 +289,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
 
 export async function updatePayrollRecord(
   id: string,
-  patch: Partial<Pick<PayrollRecord, 'ctc' | 'components' | 'autoFormula'>>
+  patch: Partial<Omit<PayrollRecord, 'id' | 'employeeId' | 'employeeName' | 'status'>>
 ): Promise<PayrollRecord | null> {
   await delay(80);
   const idx = _records.findIndex(r => r.id === id);
@@ -148,19 +298,48 @@ export async function updatePayrollRecord(
   if (rec.status === 'approved') return null; // Locked
 
   const updated: PayrollRecord = { ...rec, ...patch };
-  if (patch.autoFormula || (patch.ctc !== undefined && updated.autoFormula)) {
-    const comp = computeNet(updated.ctc);
+  if (patch.autoFormula || (patch.monthlySalary !== undefined && updated.autoFormula) || (patch.ctc !== undefined && updated.autoFormula) || (patch.payDays !== undefined && updated.autoFormula) || (patch.totalDays !== undefined && updated.autoFormula)) {
+    if (patch.ctc !== undefined) {
+      updated.monthlySalary = patch.ctc;
+    } else if (patch.monthlySalary !== undefined) {
+      updated.ctc = patch.monthlySalary;
+    }
+    const comp = computeNet({
+      monthlySalary: updated.monthlySalary,
+      totalDays: updated.totalDays,
+      payDays: updated.payDays,
+      medical: updated.components.medical,
+      ta: updated.components.ta,
+      lta: updated.components.lta,
+      reimbursement: updated.components.reimbursement,
+      incentives: updated.components.incentives,
+      overtime: updated.components.overtime,
+      tds: updated.components.tds,
+      otherDeductions: updated.components.otherDeductions,
+    });
     updated.components = {
       basic: comp.basic,
       hra: comp.hra,
-      pf: comp.pf,
+      pfEmployee: comp.pfEmployee,
+      pfEmployer: comp.pfEmployer,
+      esi: comp.esi,
+      pt: comp.pt,
       tds: comp.tds,
       specialAllowance: comp.specialAllowance,
+      medical: comp.medical,
+      ta: comp.ta,
+      lta: comp.lta,
+      reimbursement: comp.reimbursement,
+      incentives: comp.incentives,
+      overtime: comp.overtime,
+      otherDeductions: comp.otherDeductions,
     };
     updated.netPay = comp.netPay;
   } else if (patch.components) {
     const c = updated.components;
-    updated.netPay = c.basic + c.hra + c.specialAllowance - c.pf - c.tds;
+    const gross = c.basic + c.hra + c.medical + c.ta + c.lta + c.specialAllowance;
+    const totalDeductions = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + c.otherDeductions;
+    updated.netPay = gross - totalDeductions + c.reimbursement + c.incentives + c.overtime;
   }
   _records[idx] = updated;
   return updated;
@@ -218,13 +397,42 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
   await delay(600);
   _records = _records.map(r => {
     if (r.status === 'approved') return r;
-    const ctc = ctcMultiplier ? Math.round(r.ctc * ctcMultiplier) : r.ctc;
-    const comp = computeNet(ctc);
+    const monthlySalary = ctcMultiplier ? Math.round(r.monthlySalary * ctcMultiplier) : r.monthlySalary;
+    const comp = computeNet({
+      monthlySalary,
+      totalDays: r.totalDays,
+      payDays: r.payDays,
+      medical: r.components.medical,
+      ta: r.components.ta,
+      lta: r.components.lta,
+      reimbursement: r.components.reimbursement,
+      incentives: r.components.incentives,
+      overtime: r.components.overtime,
+      tds: r.components.tds,
+      otherDeductions: r.components.otherDeductions,
+    });
     return {
       ...r,
-      ctc,
+      ctc: monthlySalary,
+      monthlySalary,
       autoFormula: true,
-      components: { basic: comp.basic, hra: comp.hra, pf: comp.pf, tds: comp.tds, specialAllowance: comp.specialAllowance },
+      components: {
+        basic: comp.basic,
+        hra: comp.hra,
+        pfEmployee: comp.pfEmployee,
+        pfEmployer: comp.pfEmployer,
+        esi: comp.esi,
+        pt: comp.pt,
+        tds: comp.tds,
+        specialAllowance: comp.specialAllowance,
+        medical: comp.medical,
+        ta: comp.ta,
+        lta: comp.lta,
+        reimbursement: comp.reimbursement,
+        incentives: comp.incentives,
+        overtime: comp.overtime,
+        otherDeductions: comp.otherDeductions,
+      },
       netPay: comp.netPay,
     };
   });
@@ -242,10 +450,31 @@ export interface SlipRow {
   email: string;
   employeeId?: string;
   department?: string;
+  designation?: string;
   month?: string;
-  ctc: number;           // monthly CTC
-  deductions: number;    // total deductions (PF + TDS etc.)
-  netPay: number;        // ctc - deductions
+  monthlySalary: number;
+  totalDays: number;
+  payDays: number;
+  clBalance?: number;
+  pfUan?: string;
+  medical?: number;
+  ta?: number;
+  lta?: number;
+  reimbursement?: number;
+  incentives?: number;
+  overtime?: number;
+  tds?: number;
+  otherDeductions?: number;
+  basic?: number;
+  hra?: number;
+  specialAllowance?: number;
+  pfEmployee?: number;
+  pfEmployer?: number;
+  esi?: number;
+  pt?: number;
+  ctc: number;
+  deductions: number;
+  netPay: number;
 }
 
 export interface BulkSendResult {

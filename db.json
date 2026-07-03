@@ -147,6 +147,41 @@
       "by": "admin@varistor.in",
       "details": "Created employee akash kumar (2131)",
       "timestamp": "2026-07-01T07:27:17.048Z"
+    },
+    {
+      "id": "1783070208727",
+      "action": "APPLY_LEAVE",
+      "by": "Aarav Patel",
+      "details": "Aarav Patel applied for Casual Leave from 2026-07-22 to 2026-07-23",
+      "timestamp": "2026-07-03T09:16:48.727Z"
+    }
+  ],
+  "leaves": [
+    {
+      "id": "leave-1",
+      "employeeId": "VAR-024",
+      "employeeName": "Aarav Patel",
+      "department": "Operations",
+      "type": "Casual Leave",
+      "startDate": "2026-07-10",
+      "endDate": "2026-07-12",
+      "days": 3,
+      "reason": "Family gathering out of station",
+      "status": "Pending",
+      "createdAt": "2026-07-01T10:00:00Z"
+    },
+    {
+      "id": "leave-1783070208727",
+      "employeeId": "VAR-024",
+      "employeeName": "Aarav Patel",
+      "department": "Operations",
+      "type": "Casual Leave",
+      "startDate": "2026-07-22",
+      "endDate": "2026-07-23",
+      "days": 2,
+      "reason": "sick",
+      "status": "Pending",
+      "createdAt": "2026-07-03T09:16:48.727Z"
     }
   ]
 }
