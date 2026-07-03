@@ -57,6 +57,37 @@
   --brand-ink: #f2f4ee;
 }
 
+/*
+ * Pins pre-auth screens (Login, ResetPassword) to the light brand theme
+ * regardless of the app's dark mode state - these are the branded entry
+ * points, not "app content", and resetting the same tokens the rest of the
+ * app reads means every shared component nested here (Input, Button, Modal)
+ * renders correctly too, not just this page's own classes.
+ */
+.force-light {
+  color-scheme: light;
+  --color-white: #ffffff;
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
+
 @layer base {
   /*
    * Tells the browser to render native form controls (select dropdowns,

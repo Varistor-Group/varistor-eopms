@@ -55,7 +55,7 @@ export const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-white font-sans selection:bg-brand-lime/20 selection:text-brand-ink">
+    <div className="force-light min-h-screen w-full flex bg-white font-sans selection:bg-brand-lime/20 selection:text-brand-ink">
       
       {/* Brand Splash (Left Side) - Hidden on mobile */}
       <div className="hidden md:flex w-1/2 bg-[#f1f3f0] p-12 lg:p-20 flex-col justify-between relative overflow-hidden">
