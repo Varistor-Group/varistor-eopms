@@ -74,7 +74,7 @@
       "size": "1.2 MB",
       "uploadDate": "2026-01-15",
       "verified": true,
-      "status": "Verified"
+      "status": "Rejected"
     },
     {
       "id": "doc-2",
@@ -94,17 +94,18 @@
       "size": "2.1 MB",
       "uploadDate": "2026-01-16",
       "verified": false,
-      "status": "Pending"
+      "status": "Under Review"
     },
     {
       "id": "doc-4",
       "employeeId": "VAR-024",
-      "filename": "Experience_Letter_Prev.pdf",
-      "type": "PDF",
-      "size": "1.5 MB",
+      "filename": "er_schema.md",
+      "type": "MD",
+      "size": "0.0 MB",
       "uploadDate": "2026-01-16",
       "verified": true,
-      "status": "Verified"
+      "status": "Pending",
+      "uploadedAt": "2026-07-02T09:55:31.069Z"
     },
     {
       "id": "doc-5",
@@ -125,6 +126,15 @@
       "uploadDate": "2026-01-17",
       "verified": true,
       "status": "Verified"
+    },
+    {
+      "id": "doc-1782985533791",
+      "employeeId": "VAR-024",
+      "filename": "er_schema.md",
+      "type": "MD",
+      "size": "0.0 MB",
+      "status": "Pending",
+      "uploadedAt": "2026-07-02T09:45:33.791Z"
     }
   ],
   "activity_log": [
@@ -176,6 +186,99 @@
       "by": "admin@varistor.in",
       "details": "Created employee dia (2913AS)",
       "timestamp": "2026-07-02T08:06:10.668Z"
+    },
+    {
+      "id": "1782983012050",
+      "action": "document_status_changed",
+      "by": "hr@varistor.in",
+      "details": "Document doc-1 status changed to Pending",
+      "metadata": {
+        "documentId": "doc-1",
+        "newStatus": "Pending"
+      },
+      "timestamp": "2026-07-02T09:03:32.050Z"
+    },
+    {
+      "id": "1782983015548",
+      "action": "document_status_changed",
+      "by": "hr@varistor.in",
+      "details": "Document doc-1 status changed to Rejected",
+      "metadata": {
+        "documentId": "doc-1",
+        "newStatus": "Rejected"
+      },
+      "timestamp": "2026-07-02T09:03:35.548Z"
+    },
+    {
+      "id": "1782983018601",
+      "action": "document_status_changed",
+      "by": "hr@varistor.in",
+      "details": "Document doc-3 status changed to Under Review",
+      "metadata": {
+        "documentId": "doc-3",
+        "newStatus": "Under Review"
+      },
+      "timestamp": "2026-07-02T09:03:38.601Z"
+    },
+    {
+      "id": "1782985192548",
+      "employeeId": "admin@varistor.in",
+      "action": "View",
+      "performed_by": "admin@varistor.in",
+      "metadata": {
+        "documentId": "doc-1"
+      },
+      "timestamp": "2026-07-02T09:39:52.548Z"
+    },
+    {
+      "id": "1782985271098",
+      "employeeId": "admin@varistor.in",
+      "action": "View",
+      "performed_by": "admin@varistor.in",
+      "metadata": {
+        "documentId": "doc-1"
+      },
+      "timestamp": "2026-07-02T09:41:11.098Z"
+    },
+    {
+      "id": "1782985271745",
+      "employeeId": "admin@varistor.in",
+      "action": "View",
+      "performed_by": "admin@varistor.in",
+      "metadata": {
+        "documentId": "doc-1"
+      },
+      "timestamp": "2026-07-02T09:41:11.745Z"
+    },
+    {
+      "id": "1782985533791",
+      "action": "document_uploaded",
+      "by": "VAR-024",
+      "details": "Uploaded document er_schema.md",
+      "metadata": {
+        "documentId": "doc-1782985533791"
+      },
+      "timestamp": "2026-07-02T09:45:33.791Z"
+    },
+    {
+      "id": "1782986115574",
+      "action": "document_replaced",
+      "by": "VAR-024",
+      "details": "Uploaded new file file1 for document slot",
+      "metadata": {
+        "documentId": "doc-4"
+      },
+      "timestamp": "2026-07-02T09:55:15.574Z"
+    },
+    {
+      "id": "1782986131069",
+      "action": "document_replaced",
+      "by": "VAR-024",
+      "details": "Uploaded new file er_schema.md for document slot",
+      "metadata": {
+        "documentId": "doc-4"
+      },
+      "timestamp": "2026-07-02T09:55:31.069Z"
     }
   ],
   "policies": [
