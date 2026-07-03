@@ -1,14 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download } from 'lucide-react';
 import { chatApi } from '../api/chat';
 import type { ChannelId, ChatMessage } from '../types';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🎉', '😂', '🙏', '👀'];
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5MB - keeps localStorage well within quota
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatTime(iso: string): string {
@@ -37,6 +47,7 @@ export const Chat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [unread, setUnread] = useState<{ total: number; byChannel: Record<string, number> }>({ total: 0, byChannel: {} });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -87,9 +98,18 @@ export const Chat: React.FC = () => {
     e.target.value = '';
     if (!file) return;
 
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError(`"${file.name}" is over the 5 MB attachment limit.`);
+      setTimeout(() => setAttachError(null), 4000);
+      return;
+    }
+
+    const dataUrl = await readFileAsDataUrl(file);
     const message = await chatApi.sendMessage(activeChannelId, undefined, {
       name: file.name,
       size: formatFileSize(file.size),
+      type: file.type || 'application/octet-stream',
+      dataUrl,
     });
     setMessages(prev => [...prev, message]);
   };
@@ -183,13 +203,44 @@ export const Chat: React.FC = () => {
                   </div>
 
                   {message.attachment ? (
-                    <div className="flex items-center gap-2 bg-varistor-surfaceMuted border border-varistor-border rounded-lg px-3 py-2 text-xs">
-                      <FileSpreadsheet size={16} className="text-varistor-lime flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-varistor-dark truncate">{message.attachment.name}</p>
-                        <p className="text-[10px] text-varistor-muted">{message.attachment.size} · searchable archive</p>
+                    message.attachment.dataUrl && message.attachment.type?.startsWith('image/') ? (
+                      <a href={message.attachment.dataUrl} target="_blank" rel="noreferrer" title={`Preview ${message.attachment.name}`}>
+                        <img
+                          src={message.attachment.dataUrl}
+                          alt={message.attachment.name}
+                          className="max-w-[220px] max-h-[220px] rounded-lg border border-varistor-border object-cover"
+                        />
+                      </a>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-varistor-surfaceMuted border border-varistor-border rounded-lg px-3 py-2 text-xs">
+                        <FileSpreadsheet size={16} className="text-varistor-lime flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-varistor-dark truncate">{message.attachment.name}</p>
+                          <p className="text-[10px] text-varistor-muted">{message.attachment.size} · searchable archive</p>
+                        </div>
+                        {message.attachment.dataUrl && (
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+                            <a
+                              href={message.attachment.dataUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Preview"
+                              className="p-1.5 rounded hover:bg-varistor-surface text-varistor-muted hover:text-varistor-dark transition-colors"
+                            >
+                              <Eye size={13} />
+                            </a>
+                            <a
+                              href={message.attachment.dataUrl}
+                              download={message.attachment.name}
+                              title="Download"
+                              className="p-1.5 rounded hover:bg-varistor-surface text-varistor-muted hover:text-varistor-dark transition-colors"
+                            >
+                              <Download size={13} />
+                            </a>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )
                   ) : (
                     <div
                       className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
@@ -208,6 +259,13 @@ export const Chat: React.FC = () => {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Attachment error */}
+        {attachError && (
+          <div className="px-4 py-2 text-[11px] font-semibold text-varistor-dangerText bg-varistor-dangerBg border-t border-varistor-dangerBorder flex-shrink-0">
+            {attachError}
+          </div>
+        )}
 
         {/* Composer */}
         <form onSubmit={handleSend} className="border-t border-varistor-border px-4 py-3 flex items-center gap-2 relative flex-shrink-0">

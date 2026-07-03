@@ -79,7 +79,7 @@ export const chatApi = {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   },
 
-  async sendMessage(channelId: ChannelId, text?: string, attachment?: { name: string; size: string }): Promise<ChatMessage> {
+  async sendMessage(channelId: ChannelId, text?: string, attachment?: { name: string; size: string; type?: string; dataUrl?: string }): Promise<ChatMessage> {
     const message: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       channelId,
