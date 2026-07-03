@@ -161,7 +161,7 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'attendance', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 

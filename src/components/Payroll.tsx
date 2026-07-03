@@ -273,6 +273,18 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
 
 type SendStep = 'idle' | 'preview' | 'sending' | 'done';
 
+function convertMonthToYYYYMM(monthStr: string): string {
+  const parts = monthStr.split(' ');
+  if (parts.length !== 2) return new Date().toISOString().slice(0, 7);
+  const [monStr, yearStr] = parts;
+  const monthMap: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+  };
+  const monVal = monthMap[monStr.toLowerCase().slice(0, 3)] || '01';
+  return `${yearStr}-${monVal}`;
+}
+
 interface ExcelUploadPanelProps {
   onClose: () => void;
 }
@@ -292,7 +304,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
     try {
       const emps = await getEmployees();
       const payrollRecords = await getPayrollRecords();
-      const attendanceReport = await getMonthlyReport(MONTH);
+      const apiMonth = convertMonthToYYYYMM(MONTH);
+      const attendanceReport = await getMonthlyReport(apiMonth);
 
       const parsed: SlipRow[] = [];
       attendanceReport.forEach(att => {
