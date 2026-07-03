@@ -121,7 +121,7 @@ const AppContent: React.FC = () => {
               <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
               <select
                 value={currentRole}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onChange={(e) => setCurrentRole(e.target.value as any)}
                 className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
                 title="Switch active role for permission testing"
@@ -161,7 +161,7 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'attendance', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'chat', 'training'];
               }
             };
 
