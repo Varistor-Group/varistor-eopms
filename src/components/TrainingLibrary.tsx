@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BookOpen, Lock, CheckCircle, Clock, PlayCircle, RotateCcw, AlertCircle } from 'lucide-react';
+import { BookOpen, Lock, CheckCircle, Clock, PlayCircle, RotateCcw, AlertCircle, Plus, Trash2, Users } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { TrainingModuleWithStatus, TrainingStatus, TrainingTrack } from '../types';
 import VideoPlayer from './VideoPlayer';
 import QuizScreen from './QuizScreen';
+import TrainingUploadModal from './TrainingUploadModal';
 
 type InternalView = 'library' | 'player' | 'quiz';
 
@@ -52,9 +54,13 @@ function ProgressBar({ watched, duration }: { watched: number; duration: number 
 function TrainingCard({
   mod,
   onStart,
+  showAudience = false,
+  onDelete,
 }: {
   mod: TrainingModuleWithStatus;
   onStart: (mod: TrainingModuleWithStatus) => void;
+  showAudience?: boolean;
+  onDelete?: (mod: TrainingModuleWithStatus) => void;
 }) {
   const isLocked = mod.status === 'locked';
   const isCompleted = mod.status === 'completed';
@@ -107,6 +113,25 @@ function TrainingCard({
 
         {/* Description */}
         <p className="text-[11px] text-varistor-muted leading-relaxed line-clamp-2">{mod.description}</p>
+
+        {/* Audience badge (HR/Admin management view only) */}
+        {showAudience && (
+          <div className="flex items-center gap-1.5 text-[10px] text-varistor-muted">
+            <Users size={11} strokeWidth={1.5} className="flex-shrink-0" />
+            <span className="truncate">
+              Audience: {mod.visibleToRoles && mod.visibleToRoles.length > 0 ? mod.visibleToRoles.join(', ') : 'Everyone'}
+            </span>
+            {onDelete && trainingApi.isCustomModule(mod.id) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(mod); }}
+                className="ml-auto flex-shrink-0 text-varistor-muted hover:text-varistor-dangerText transition-colors"
+                title="Delete this uploaded module"
+              >
+                <Trash2 size={12} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Duration */}
         <div className="flex items-center gap-1.5 text-[10px] text-varistor-muted">
@@ -167,18 +192,21 @@ const TrainingLibrary: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<InternalView>('library');
   const [selectedModule, setSelectedModule] = useState<TrainingModuleWithStatus | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
 
+  const { currentRole } = useVariPoints();
+  const isManager = currentRole === 'HR' || currentRole === 'Admin';
   const employeeId = trainingApi.getCurrentUserId();
 
   const loadModules = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await trainingApi.fetchModulesWithStatus(employeeId);
+      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole);
       setModules(data);
     } finally {
       setLoading(false);
     }
-  }, [employeeId]);
+  }, [employeeId, currentRole]);
 
   useEffect(() => {
     loadModules();
@@ -208,6 +236,21 @@ const TrainingLibrary: React.FC = () => {
     await loadModules();
     setView('library');
     setSelectedModule(null);
+  };
+
+  const handleModuleCreated = async () => {
+    setShowUpload(false);
+    await loadModules();
+  };
+
+  const handleDeleteModule = async (mod: TrainingModuleWithStatus) => {
+    if (!window.confirm(`Delete the module "${mod.title}"? This also removes its video and quiz.`)) return;
+    try {
+      await trainingApi.deleteModule(mod.id);
+      await loadModules();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Failed to delete module.');
+    }
   };
 
   if (view === 'player' && selectedModule) {
@@ -247,6 +290,18 @@ const TrainingLibrary: React.FC = () => {
           <p className="text-sm text-varistor-muted">Complete all modules to finish your onboarding. Modules unlock sequentially within each track.</p>
         </div>
 
+        <div className="flex-shrink-0 flex items-center gap-3">
+        {/* Upload module (HR/Admin only) */}
+        {isManager && (
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 bg-varistor-lime text-varistor-dark text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-lime-500 active:scale-[0.98] transition-all duration-150"
+          >
+            <Plus size={14} strokeWidth={2} />
+            Upload Module
+          </button>
+        )}
+
         {/* Overall progress chip */}
         {!loading && (
           <div className="flex-shrink-0 flex items-center gap-2 bg-white border border-varistor-border rounded-varistor px-4 py-2.5 shadow-varistor">
@@ -258,6 +313,7 @@ const TrainingLibrary: React.FC = () => {
             <CheckCircle size={20} strokeWidth={1.5} className={completedCount === totalCount ? 'text-varistor-lime' : 'text-varistor-muted'} />
           </div>
         )}
+        </div>
       </div>
 
       {loading ? (
@@ -306,13 +362,28 @@ const TrainingLibrary: React.FC = () => {
                   {trackModules
                     .sort((a, b) => a.order - b.order)
                     .map(mod => (
-                      <TrainingCard key={mod.id} mod={mod} onStart={handleStartModule} />
+                      <TrainingCard
+                        key={mod.id}
+                        mod={mod}
+                        onStart={handleStartModule}
+                        showAudience={isManager}
+                        onDelete={isManager ? handleDeleteModule : undefined}
+                      />
                     ))}
                 </div>
               </section>
             );
           })}
         </div>
+      )}
+
+      {/* Upload modal (HR/Admin only) */}
+      {showUpload && isManager && (
+        <TrainingUploadModal
+          modules={modules}
+          onClose={() => setShowUpload(false)}
+          onCreated={handleModuleCreated}
+        />
       )}
     </div>
   );

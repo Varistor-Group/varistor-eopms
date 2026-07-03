@@ -9,6 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Uploaded training videos (served locally, never committed)
+server_uploads/
 dist-ssr
 *.local
 .env

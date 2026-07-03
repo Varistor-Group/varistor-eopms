@@ -207,5 +207,7 @@
   "policy": {
     "content": "<p>1.come on time</p><p>2.dont be late</p>",
     "updatedAt": "2026-07-02T06:16:46.549Z"
-  }
+  },
+  "training_modules": [],
+  "training_questions": {}
 }

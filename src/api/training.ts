@@ -5,6 +5,7 @@ import type {
   QuizAttempt,
   TrainingModuleWithStatus,
   TrainingStatus,
+  UserRole,
 } from '../types';
 
 const SERVER_URL = 'http://localhost:3001';
@@ -121,6 +122,28 @@ const MOCK_QUESTIONS: Record<string, QuizQuestion[]> = {
   ],
 };
 
+// ─── Server modules (HR/Admin uploads, persisted in db.json) ─────────────────
+
+let serverModulesCache: TrainingModule[] = [];
+const serverQuestionsCache: Record<string, QuizQuestion[]> = {};
+
+async function fetchServerModules(): Promise<TrainingModule[]> {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/training/modules`);
+    if (res.ok) {
+      const data = await res.json();
+      serverModulesCache = Array.isArray(data) ? data : [];
+    }
+  } catch {
+    // Server not running — fall back to seed modules only
+  }
+  return serverModulesCache;
+}
+
+function allKnownModules(): TrainingModule[] {
+  return [...MOCK_MODULES, ...serverModulesCache];
+}
+
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
 function getProgress(): TrainingProgress[] {
@@ -153,7 +176,8 @@ function resolveStatus(
   module: TrainingModule,
   allProgress: TrainingProgress[],
   allAttempts: QuizAttempt[],
-  employeeId: string
+  employeeId: string,
+  visibleIds?: Set<string>
 ): TrainingStatus {
   const attempt = allAttempts
     .filter(a => a.employee_id === employeeId && a.module_id === module.id)
@@ -161,7 +185,11 @@ function resolveStatus(
 
   if (attempt?.passed) return 'completed';
 
-  if (module.prerequisite_id) {
+  // A prerequisite the user cannot see (different audience, or deleted) counts
+  // as satisfied — otherwise they would be permanently locked out.
+  const prereqVisible = !visibleIds || (module.prerequisite_id !== null && visibleIds.has(module.prerequisite_id));
+
+  if (module.prerequisite_id && prereqVisible) {
     const prereqAttempt = allAttempts
       .filter(a => a.employee_id === employeeId && a.module_id === module.prerequisite_id && a.passed)
       .length > 0;
@@ -184,13 +212,24 @@ export const trainingApi = {
     return MOCK_USER_ID;
   },
 
-  async fetchModulesWithStatus(employeeId: string): Promise<TrainingModuleWithStatus[]> {
+  async fetchModulesWithStatus(employeeId: string, role?: UserRole): Promise<TrainingModuleWithStatus[]> {
     await delay();
+    const serverModules = await fetchServerModules();
     const allProgress = getProgress();
     const allAttempts = getAttempts();
 
-    return MOCK_MODULES.map(module => {
-      const status = resolveStatus(module, allProgress, allAttempts, employeeId);
+    const merged = [...MOCK_MODULES, ...serverModules];
+
+    // HR/Admin (or no role given) see everything; learners only see modules
+    // whose audience is empty or includes their role.
+    const isManager = role === 'HR' || role === 'Admin';
+    const visible = !role || isManager
+      ? merged
+      : merged.filter(m => !m.visibleToRoles || m.visibleToRoles.length === 0 || m.visibleToRoles.includes(role));
+    const visibleIds = new Set(visible.map(m => m.id));
+
+    return visible.map(module => {
+      const status = resolveStatus(module, allProgress, allAttempts, employeeId, visibleIds);
       const progress = allProgress.find(p => p.employee_id === employeeId && p.module_id === module.id) ?? null;
       const latestAttempt = allAttempts
         .filter(a => a.employee_id === employeeId && a.module_id === module.id)
@@ -202,7 +241,7 @@ export const trainingApi = {
   async updateProgress(employeeId: string, moduleId: string, watchedSeconds: number): Promise<void> {
     const all = getProgress();
     const idx = all.findIndex(p => p.employee_id === employeeId && p.module_id === moduleId);
-    const module = MOCK_MODULES.find(m => m.id === moduleId);
+    const module = allKnownModules().find(m => m.id === moduleId);
     const completed = module ? watchedSeconds >= module.duration_seconds : false;
 
     if (idx > -1) {
@@ -225,6 +264,19 @@ export const trainingApi = {
 
   async fetchQuizQuestions(moduleId: string): Promise<QuizQuestion[]> {
     await delay();
+    // Server-authored questions first, then fall back to the seeded mocks
+    try {
+      const res = await fetch(`${SERVER_URL}/api/training/questions/${moduleId}`);
+      if (res.ok) {
+        const qs = await res.json();
+        if (Array.isArray(qs) && qs.length > 0) {
+          serverQuestionsCache[moduleId] = qs;
+          return qs;
+        }
+      }
+    } catch {
+      // Server not running — use mocks
+    }
     return MOCK_QUESTIONS[moduleId] ?? [];
   },
 
@@ -264,7 +316,7 @@ export const trainingApi = {
   ): Promise<QuizAttempt> {
     await delay();
 
-    const questions = MOCK_QUESTIONS[moduleId] ?? [];
+    const questions = serverQuestionsCache[moduleId] ?? MOCK_QUESTIONS[moduleId] ?? [];
     const correct = questions.filter(q => answers[q.id] === q.correct_index).length;
     const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
     const passed = score >= 70;
@@ -298,6 +350,34 @@ export const trainingApi = {
     }
 
     return attempt;
+  },
+
+  // ── HR/Admin module management ──────────────────────────────────────────────
+
+  async createModule(formData: FormData): Promise<TrainingModule> {
+    const res = await fetch(`${SERVER_URL}/api/training/modules`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to create module. Is the server running?');
+    }
+    return data.module;
+  },
+
+  async deleteModule(moduleId: string): Promise<void> {
+    const res = await fetch(`${SERVER_URL}/api/training/modules/${moduleId}`, {
+      method: 'DELETE',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to delete module.');
+    }
+  },
+
+  isCustomModule(moduleId: string): boolean {
+    return moduleId.startsWith('mod-custom-');
   },
 
   isRetryAllowed(latestAttempt: QuizAttempt | null): boolean {

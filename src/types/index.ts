@@ -172,6 +172,8 @@ export interface TrainingModule {
   video_url: string;
   order: number;
   prerequisite_id: string | null;
+  /** Roles that can see this module. Empty/undefined = visible to everyone. */
+  visibleToRoles?: UserRole[];
 }
 
 export interface TrainingProgress {

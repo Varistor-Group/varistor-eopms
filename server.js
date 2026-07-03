@@ -3,6 +3,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
 import fs from 'fs/promises';
+import multer from 'multer';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -407,6 +408,158 @@ app.delete('/api/policies/:id', async (req, res) => {
   const id = req.params.id;
   if (!db.policies) return res.status(404).json({ success: false, error: 'Policy not found.' });
   db.policies = db.policies.filter(p => p.id !== id);
+  await writeDB(db);
+  res.json({ success: true });
+});
+
+// ── Training modules (HR/Admin video uploads — Task C) ───────────────────────
+
+const TRAINING_UPLOAD_DIR = path.join(__dirname, 'server_uploads', 'training');
+fs.mkdir(TRAINING_UPLOAD_DIR, { recursive: true }).catch(err =>
+  console.error('Failed to create training uploads folder', err)
+);
+
+// Serve uploaded videos statically: http://localhost:3001/uploads/training/<id>.mp4
+app.use('/uploads', express.static(path.join(__dirname, 'server_uploads')));
+
+const trainingStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, TRAINING_UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    // Unique generated name derived from the module id — never the original filename
+    const moduleId = `mod-custom-${Date.now()}`;
+    req.generatedModuleId = moduleId;
+    cb(null, `${moduleId}.mp4`);
+  },
+});
+
+const trainingUpload = multer({
+  storage: trainingStorage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
+  fileFilter: (req, file, cb) => {
+    const isMp4 =
+      file.mimetype === 'video/mp4' &&
+      path.extname(file.originalname).toLowerCase() === '.mp4';
+    if (!isMp4) return cb(new Error('Only .mp4 video files are accepted.'));
+    cb(null, true);
+  },
+});
+
+// Training modules — GET all
+app.get('/api/training/modules', async (req, res) => {
+  const db = await readDB();
+  res.json(db.training_modules || []);
+});
+
+// Training questions — GET by module id
+app.get('/api/training/questions/:moduleId', async (req, res) => {
+  const db = await readDB();
+  res.json((db.training_questions || {})[req.params.moduleId] || []);
+});
+
+// Training modules — POST (multipart: 'video' file OR video_url + metadata + quiz)
+app.post('/api/training/modules', (req, res) => {
+  trainingUpload.single('video')(req, res, async (err) => {
+    if (err) {
+      const msg =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? 'Video exceeds the 200 MB size limit.'
+          : err.message || 'Upload failed.';
+      return res.status(400).json({ success: false, error: msg });
+    }
+
+    const cleanupFile = async () => {
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+    };
+
+    try {
+      const {
+        title, description, track, department, prerequisite_id,
+        video_url, duration_seconds, order, questions, visibleToRoles,
+      } = req.body;
+
+      if (!title || !description || !track) {
+        await cleanupFile();
+        return res.status(400).json({ success: false, error: 'title, description and track are required' });
+      }
+      if (!req.file && !video_url) {
+        await cleanupFile();
+        return res.status(400).json({ success: false, error: 'Provide an MP4 file or a direct MP4 URL.' });
+      }
+
+      let parsedQuestions;
+      let parsedRoles;
+      try {
+        parsedQuestions = JSON.parse(questions || '[]');
+        parsedRoles = JSON.parse(visibleToRoles || '[]');
+      } catch {
+        await cleanupFile();
+        return res.status(400).json({ success: false, error: 'questions and visibleToRoles must be valid JSON' });
+      }
+      if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
+        await cleanupFile();
+        return res.status(400).json({ success: false, error: 'At least one quiz question is required.' });
+      }
+
+      const moduleId = req.generatedModuleId || `mod-custom-${Date.now()}`;
+      const finalVideoUrl = req.file
+        ? `http://localhost:${port}/uploads/training/${req.file.filename}`
+        : video_url;
+
+      const newModule = {
+        id: moduleId,
+        title,
+        description,
+        track,
+        ...(department ? { department } : {}),
+        duration_seconds: Math.max(1, Math.round(Number(duration_seconds) || 0)),
+        thumbnail_url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=640&fit=crop&q=60',
+        video_url: finalVideoUrl,
+        order: Number(order) || 999,
+        prerequisite_id: prerequisite_id || null,
+        visibleToRoles: Array.isArray(parsedRoles) ? parsedRoles : [],
+        uploaded: !!req.file,
+        createdAt: new Date().toISOString(),
+      };
+
+      const newQuestions = parsedQuestions.map((q, i) => ({
+        id: `q-${moduleId}-${i + 1}`,
+        module_id: moduleId,
+        question: q.question,
+        options: q.options,
+        correct_index: q.correct_index,
+      }));
+
+      const db = await readDB();
+      if (!db.training_modules) db.training_modules = [];
+      if (!db.training_questions) db.training_questions = {};
+      db.training_modules.push(newModule);
+      db.training_questions[moduleId] = newQuestions;
+      await writeDB(db);
+
+      res.json({ success: true, module: newModule });
+    } catch (e) {
+      console.error('Failed to create training module', e);
+      await cleanupFile();
+      res.status(500).json({ success: false, error: 'Failed to create training module' });
+    }
+  });
+});
+
+// Training modules — DELETE (also removes the uploaded file from disk)
+app.delete('/api/training/modules/:id', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  const index = (db.training_modules || []).findIndex(m => m.id === id);
+  if (index === -1) return res.status(404).json({ success: false, error: 'Module not found.' });
+
+  const [removed] = db.training_modules.splice(index, 1);
+  if (db.training_questions) delete db.training_questions[id];
+
+  if (removed.uploaded) {
+    const filePath = path.join(TRAINING_UPLOAD_DIR, `${path.basename(id)}.mp4`);
+    await fs.unlink(filePath).catch(() => {});
+  }
+
   await writeDB(db);
   res.json({ success: true });
 });
