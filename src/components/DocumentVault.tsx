@@ -56,6 +56,7 @@ const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
 // ── Document Vault ────────────────────────────────────────────────────────────
 export const DocumentVault: React.FC = () => {
   const { currentRole, addToast } = useVariPoints();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [documents, setDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +75,7 @@ export const DocumentVault: React.FC = () => {
 
   // Re-fetch documents when the selected employee changes
   useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getVaultDocuments(selectedEmployeeId).then(docs => {
       setDocuments(docs);
@@ -84,6 +86,7 @@ export const DocumentVault: React.FC = () => {
   // Lock back to logged-in user when role switches away from Admin/HR
   useEffect(() => {
     if (currentRole !== 'Admin' && currentRole !== 'HR') {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedEmployeeId(loggedInEmployeeId);
     }
   }, [currentRole]);

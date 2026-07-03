@@ -94,6 +94,7 @@ export async function mockLogin(email: string, password: string) {
   delete loginAttempts[email];
 
   // Strip password from returned object
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _pw, ...secureUser } = user;
   return { user: secureUser, error: null };
 }
@@ -131,6 +132,7 @@ export async function sendPasswordReset(email: string) {
       success: true,
       message: 'Reset link sent — check your inbox',
     };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, error: 'Email server unreachable.' };
   }

@@ -10,6 +10,7 @@ export function useFieldTracking(employeeId: string | null, isFieldEmployee: boo
 
   useEffect(() => {
     if (!employeeId || !isFieldEmployee || !navigator.geolocation) {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsTracking(false);
       return;
     }

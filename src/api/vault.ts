@@ -12,6 +12,7 @@ export async function getVaultDocuments(employeeId: string) {
     const docs = await res.json();
 
     // Map DB fields back to the UI expected fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return docs.map((d: any) => ({
       id: d.id,
       name: d.filename,

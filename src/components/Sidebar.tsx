@@ -32,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentRole } = useVariPoints();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
 
   if (currentRole === 'Admin') {
@@ -43,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
@@ -59,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
@@ -70,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];

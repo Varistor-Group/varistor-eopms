@@ -10,5 +10,33 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Disable Right Click
+      document.addEventListener('contextmenu', event => event.preventDefault());
+
+      // Disable Keyboard Shortcuts for DevTools
+      document.addEventListener('keydown', (e) => {
+        // F12
+        if (e.keyCode === 123) {
+          e.preventDefault();
+        }
+        // Ctrl+Shift+I
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+          e.preventDefault();
+        }
+        // Ctrl+Shift+J
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+          e.preventDefault();
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && e.keyCode === 85) {
+          e.preventDefault();
+        }
+        // Cmd+Option+I (Mac)
+        if (e.metaKey && e.altKey && e.keyCode === 73) {
+          e.preventDefault();
+        }
+      });
+    </script>
   </body>
 </html>

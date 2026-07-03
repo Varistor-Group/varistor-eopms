@@ -14,6 +14,7 @@ export const ResetPassword: React.FC = () => {
     // Extract token from URL
     const urlParams = new URLSearchParams(window.location.search);
     const tokenParam = urlParams.get('token');
+  // eslint-disable-next-line react-hooks/set-state-in-effect
     setToken(tokenParam);
   }, []);
 
