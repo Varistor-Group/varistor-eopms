@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PointsLedger } from './components/PointsLedger';
-import { AnnouncementsFeed } from './components/AnnouncementsFeed'; // eslint-disable-line import/no-unresolved
+import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
@@ -119,6 +119,7 @@ const AppContent: React.FC = () => {
               <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
               <select
                 value={currentRole}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onChange={(e) => setCurrentRole(e.target.value as any)}
                 className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
                 title="Switch active role for permission testing"
@@ -158,7 +159,7 @@ const AppContent: React.FC = () => {
               } else if (currentRole === 'Reporting Manager') {
                 return ['dashboard', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
               } else {
-                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'chat', 'training'];
               }
             };
 

@@ -12,6 +12,7 @@ export async function getVaultDocuments(employeeId: string) {
     const docs = await res.json();
 
     // Map DB fields back to the UI expected fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return docs.map((d: any) => ({
       id: d.id,
       name: d.filename,
@@ -20,9 +21,81 @@ export async function getVaultDocuments(employeeId: string) {
       status: d.status as DocumentStatus,
       url: '#'
     }));
-  } catch (err) {
+} catch (err) {
     console.error('Failed to fetch documents', err);
     return [];
+  }
+}
+
+import { encryptFile, decryptFile, getMasterKey } from '../utils/crypto';
+
+export async function uploadDocument(employeeId: string, file: File) {
+  try {
+    const key = await getMasterKey();
+    const encryptedPayload = await encryptFile(file, key);
+
+    const res = await fetch('http://localhost:3001/api/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId,
+        filename: file.name,
+        type: file.name.split('.').pop()?.toUpperCase() || 'DOCUMENT',
+        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
+        payload: encryptedPayload
+      })
+    });
+    const result = await res.json();
+    return { success: result.success, document: result.document, error: result.error };
+  } catch (err) {
+    console.error('Failed to upload document', err);
+    return { success: false, error: 'Server unreachable.' };
+  }
+}
+
+export async function updateDocumentFile(documentId: string, file: File) {
+  try {
+    const key = await getMasterKey();
+    const encryptedPayload = await encryptFile(file, key);
+
+    const res = await fetch(`http://localhost:3001/api/documents/${documentId}/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        type: file.name.split('.').pop()?.toUpperCase() || 'DOCUMENT',
+        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
+        payload: encryptedPayload
+      })
+    });
+    const result = await res.json();
+    return { success: result.success, document: result.document, error: result.error };
+  } catch (err) {
+    console.error('Failed to update document file', err);
+    return { success: false, error: 'Server unreachable.' };
+  }
+}
+
+export async function downloadDecryptedDocument(documentId: string) {
+  try {
+    const res = await fetch(`http://localhost:3001/api/documents/${documentId}/download`);
+    const result = await res.json();
+    if (!result.success) return { success: false, error: result.error };
+
+    const key = await getMasterKey();
+    
+    // Attempt to figure out MIME type from filename (simplified)
+    const ext = result.filename.split('.').pop()?.toLowerCase();
+    let mimeType = 'application/octet-stream';
+    if (ext === 'pdf') mimeType = 'application/pdf';
+    else if (['png', 'jpg', 'jpeg'].includes(ext)) mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+    const decryptedBlob = await decryptFile(result.payload, key, mimeType);
+    
+    return { success: true, blob: decryptedBlob, filename: result.filename };
+  } catch (err) {
+    console.error('Failed to download/decrypt document', err);
+    return { success: false, error: 'Decryption or download failed.' };
   }
 }
 

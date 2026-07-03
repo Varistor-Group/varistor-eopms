@@ -68,21 +68,95 @@ export const mockEmployeeStore: Employee[] = [
     is_field_employee: false
   },
   {
-    fullName: "sathvik",
-    employeeId: "2",
-    username: "sathvikkillspeople",
-    personalEmail: "sathvik@varistor.in",
-    phone: "120393132241",
-    department: "Operations",
-    reportingManager: "2131",
-    role: "Employee",
-    is_field_employee: true,
-    id: "2",
-    tempPassword: "S@2026!441",
-    createdAt: "2026-07-02T07:43:56.955Z",
-    status: "Active",
-    variPoints: 0
-  }
+    id: 'VAR-033',
+    fullName: 'Mohammed Faisal',
+    employeeId: 'VAR-033',
+    username: 'mohammed.faisal',
+    personalEmail: 'md.faisal@gmail.com',
+    phone: '+91 96860 78090',
+    department: 'Sales',
+    reportingManager: 'Aarav Patel',
+    role: 'Field Employee',
+    tempPassword: 'MF@2026!305',
+    createdAt: '2026-02-18T08:45:00Z',
+    status: 'Active',
+    variPoints: 780,
+  },
+  {
+    id: 'VAR-034',
+    fullName: 'Sneha Reddy',
+    employeeId: 'VAR-034',
+    username: 'sneha.reddy',
+    personalEmail: 'sneha.reddy@gmail.com',
+    phone: '+91 90080 23445',
+    department: 'Operations',
+    reportingManager: 'Aarav Patel',
+    role: 'Field Employee',
+    tempPassword: 'SR@2026!664',
+    createdAt: '2026-03-01T09:15:00Z',
+    status: 'Active',
+    variPoints: 1340,
+  },
+  {
+    id: 'VAR-035',
+    fullName: 'Arjun Nair',
+    employeeId: 'VAR-035',
+    username: 'arjun.nair',
+    personalEmail: 'arjun.nair@gmail.com',
+    phone: '+91 98410 56728',
+    department: 'Digital Marketing',
+    reportingManager: 'Aarav Patel',
+    role: 'Field Employee',
+    tempPassword: 'AN@2026!129',
+    createdAt: '2026-03-12T11:20:00Z',
+    status: 'Active',
+    variPoints: 610,
+  },
+  {
+    id: 'VAR-001',
+    fullName: 'Manager User',
+    employeeId: 'VAR-001',
+    username: 'manager.user',
+    personalEmail: 'manager@example.com',
+    phone: '+91 00000 00000',
+    department: 'Operations',
+    reportingManager: 'Admin User',
+    role: 'Reporting Manager',
+    tempPassword: 'Manager@2026!',
+    createdAt: '2026-01-01T09:00:00Z',
+    status: 'Active',
+    variPoints: 2000,
+  },
+  {
+    id: 'VAR-003',
+    fullName: 'Priya Sharma',
+    employeeId: 'VAR-003',
+    username: 'priya.sharma',
+    personalEmail: 'priya.sharma@gmail.com',
+    phone: '+91 97654 32109',
+    department: 'Finance',
+    reportingManager: 'Admin User',
+    role: 'HR',
+    tempPassword: 'Hr@2026!',
+    createdAt: '2026-01-10T09:00:00Z',
+    status: 'Active',
+    variPoints: 1540,
+  },
+  {
+    id: 'VAR-005',
+    fullName: 'Ravi Kumar',
+    employeeId: 'VAR-005',
+    username: 'ravi.kumar',
+    personalEmail: 'ravi.kumar@gmail.com',
+    phone: '+91 91234 56789',
+    department: 'Finance',
+    reportingManager: 'Admin User',
+    role: 'HR',
+    tempPassword: 'Hr2@2026!',
+    createdAt: '2026-02-01T09:00:00Z',
+    status: 'Active',
+    variPoints: 980,
+  },
 ];
 
 // ─── Field Tracker mock location store ───────────────────────────────────────
@@ -210,9 +284,9 @@ export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void
     ...data,
     id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
   };
-  
+
   mockLocationHistory.push(newEntry);
-  
+
   // Keep only the last 100 entries per employee to avoid memory bloat
   const employeeEntries = mockLocationHistory.filter(e => e.employeeId === data.employeeId);
   if (employeeEntries.length > 100) {
@@ -239,7 +313,7 @@ export async function getLatestLocations(): Promise<LatestLocation[]> {
     if (emp.is_field_employee) {
       const empId = emp.employeeId || emp.id;
       let entry = latestMap.get(empId);
-      
+
       // If no location exists yet, provide and record a temporary starting location in Bangalore
       if (!entry) {
         entry = {
@@ -269,7 +343,7 @@ export async function getLatestLocations(): Promise<LatestLocation[]> {
 export async function getLocationHistory(employeeId: string, from: Date, to: Date): Promise<LocationEntry[]> {
   const fromTime = from.getTime();
   const toTime = to.getTime();
-  
+
   return mockLocationHistory
     .filter(e => e.employeeId === employeeId)
     .filter(e => {
@@ -282,10 +356,10 @@ export async function getLocationHistory(employeeId: string, from: Date, to: Dat
 export async function getFieldLocations(): Promise<FieldEmployeeLocation[]> {
   // Fetch real employees from the DB
   const employees = await getEmployees();
-  
+
   // Consider Sales and Operations employees as field staff for the simulation
   const fieldStaff = employees.filter(e => e.department === 'Sales' || e.department === 'Operations');
-  
+
   if (fieldStaff.length === 0) {
     return [];
   }
@@ -328,6 +402,7 @@ export async function updateFieldStatus(employeeId: string, isField: boolean): P
     });
     if (!res.ok) throw new Error('Failed to update field status');
     return { success: true, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     // Fallback for mock store if DB unreachable
     const idx = mockEmployeeStore.findIndex(e => e.id === employeeId || e.employeeId === employeeId);
@@ -376,6 +451,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       return { success: false, employee: null, error: result.error };
     }
     employee = result.employee;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, employee: null, error: 'Database server unreachable.' };
   }
@@ -398,6 +474,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     if (!result.success) {
       emailError = result.error || 'Failed to send welcome email.';
     }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     emailError = 'Email server unreachable.';
   }
@@ -424,6 +501,7 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
     });
     const result = await res.json();
     return { success: result.success, employee: result.employee, error: result.error || null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, employee: null, error: 'Database server unreachable.' };
   }
@@ -436,6 +514,7 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; er
     });
     const result = await res.json();
     return { success: result.success, error: result.error || null };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     return { success: false, error: 'Database server unreachable.' };
   }

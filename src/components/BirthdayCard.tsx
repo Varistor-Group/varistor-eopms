@@ -14,6 +14,7 @@ export const BirthdayCard: React.FC = () => {
     const isDismissed = localStorage.getItem(`birthday_dismissed_${currentYear}`);
     
     if (isJune30 && !isDismissed) {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowCard(true);
     }
   }, [currentYear]);

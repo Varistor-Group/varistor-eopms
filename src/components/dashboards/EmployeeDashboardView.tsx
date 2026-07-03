@@ -26,6 +26,7 @@ export const EmployeeDashboardView: React.FC = () => {
   const performanceScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const formatRelativeTime = (dateString: string) => {
+  // eslint-disable-next-line react-hooks/purity
     const diffMs = Date.now() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);

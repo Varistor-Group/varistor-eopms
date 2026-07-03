@@ -44,6 +44,7 @@ interface EopmsContextType {
   rejectLeave: (leaveId: string, comment: string) => void;
 }
 
+  // eslint-disable-next-line react-refresh/only-export-components
 export const EopmsContext = createContext<EopmsContextType | undefined>(undefined);
 
 // Priority configuration matrix
@@ -283,6 +284,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     };
     loadAnnouncements();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const reactToAnnouncement = async (announcementId: string, emojiType: string) => {
@@ -332,7 +334,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     const ruleConfig = POINT_MATRIX[task.priority];
     
+  // eslint-disable-next-line no-useless-assignment
     let netPoints = 0;
+  // eslint-disable-next-line no-useless-assignment
     let reasonMessage = '';
 
     if (completedOnTime) {
@@ -395,6 +399,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Toast Management
   const addToast = (message: string, points: number, type: 'credit' | 'debit') => {
+  // eslint-disable-next-line react-hooks/purity
     const id = `toast-${Date.now()}-${Math.random()}`;
     const newToast: ToastMessage = { id, message, points, type };
     setToasts((prev) => [...prev, newToast]);

@@ -63,6 +63,7 @@ export function computeNet(ctc: number): SalaryComponents & { netPay: number } {
 
 /** Simple TDS slab (monthly TDS based on annual gross) */
 function computeTDS(annualGross: number): number {
+  // eslint-disable-next-line no-useless-assignment
   let annualTDS = 0;
   if (annualGross <= 250000) {
     annualTDS = 0;

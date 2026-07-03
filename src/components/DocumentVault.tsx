@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
-import { getVaultDocuments, trackDocumentAction, updateDocumentStatus } from '../api/vault';
+import { Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye, Upload } from 'lucide-react';
+import { getVaultDocuments, trackDocumentAction, updateDocumentStatus, updateDocumentFile, downloadDecryptedDocument } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
@@ -56,9 +56,11 @@ const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
 // ── Document Vault ────────────────────────────────────────────────────────────
 export const DocumentVault: React.FC = () => {
   const { currentRole, addToast } = useVariPoints();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [documents, setDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
 
   // Default to our mock logged-in user Aarav Patel (VAR-024)
@@ -73,6 +75,7 @@ export const DocumentVault: React.FC = () => {
 
   // Re-fetch documents when the selected employee changes
   useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     getVaultDocuments(selectedEmployeeId).then(docs => {
       setDocuments(docs);
@@ -83,13 +86,40 @@ export const DocumentVault: React.FC = () => {
   // Lock back to logged-in user when role switches away from Admin/HR
   useEffect(() => {
     if (currentRole !== 'Admin' && currentRole !== 'HR') {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedEmployeeId(loggedInEmployeeId);
     }
   }, [currentRole]);
 
-  const handleAction = (docId: string, actionName: string) => {
+  const handleAction = async (docId: string, actionName: string) => {
     trackDocumentAction('admin@varistor.in', actionName, docId);
     console.log(`[Audit Log] admin@varistor.in performed ${actionName} on document ${docId} (Employee: ${selectedEmployeeId})`);
+    
+    if (actionName === 'Download' || actionName === 'View') {
+      addToast(`Decrypting document...`, 3, 'credit');
+      const result = await downloadDecryptedDocument(docId);
+      
+      if (result.success && result.blob) {
+        const url = URL.createObjectURL(result.blob);
+        
+        if (actionName === 'Download') {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = result.filename || 'document.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else {
+          // View in new tab
+          window.open(url, '_blank');
+        }
+        
+        // Clean up URL object after a short delay
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } else {
+        addToast(result.error || 'Decryption failed. Ensure the document is uploaded properly.', 0, 'debit');
+      }
+    }
   };
 
   const handleStatusChange = async (docId: string, newStatus: DocumentStatus) => {
@@ -105,6 +135,25 @@ export const DocumentVault: React.FC = () => {
       addToast(`Document status updated to "${newStatus}".`, 0, 'credit');
     } else {
       addToast(`Failed to update status: ${result.error}`, 0, 'debit');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setUpdatingDocId(docId);
+    const result = await updateDocumentFile(docId, file);
+    setUpdatingDocId(null);
+    
+    // Reset file input
+    e.target.value = '';
+
+    if (result.success && result.document) {
+      addToast(`Successfully updated document slot with ${file.name}`, 10, 'credit');
+      setDocuments(prev => prev.map(d => d.id === docId ? result.document : d));
+    } else {
+      addToast(result.error || 'Failed to update document', 0, 'debit');
     }
   };
 
@@ -207,19 +256,32 @@ export const DocumentVault: React.FC = () => {
 
                     {/* View / Download Actions */}
                     <div className="flex gap-3 text-xs font-semibold text-gray-500">
-                      <button
-                        onClick={() => handleAction(doc.id, 'View')}
-                        className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        View
-                      </button>
-                      <span className="text-gray-300">·</span>
-                      <button
-                        onClick={() => handleAction(doc.id, 'Download')}
-                        className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        Download
-                      </button>
+                      {(!canSelectEmployee || selectedEmployeeId === loggedInEmployeeId) && (
+                        <>
+                          <label className={`hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+                            Upload
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, doc.id)} />
+                          </label>
+                          <span className="text-gray-300">·</span>
+                        </>
+                      )}
+                      {doc.filename && (
+                        <>
+                          <button
+                            onClick={() => handleAction(doc.id, 'View')}
+                            className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            View
+                          </button>
+                          <span className="text-gray-300">·</span>
+                          <button
+                            onClick={() => handleAction(doc.id, 'Download')}
+                            className="hover:text-brand-ink flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            Download
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

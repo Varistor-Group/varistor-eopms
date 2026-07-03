@@ -298,6 +298,42 @@ app.get('/api/documents/:employeeId', async (req, res) => {
   res.json(docs);
 });
 
+// Upload new document (Employee)
+app.post('/api/documents', async (req, res) => {
+  const db = await readDB();
+  const { employeeId, filename, type, size } = req.body;
+  if (!employeeId || !filename) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+
+  if (!db.documents) db.documents = [];
+  
+  const newDoc = {
+    id: `doc-${Date.now()}`,
+    employeeId,
+    filename,
+    type: type || 'PDF',
+    size: size || '1.2 MB',
+    status: 'Pending',
+    uploadedAt: new Date().toISOString()
+  };
+
+  db.documents.push(newDoc);
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'document_uploaded',
+    by: employeeId,
+    details: `Uploaded document ${filename}`,
+    metadata: { documentId: newDoc.id },
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, document: newDoc });
+});
+
 // Update document status (HR / Admin)
 app.put('/api/documents/:id', async (req, res) => {
   const db = await readDB();
@@ -327,6 +363,51 @@ app.put('/api/documents/:id', async (req, res) => {
 
   await writeDB(db);
   res.json({ success: true, document: db.documents[index] });
+});
+
+// Upload/Replace specific document file (Employee) with Encryption Payload
+app.post('/api/documents/:id/upload', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  const { filename, type, size, payload } = req.body;
+
+  const index = (db.documents || []).findIndex(d => d.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Document not found.' });
+  }
+
+  db.documents[index].filename = filename || db.documents[index].filename;
+  db.documents[index].type = type || db.documents[index].type;
+  db.documents[index].size = size || db.documents[index].size;
+  db.documents[index].payload = payload || db.documents[index].payload; // Base64 ciphertext
+  db.documents[index].status = 'Pending';
+  db.documents[index].uploadedAt = new Date().toISOString();
+
+  if (!db.activity_log) db.activity_log = [];
+  db.activity_log.push({
+    id: Date.now().toString(),
+    action: 'document_replaced',
+    by: db.documents[index].employeeId,
+    details: `Uploaded new encrypted file ${filename} for document slot`,
+    metadata: { documentId: id },
+    timestamp: new Date().toISOString()
+  });
+
+  await writeDB(db);
+  res.json({ success: true, document: db.documents[index] });
+});
+
+// Download specific document payload
+app.get('/api/documents/:id/download', async (req, res) => {
+  const db = await readDB();
+  const id = req.params.id;
+  const doc = (db.documents || []).find(d => d.id === id);
+  
+  if (!doc || !doc.payload) {
+    return res.status(404).json({ success: false, error: 'Encrypted payload not found for this document.' });
+  }
+  
+  res.json({ success: true, payload: doc.payload, filename: doc.filename });
 });
 
 // Activity
