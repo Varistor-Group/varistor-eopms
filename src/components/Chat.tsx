@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X } from 'lucide-react';
 import { chatApi } from '../api/chat';
-import type { ChannelId, ChatMessage } from '../types';
+import type { ChannelId, ChatMessage, ChatAttachment } from '../types';
+
+type PendingAttachment = Required<Pick<ChatAttachment, 'name' | 'size' | 'type' | 'dataUrl'>>;
 
 const QUICK_EMOJIS = ['👍', '❤️', '🎉', '😂', '🙏', '👀'];
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5MB - keeps localStorage well within quota
@@ -48,6 +50,7 @@ export const Chat: React.FC = () => {
   const [unread, setUnread] = useState<{ total: number; byChannel: Record<string, number> }>({ total: 0, byChannel: {} });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -83,16 +86,19 @@ export const Chat: React.FC = () => {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
-    if (!text) return;
+    if (!text && !pendingAttachment) return;
 
-    const message = await chatApi.sendMessage(activeChannelId, text);
+    const message = await chatApi.sendMessage(activeChannelId, text || undefined, pendingAttachment ?? undefined);
     setMessages(prev => [...prev, message]);
     setDraft('');
+    setPendingAttachment(null);
     setShowEmojiPicker(false);
   };
 
   const handleAttachClick = () => fileInputRef.current?.click();
 
+  // Stages the file for preview - it isn't sent until the user hits Send,
+  // same as attaching a file in WhatsApp or similar messaging apps.
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -105,14 +111,15 @@ export const Chat: React.FC = () => {
     }
 
     const dataUrl = await readFileAsDataUrl(file);
-    const message = await chatApi.sendMessage(activeChannelId, undefined, {
+    setPendingAttachment({
       name: file.name,
       size: formatFileSize(file.size),
       type: file.type || 'application/octet-stream',
       dataUrl,
     });
-    setMessages(prev => [...prev, message]);
   };
+
+  const removePendingAttachment = () => setPendingAttachment(null);
 
   const insertEmoji = (emoji: string) => {
     setDraft(prev => `${prev}${emoji}`);
@@ -202,7 +209,7 @@ export const Chat: React.FC = () => {
                     <span className="text-[9px] text-varistor-muted">{formatTime(message.timestamp)}</span>
                   </div>
 
-                  {message.attachment ? (
+                  {message.attachment && (
                     message.attachment.dataUrl && message.attachment.type?.startsWith('image/') ? (
                       <a href={message.attachment.dataUrl} target="_blank" rel="noreferrer" title={`Preview ${message.attachment.name}`}>
                         <img
@@ -241,15 +248,16 @@ export const Chat: React.FC = () => {
                         )}
                       </div>
                     )
-                  ) : (
+                  )}
+                  {message.text && (
                     <div
-                      className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
+                      className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${message.attachment ? 'mt-1.5' : ''} ${
                         message.isSelf
                           ? 'bg-varistor-lime text-black font-medium'
                           : 'bg-varistor-surfaceMuted text-varistor-dark'
                       }`}
                     >
-                      {renderMessageText(message.text || '')}
+                      {renderMessageText(message.text)}
                     </div>
                   )}
                 </div>
@@ -268,58 +276,88 @@ export const Chat: React.FC = () => {
         )}
 
         {/* Composer */}
-        <form onSubmit={handleSend} className="border-t border-varistor-border px-4 py-3 flex items-center gap-2 relative flex-shrink-0">
+        <form onSubmit={handleSend} className="border-t border-varistor-border px-4 py-3 flex flex-col gap-2 relative flex-shrink-0">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-          <button
-            type="button"
-            onClick={handleAttachClick}
-            className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer flex-shrink-0"
-            title="Attach a file"
-          >
-            <Paperclip size={16} />
-          </button>
 
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={`Message #${activeChannel.name}...`}
-            className="flex-1 bg-varistor-surfaceMuted border border-transparent rounded-full px-4 py-2 text-xs focus:outline-none focus:bg-varistor-surface focus:border-varistor-lime transition-all text-varistor-dark"
-          />
+          {/* Staged attachment preview - not sent until the user hits Send */}
+          {pendingAttachment && (
+            <div className="flex items-center gap-3 bg-varistor-surfaceMuted border border-varistor-border rounded-lg px-3 py-2">
+              {pendingAttachment.type.startsWith('image/') ? (
+                <img
+                  src={pendingAttachment.dataUrl}
+                  alt={pendingAttachment.name}
+                  className="w-12 h-12 rounded object-cover border border-varistor-border flex-shrink-0"
+                />
+              ) : (
+                <FileSpreadsheet size={20} className="text-varistor-lime flex-shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-varistor-dark truncate">{pendingAttachment.name}</p>
+                <p className="text-[10px] text-varistor-muted">{pendingAttachment.size} · ready to send</p>
+              </div>
+              <button
+                type="button"
+                onClick={removePendingAttachment}
+                title="Remove attachment"
+                className="p-1.5 rounded-full hover:bg-varistor-surface text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer flex-shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
-          <div className="relative">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowEmojiPicker(prev => !prev)}
-              className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
-              title="Add emoji"
+              onClick={handleAttachClick}
+              className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer flex-shrink-0"
+              title="Attach a file"
             >
-              <Smile size={16} />
+              <Paperclip size={16} />
             </button>
-            {showEmojiPicker && (
-              <div className="absolute bottom-11 right-0 bg-varistor-surface border border-varistor-border rounded-lg shadow-varistor p-2 flex gap-1 z-10">
-                {QUICK_EMOJIS.map(emoji => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => insertEmoji(emoji)}
-                    className="text-base p-1 hover:bg-varistor-surfaceMuted rounded cursor-pointer"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          <button
-            type="submit"
-            disabled={!draft.trim()}
-            className="p-2 rounded-full bg-varistor-lime hover:bg-[#7bc012] text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex-shrink-0"
-            title="Send message"
-          >
-            <Send size={16} />
-          </button>
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={pendingAttachment ? 'Add a caption...' : `Message #${activeChannel.name}...`}
+              className="flex-1 bg-varistor-surfaceMuted border border-transparent rounded-full px-4 py-2 text-xs focus:outline-none focus:bg-varistor-surface focus:border-varistor-lime transition-all text-varistor-dark"
+            />
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(prev => !prev)}
+                className="p-2 rounded-full hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
+                title="Add emoji"
+              >
+                <Smile size={16} />
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-11 right-0 bg-varistor-surface border border-varistor-border rounded-lg shadow-varistor p-2 flex gap-1 z-10">
+                  {QUICK_EMOJIS.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => insertEmoji(emoji)}
+                      className="text-base p-1 hover:bg-varistor-surfaceMuted rounded cursor-pointer"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={!draft.trim() && !pendingAttachment}
+              className="p-2 rounded-full bg-varistor-lime hover:bg-[#7bc012] text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex-shrink-0"
+              title="Send message"
+            >
+              <Send size={16} />
+            </button>
+          </div>
         </form>
       </div>
     </div>
