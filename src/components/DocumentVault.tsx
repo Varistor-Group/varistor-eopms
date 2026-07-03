@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye, Upload } from 'lucide-react';
+import { Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
 import { getVaultDocuments, trackDocumentAction, updateDocumentStatus, updateDocumentFile, downloadDecryptedDocument } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
@@ -60,7 +60,6 @@ export const DocumentVault: React.FC = () => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
   const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
 
   // Default to our mock logged-in user Aarav Patel (VAR-024)
