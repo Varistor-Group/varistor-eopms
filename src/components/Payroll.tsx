@@ -387,8 +387,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       setRows(parsed);
       setFileName(`Attendance Tab data (${MONTH})`);
       setStep('preview');
-    } catch (err: any) {
-      setParseError(`Failed to fetch attendance data: ${err.message}`);
+    } catch (err) {
+      setParseError(`Failed to fetch attendance data: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
