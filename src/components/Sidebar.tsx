@@ -213,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Drawer Overlay */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-50 lg:hidden"
+          className="fixed inset-0 bg-[rgba(0,0,0,0.4)] transition-opacity duration-300 z-50 lg:hidden"
           onClick={() => setIsOpenMobile(false)}
         />
       )}

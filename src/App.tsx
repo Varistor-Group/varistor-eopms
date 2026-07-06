@@ -22,6 +22,7 @@ import { PolicyPage } from './components/PolicyPage';
 import Payroll from './components/Payroll';
 import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
+import { useOrientation } from './hooks/useOrientation';
 
 const AppContent: React.FC = () => {
   const { currentRole, setCurrentRole } = useVariPoints();
@@ -29,6 +30,7 @@ const AppContent: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
+  const { isLandscape } = useOrientation();
 
   useEffect(() => {
     const handleNavigate = (e: Event) => {
@@ -88,7 +90,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-varistor-pageBg text-varistor-dark flex font-sans w-full">
+    <div className={`min-h-[100dvh] bg-varistor-pageBg text-varistor-dark flex font-sans w-full max-w-[100vw] overflow-x-hidden ${isLandscape && window.innerWidth < 768 ? 'landscape-mobile' : ''}`}>
 
       {/* Sidebar navigation */}
       <Sidebar
@@ -99,7 +101,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Main Panel Content Area */}
-      <div className="flex-1 flex flex-col lg:pl-[220px]">
+      <div className="flex-1 flex flex-col lg:pl-[220px] min-w-0">
 
         {/* Top Header bar */}
         <header className="h-16 bg-white border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
@@ -150,7 +152,7 @@ const AppContent: React.FC = () => {
         </header>
 
         {/* Dynamic Inner Page Content */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
+        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {

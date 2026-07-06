@@ -19,11 +19,11 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 md:space-y-8">
       {renderDashboard()}
       
-      <div>
-        <h3 className="text-xl font-bold text-varistor-dark mb-4">Organization Leaderboard</h3>
+      <div className="px-2 md:px-0">
+        <h3 className="text-xl font-bold text-varistor-dark mb-6 md:mb-4">Organization Leaderboard</h3>
         <Leaderboard />
       </div>
     </div>
