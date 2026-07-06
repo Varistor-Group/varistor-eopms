@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Kanban,
@@ -14,7 +14,8 @@ import {
   UserPlus,
   ShieldAlert,
   ScrollText,
-  ClipboardCheck
+  ClipboardCheck,
+  Download
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -32,6 +33,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsOpenMobile
 }) => {
   const { currentRole } = useVariPoints();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
@@ -157,6 +181,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation list */}
         {renderNavList()}
 
+        {/* Install App Button */}
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border lg:block hidden">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={18} />
+              Install App
+            </button>
+          </div>
+        )}
+
         {/* User Card (Bottom) */}
         <div className="p-4 border-t border-varistor-border lg:block hidden">
           <div className="flex items-center gap-3">
@@ -200,6 +237,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {renderNavList()}
+
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={20} />
+              Install App
+            </button>
+          </div>
+        )}
 
         <div className="p-4 border-t border-varistor-border">
           <div className="flex items-center gap-3">
