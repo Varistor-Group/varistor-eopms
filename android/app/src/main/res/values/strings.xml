@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EOPMS</string>
+    <string name="title_activity_main">EOPMS</string>
+    <string name="package_name">com.varistor.eopms</string>
+    <string name="custom_url_scheme">com.varistor.eopms</string>
+</resources>
