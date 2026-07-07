@@ -8,7 +8,7 @@ import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
@@ -22,13 +22,34 @@ import { PolicyPage } from './components/PolicyPage';
 import Payroll from './components/Payroll';
 import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
+import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 
 const AppContent: React.FC = () => {
-  const { currentRole, setCurrentRole } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser } = useVariPoints();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
+  
+  // Profile dropdown state
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+  const handleLogin = (isFirstLogin: boolean) => {
+    setIsLoggedIn(true);
+    if (isFirstLogin) {
+      setActiveTab('training');
+    }
+  };
+
+  const handleLogout = () => {
+    // Clear all session data
+    localStorage.removeItem('eopms_current_user');
+    localStorage.removeItem('eopms_role');
+    localStorage.removeItem('eopms_first_login_done');
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+    setIsLoggedIn(false);
+  };
 
   useEffect(() => {
     const handleNavigate = (e: Event) => {
@@ -84,7 +105,7 @@ const AppContent: React.FC = () => {
   }
 
   if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
@@ -116,35 +137,39 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Live Role Switcher */}
-            <div className="flex items-center gap-1.5 bg-[#f1f3f0] px-2.5 py-1.5 rounded-full border border-varistor-border">
-              <span className="text-[9px] text-[#555a52] font-bold uppercase tracking-wider hidden md:inline">Role:</span>
-              <select
-                value={currentRole}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                onChange={(e) => setCurrentRole(e.target.value as any)}
-                className="bg-transparent text-xs font-bold text-varistor-dark focus:outline-none cursor-pointer pr-1"
-                title="Switch active role for permission testing"
-              >
-                <option value="Employee">Employee</option>
-                <option value="Field Employee">Field Employee</option>
-                <option value="Reporting Manager">Reporting Manager</option>
-                <option value="HR">HR</option>
-                <option value="Admin">Admin</option>
-              </select>
-            </div>
-
             {/* Notification Bell */}
             <NotificationBell onNavigateToChat={() => setActiveTab('chat')} />
 
             {/* User Profile */}
-            <div className="flex items-center gap-2 border-l border-varistor-border pl-4">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
-                alt="User Profile"
-                className="w-8 h-8 rounded-full object-cover border border-varistor-border"
-              />
-              <span className="text-xs font-semibold text-varistor-dark hidden sm:inline">Aarav Patel</span>
+            {/* User Profile + Logout */}
+            <div className="relative flex items-center gap-2 border-l border-varistor-border pl-4">
+              <button
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex items-center gap-2 focus:outline-none text-left hover:opacity-80 transition-opacity"
+              >
+                <img
+                  src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+                  alt={currentUser?.name ?? 'User'}
+                  className="w-8 h-8 rounded-full object-cover border border-varistor-border"
+                />
+                <div className="hidden sm:flex flex-col">
+                  <span className="text-xs font-semibold text-varistor-dark leading-tight">{currentUser?.name ?? 'User'}</span>
+                  <span className="text-[10px] text-varistor-muted leading-tight">{currentUser?.department ?? ''}</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={handleLogout}
+                title="Logout"
+                className="ml-1 p-1.5 rounded-lg text-varistor-muted hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={15} strokeWidth={1.8} />
+              </button>
+
+              {/* Profile Dropdown */}
+              {isProfileMenuOpen && (
+                <ProfilePictureEditor onClose={() => setIsProfileMenuOpen(false)} />
+              )}
             </div>
           </div>
         </header>
@@ -154,11 +179,14 @@ const AppContent: React.FC = () => {
           {(() => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                // Admin has access to everything
+                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                // HR does not have Vari Points (ledger)
+                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
-                return ['dashboard', 'attendance', 'task-management', 'leaves', 'announcements', 'policy', 'chat', 'training'];
+                // All employee tabs (minus vault & attendance) + task-management
+                return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
                 return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];

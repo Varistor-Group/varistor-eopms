@@ -3,10 +3,20 @@ import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
-import { getLeaveRequests, getLeaveBalance, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
+import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
+
+// Logged-in user shape (password-stripped)
+export interface CurrentUser {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  avatarUrl: string;
+  role: UserRole;
+}
 
 interface EopmsContextType {
   tasks: Task[];
@@ -15,6 +25,8 @@ interface EopmsContextType {
   pointsBalance: number;
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
+  currentUser: CurrentUser | null;
+  setCurrentUser: (user: CurrentUser | null) => void;
   
   // Kanban Actions
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
@@ -232,16 +244,30 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return (saved as UserRole) || 'Admin'; // Default role is Admin
   });
 
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('eopms_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   const MOCK_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
   const [announcements, setAnnouncements] = useState<AnnouncementDTO[]>([]);
 
   // ── Leave Management state ────────────────────────────────────────────────
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getLeaveRequests());
-  const leaveBalance = getLeaveBalance('2') ?? null; // hardcoded for now (mock logged-in user: sathvik)
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+
+  useEffect(() => {
+    // Load async states for leaves
+    const empId = currentUser?.id ?? MOCK_USER_ID;
+    getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
+    getLeaveRequestsAsync(currentRole === 'Admin' || currentRole === 'HR' ? undefined : empId).then(setLeaveRequests).catch(console.error);
+  }, [currentUser, currentRole, MOCK_USER_ID]);
 
   const submitLeave = (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => {
-    submitLeaveRequest(input);
-    setLeaveRequests(getLeaveRequests());
+    const optimistic = submitLeaveRequest(input);
+    setLeaveRequests(prev => [optimistic, ...prev]);
     addToast('Leave request submitted successfully', 0, 'credit');
 
     // Fire-and-forget manager notification email (same pattern as createEmployee)
@@ -263,14 +289,18 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const approveLeave = (leaveId: string) => {
     const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
     approveLeaveRequest(leaveId, reviewerName);
-    setLeaveRequests(getLeaveRequests());
+    setLeaveRequests(prev => prev.map(r => r.id === leaveId ? { ...r, status: 'Approved', reviewerName, reviewedAt: new Date().toISOString() } : r));
     addToast('Leave request approved', 0, 'credit');
+    
+    // Refresh balance after approval
+    const empId = currentUser?.id ?? MOCK_USER_ID;
+    getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
   };
 
   const rejectLeave = (leaveId: string, comment: string) => {
     const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
     rejectLeaveRequest(leaveId, reviewerName, comment);
-    setLeaveRequests(getLeaveRequests());
+    setLeaveRequests(prev => prev.map(r => r.id === leaveId ? { ...r, status: 'Rejected', reviewerName, rejectionComment: comment, reviewedAt: new Date().toISOString() } : r));
     addToast('Leave request rejected', 0, 'debit');
   };
 
@@ -390,6 +420,14 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     localStorage.setItem('eopms_role', currentRole);
   }, [currentRole]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('eopms_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('eopms_current_user');
+    }
+  }, [currentUser]);
 
   // Points Balance Calculation (Sum credits - Sum debits)
   // Let's set a base starting score of 1240 for Aarav
@@ -696,6 +734,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         pointsBalance,
         currentRole,
         setCurrentRole,
+        currentUser,
+        setCurrentUser,
         moveTask,
         approveTask,
         rejectTask,

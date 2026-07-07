@@ -4,14 +4,15 @@ import { Button } from './shared/Button';
 import { Modal } from './shared/Modal';
 import { mockLogin, sendPasswordReset } from '../api/auth';
 import { useVariPoints } from '../hooks/useVariPoints';
+import type { CurrentUser } from '../context/EopmsContext';
 import { ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (isFirstLogin: boolean, user: CurrentUser) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { setCurrentRole } = useVariPoints();
+  const { setCurrentRole, setCurrentUser } = useVariPoints();
 
   // Login form state
   const [email, setEmail] = useState('');
@@ -71,7 +72,20 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       if (user) {
         setCurrentRole(user.role);
-        onLogin();
+        const loggedInUser: CurrentUser = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          department: user.department,
+          avatarUrl: user.avatarUrl,
+          role: user.role,
+        };
+        setCurrentUser(loggedInUser);
+        const isFirstLogin = !localStorage.getItem('eopms_first_login_done');
+        if (isFirstLogin) {
+          localStorage.setItem('eopms_first_login_done', 'true');
+        }
+        onLogin(isFirstLogin, loggedInUser);
       }
     } catch {
       setErrors({ general: 'An unexpected error occurred. Please try again.' });

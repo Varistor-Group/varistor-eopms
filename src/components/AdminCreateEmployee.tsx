@@ -49,6 +49,7 @@ const EMPTY_FORM: CreateEmployeeInput = {
   reportingManager: '',
   role: 'Employee',
   is_field_employee: false,
+  avatarUrl: '',
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -249,7 +250,26 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Department */}
+            {/* Profile Picture URL */}
+            <Field label="Profile picture URL">
+              <div className="flex items-center gap-3">
+                {form.avatarUrl && (
+                  <img
+                    src={form.avatarUrl}
+                    alt="Preview"
+                    className="w-10 h-10 rounded-full object-cover border border-varistor-border flex-shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <input
+                  type="url"
+                  className={inputCls()}
+                  placeholder="https://example.com/photo.jpg"
+                  value={form.avatarUrl ?? ''}
+                  onChange={set('avatarUrl')}
+                />
+              </div>
+            </Field>
             <Field label="Department" required error={errors.department}>
               <select
                 className={inputCls(!!errors.department)}

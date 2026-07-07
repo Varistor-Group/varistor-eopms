@@ -1,6 +1,7 @@
 import React from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { AdminDashboardView } from './dashboards/AdminDashboardView';
+import { HRDashboardView } from './dashboards/HRDashboardView';
 import { ManagerDashboardView } from './dashboards/ManagerDashboardView';
 import { EmployeeDashboardView } from './dashboards/EmployeeDashboardView';
 
@@ -10,8 +11,10 @@ export const Dashboard: React.FC = () => {
   const { currentRole } = useVariPoints();
 
   const renderDashboard = () => {
-    if (currentRole === 'Admin' || currentRole === 'HR') {
+    if (currentRole === 'Admin') {
       return <AdminDashboardView />;
+    } else if (currentRole === 'HR') {
+      return <HRDashboardView />;
     } else if (currentRole === 'Reporting Manager') {
       return <ManagerDashboardView />;
     }

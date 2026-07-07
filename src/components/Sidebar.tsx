@@ -14,7 +14,8 @@ import {
   UserPlus,
   ShieldAlert,
   ScrollText,
-  ClipboardCheck
+  ClipboardCheck,
+  ListChecks
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -31,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   setIsOpenMobile
 }) => {
-  const { currentRole } = useVariPoints();
+  const { currentRole, currentUser } = useVariPoints();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
@@ -40,22 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
-      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
-      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
-      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
-      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
-      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
-      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: false },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
-      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
-      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
-    ];
-  } else if (currentRole === 'HR') {
-    // HR participates in Vari Points — same rules as employees
-    menuItems = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
@@ -68,15 +55,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
+  } else if (currentRole === 'HR') {
+    menuItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
+      { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
+      { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
+    ];
   } else if (currentRole === 'Reporting Manager') {
     menuItems = [
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
-      { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else {
@@ -161,13 +165,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 border-t border-varistor-border lg:block hidden">
           <div className="flex items-center gap-3">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
-              alt="Aarav Patel"
+              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+              alt={currentUser?.name ?? 'User'}
               className="w-9 h-9 rounded-full object-cover border border-varistor-border"
             />
             <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-varistor-dark truncate">Aarav Patel</p>
-              <p className="text-[10px] text-varistor-muted truncate">Operations Dept</p>
+              <p className="text-xs font-semibold text-varistor-dark truncate">{currentUser?.name ?? 'User'}</p>
+              <p className="text-[10px] text-varistor-muted truncate">{currentUser?.department ?? ''}</p>
             </div>
           </div>
         </div>
@@ -204,13 +208,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 border-t border-varistor-border">
           <div className="flex items-center gap-3">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
-              alt="Aarav Patel"
+              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+              alt={currentUser?.name ?? 'User'}
               className="w-10 h-10 rounded-full object-cover"
             />
             <div>
-              <p className="text-sm font-semibold text-varistor-dark">Aarav Patel</p>
-              <p className="text-xs text-varistor-muted">Operations Dept</p>
+              <p className="text-sm font-semibold text-varistor-dark">{currentUser?.name ?? 'User'}</p>
+              <p className="text-xs text-varistor-muted">{currentUser?.department ?? ''}</p>
             </div>
           </div>
         </div>

@@ -1,84 +1,51 @@
-import type { UserRole } from '../types';
-
 /**
- * MOCK AUTHENTICATION SERVICE
- *
- * TODO: Replace with real Supabase Auth implementation.
- * Expected return shape: { user: { id, email, role, name } | null, error: string | null }
- *
- * Security features implemented (mock):
- * - Generic error messages (no email enumeration)
- * - Rate limiting (max 5 attempts → 30 s lockout)
- * - Password-stripped response object
+ * AUTH SERVICE — Supabase Auth
+ * Replaces the mock authentication system.
  */
 
-const MOCK_USERS = [
-  {
-    id: 'VAR-001',
-    email: 'admin@varistor.in',
-    password: 'Admin@2026!',
-    role: 'Admin' as UserRole,
-    name: 'Admin User',
-    department: 'Management',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&fit=crop&q=60',
-  },
-  {
-    id: 'VAR-024',
-    email: 'employee@varistor.in',
-    password: 'Employee@2026!',
-    role: 'Employee' as UserRole,
-    name: 'Aarav Patel',
-    department: 'Operations',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60',
-  },
-  {
-    id: 'VAR-003',
-    email: 'hr@varistor.in',
-    password: 'Hr@2026!',
-    role: 'HR' as UserRole,
-    name: 'Priya Sharma',
-    department: 'Human Resources',
-    avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&fit=crop&q=60',
-  },
-];
+import { supabase } from '../lib/supabase';
+import type { UserRole } from '../types';
 
-// In-memory rate limiter: { email -> { count, lockedUntil } }
+export interface AuthUser {
+  id: string;          // employees.id e.g. "VAR-001"
+  name: string;
+  email: string;
+  department: string;
+  avatarUrl: string;
+  role: UserRole;
+}
+
+// ─── Rate limiter (client-side, mirrors previous mock behaviour) ──────────────
+
 const loginAttempts: Record<string, { count: number; lockedUntil: number }> = {};
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30_000; // 30 seconds
+const LOCKOUT_MS = 30_000;
 
-export async function mockLogin(email: string, password: string) {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 800));
+// ─── Login ────────────────────────────────────────────────────────────────────
 
+export async function mockLogin(email: string, password: string): Promise<{ user: AuthUser | null; error: string | null }> {
   if (!email || !password) {
     return { user: null, error: 'Email and password are required.' };
   }
 
-  // --- Rate limiting check ---
+  // Rate limit check
   const now = Date.now();
   const attempt = loginAttempts[email];
-  if (attempt && attempt.lockedUntil > now) {
+  if (attempt?.lockedUntil > now) {
     const secsLeft = Math.ceil((attempt.lockedUntil - now) / 1000);
-    return {
-      user: null,
-      error: `Too many failed attempts. Please wait ${secsLeft}s before trying again.`,
-    };
+    return { user: null, error: `Too many failed attempts. Please wait ${secsLeft}s before trying again.` };
   }
 
-  // --- Credential check ---
-  const user = MOCK_USERS.find(u => u.email === email);
-  const isValid = user && user.password === password;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (!isValid) {
-    // Increment attempt counter
+  if (error || !data.user) {
+    // Increment attempts
     const prev = loginAttempts[email] ?? { count: 0, lockedUntil: 0 };
     const newCount = prev.count + 1;
     loginAttempts[email] = {
       count: newCount,
       lockedUntil: newCount >= MAX_ATTEMPTS ? now + LOCKOUT_MS : 0,
     };
-
     const remaining = MAX_ATTEMPTS - newCount;
     const suffix =
       newCount >= MAX_ATTEMPTS
@@ -86,54 +53,120 @@ export async function mockLogin(email: string, password: string) {
         : remaining > 0
           ? ` ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
           : '';
-
     return { user: null, error: `Invalid email or password.${suffix}` };
   }
 
-  // Clear attempts on success
   delete loginAttempts[email];
 
-  // Strip password from returned object
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { password: _pw, ...secureUser } = user;
-  return { user: secureUser, error: null };
+  // Load the employee profile for this auth user
+  const { data: emp, error: empError } = await supabase
+    .from('employees')
+    .select('id, full_name, personal_email, department, role, avatar_url')
+    .eq('auth_id', data.user.id)
+    .single();
+
+  if (empError || !emp) {
+    await supabase.auth.signOut();
+    return { user: null, error: 'Employee profile not found. Contact your administrator.' };
+  }
+
+  return {
+    user: {
+      id: emp.id,
+      name: emp.full_name,
+      email: emp.personal_email,
+      department: emp.department ?? '',
+      avatarUrl: emp.avatar_url ?? '',
+      role: emp.role as UserRole,
+    },
+    error: null,
+  };
 }
 
-export async function mockResetPassword(email: string) {
-  await new Promise(resolve => setTimeout(resolve, 600));
+// ─── Sign Out ─────────────────────────────────────────────────────────────────
 
+export async function signOut(): Promise<void> {
+  await supabase.auth.signOut();
+}
+
+// ─── Get Current Session ──────────────────────────────────────────────────────
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session?.user) return null;
+
+  const { data: emp } = await supabase
+    .from('employees')
+    .select('id, full_name, personal_email, department, role, avatar_url')
+    .eq('auth_id', data.session.user.id)
+    .single();
+
+  if (!emp) return null;
+
+  return {
+    id: emp.id,
+    name: emp.full_name,
+    email: emp.personal_email,
+    department: emp.department ?? '',
+    avatarUrl: emp.avatar_url ?? '',
+    role: emp.role as UserRole,
+  };
+}
+
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+export async function mockResetPassword(email: string): Promise<{ success: boolean; error?: string; message?: string }> {
   if (!email || !/\S+@\S+\.\S+/.test(email)) {
     return { success: false, error: 'Please enter a valid email address.' };
   }
-
-  // Security: always return success (prevents email enumeration)
+  // Security: always return success to prevent email enumeration
   return {
     success: true,
     message: 'If an account exists with this email, a reset link has been sent.',
   };
 }
 
-export async function sendPasswordReset(email: string) {
+export async function sendPasswordReset(email: string): Promise<{ success: boolean; error?: string; message?: string }> {
   if (!email || !/\S+@\S+\.\S+/.test(email)) {
     return { success: false, error: 'Please enter a valid email address.' };
   }
 
-  try {
-    const res = await fetch('http://localhost:3001/api/send-password-reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const result = await res.json();
-    if (!result.success) {
-      return { success: false, error: result.error || 'Failed to send reset link.' };
-    }
-    return {
-      success: true,
-      message: 'Reset link sent — check your inbox',
-    };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    return { success: false, error: 'Email server unreachable.' };
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  if (error) {
+    return { success: false, error: 'Failed to send reset link.' };
   }
+
+  return { success: true, message: 'Reset link sent — check your inbox' };
+}
+
+// ─── Auth state change listener ───────────────────────────────────────────────
+
+export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
+  return supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!session?.user) {
+      callback(null);
+      return;
+    }
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id, full_name, personal_email, department, role, avatar_url')
+      .eq('auth_id', session.user.id)
+      .single();
+
+    if (emp) {
+      callback({
+        id: emp.id,
+        name: emp.full_name,
+        email: emp.personal_email,
+        department: emp.department ?? '',
+        avatarUrl: emp.avatar_url ?? '',
+        role: emp.role as UserRole,
+      });
+    } else {
+      callback(null);
+    }
+  });
 }
