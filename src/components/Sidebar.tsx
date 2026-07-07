@@ -213,13 +213,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Drawer Overlay */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 bg-[rgba(0,0,0,0.4)] transition-opacity duration-300 z-50 lg:hidden"
+          className="fixed inset-0 bg-[rgba(0,0,0,0.4)] transition-opacity duration-300 z-[1000] lg:hidden"
           onClick={() => setIsOpenMobile(false)}
         />
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-50 transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
