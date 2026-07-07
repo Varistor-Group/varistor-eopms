@@ -11,7 +11,7 @@ export const AdminDashboardView: React.FC = () => {
 
   // Profile picture editing
   const [editingAvatar, setEditingAvatar] = useState(false);
-  
+
   // Mock data generation for demo purposes
   const generateMockPerformance = () => {
     return employees.map(emp => ({
@@ -27,7 +27,7 @@ export const AdminDashboardView: React.FC = () => {
   const [mockData] = useState(generateMockPerformance());
 
   return (
-    <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
+    <div className="space-y-8 md:space-y-6 animate-[fadeInPage_250ms_ease-out] px-2 md:px-0">
 
       {/* Welcome / Profile header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -46,9 +46,9 @@ export const AdminDashboardView: React.FC = () => {
               <Camera size={16} className="text-white" strokeWidth={1.8} />
             </button>
             {editingAvatar && (
-              <ProfilePictureEditor 
-                onClose={() => setEditingAvatar(false)} 
-                className="absolute top-16 left-0 mt-2" 
+              <ProfilePictureEditor
+                onClose={() => setEditingAvatar(false)}
+                className="absolute top-16 left-0 mt-2"
               />
             )}
           </div>
@@ -62,7 +62,7 @@ export const AdminDashboardView: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-6 mt-4 md:mt-0">
         {/* Performance & Points Leaderboard */}
         <div className="lg:col-span-2 bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
           <div className="flex items-center gap-2 mb-4">

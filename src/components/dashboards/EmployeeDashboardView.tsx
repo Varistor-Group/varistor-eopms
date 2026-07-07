@@ -49,9 +49,9 @@ export const EmployeeDashboardView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 md:space-y-6 px-2 md:px-0">
       {/* Welcome Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 sm:gap-4 mb-4 md:mb-0">
         <div className="flex items-center gap-4">
           {/* Avatar with camera overlay */}
           <div className="relative group flex-shrink-0">
@@ -102,7 +102,7 @@ export const EmployeeDashboardView: React.FC = () => {
       <BirthdayCard />
 
       {/* 3-Column Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-6 mt-4 md:mt-0">
         
         {/* Column 1: Performance Meter & Today's Tasks */}
         <div className="space-y-6">

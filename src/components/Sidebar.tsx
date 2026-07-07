@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Kanban,
@@ -33,6 +33,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsOpenMobile
 }) => {
   const { currentRole, currentUser } = useVariPoints();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
@@ -161,6 +184,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation list */}
         {renderNavList()}
 
+        {/* Install App Button */}
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border lg:block hidden">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={18} />
+              Install App
+            </button>
+          </div>
+        )}
+
         {/* User Card (Bottom) */}
         <div className="p-4 border-t border-varistor-border lg:block hidden">
           <div className="flex items-center gap-3">
@@ -180,13 +216,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Drawer Overlay */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-50 lg:hidden"
+          className="fixed inset-0 bg-[rgba(0,0,0,0.4)] transition-opacity duration-300 z-[1000] lg:hidden"
           onClick={() => setIsOpenMobile(false)}
         />
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-50 transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
@@ -204,6 +240,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {renderNavList()}
+
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={20} />
+              Install App
+            </button>
+          </div>
+        )}
 
         <div className="p-4 border-t border-varistor-border">
           <div className="flex items-center gap-3">
