@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   ScrollText,
   ClipboardCheck,
-  ListChecks
+  ListChecks,
+  Download
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 

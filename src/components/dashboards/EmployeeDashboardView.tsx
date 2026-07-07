@@ -23,7 +23,7 @@ export const EmployeeDashboardView: React.FC = () => {
   const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
   const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
 
-  const { isTracking } = useFieldTracking(mockStoreUser.employeeId, !!mockStoreUser.is_field_employee);
+  const { isTracking } = useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'done').length;
@@ -56,8 +56,8 @@ export const EmployeeDashboardView: React.FC = () => {
           {/* Avatar with camera overlay */}
           <div className="relative group flex-shrink-0">
             <img
-              src={currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(mockStoreUser.fullName)}&background=84CC16&color=fff&size=64&bold=true`}
-              alt={currentUser?.name ?? mockStoreUser.fullName}
+              src={currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || mockStoreUser?.fullName || 'Employee')}&background=84CC16&color=fff&size=64&bold=true`}
+              alt={currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}
               className="w-16 h-16 rounded-full border-2 border-varistor-lime/20 shadow-sm object-cover"
             />
             <button
@@ -69,8 +69,8 @@ export const EmployeeDashboardView: React.FC = () => {
             </button>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser?.name ?? mockStoreUser.fullName}</h1>
-            <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser.department} Team · {currentUser?.role ?? mockStoreUser.role}</p>
+            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}</h1>
+            <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser?.department ?? 'General'} Team · {currentUser?.role ?? mockStoreUser?.role ?? 'Employee'}</p>
             <div className="mt-2 flex items-center">
             {isTracking ? (
               <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">

@@ -142,6 +142,14 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
   return { success: true, message: 'Reset link sent — check your inbox' };
 }
 
+export async function updatePassword(password: string): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
 // ─── Auth state change listener ───────────────────────────────────────────────
 
 export function onAuthStateChange(callback: (user: AuthUser | null) => void) {

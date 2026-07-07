@@ -1,25 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
-export interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  days: number;
-  reason: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-  createdAt: string;
-}
-
 const Leaves: React.FC = () => {
-  const { currentRole } = useVariPoints();
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser, leaveBalance } = useVariPoints();
+  
   const [leaveType, setLeaveType] = useState('Casual Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -28,9 +13,9 @@ const Leaves: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const LOGGED_IN_EMP = 'VAR-024';
-  const LOGGED_IN_NAME = 'Aarav Patel';
-  const LOGGED_IN_DEPT = 'Operations';
+  const LOGGED_IN_EMP = currentUser?.id ?? 'VAR-024';
+  const LOGGED_IN_NAME = currentUser?.name ?? 'Aarav Patel';
+  const LOGGED_IN_DEPT = currentUser?.department ?? 'Operations';
 
   // Minimum date selection: today + 2 days
   const getMinDateStr = () => {
@@ -39,23 +24,7 @@ const Leaves: React.FC = () => {
     return minDate.toISOString().split('T')[0];
   };
 
-  const loadLeaves = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/leaves');
-      if (res.ok) {
-        const data = await res.json();
-        setLeaves(data);
-      }
-    } catch (err) {
-      console.error('Failed to load leaves', err);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadLeaves();
-  }, []);
+  // Data is loaded via context
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,46 +58,33 @@ const Leaves: React.FC = () => {
     const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
     try {
-      const res = await fetch('/api/leaves', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeeId: LOGGED_IN_EMP,
-          employeeName: LOGGED_IN_NAME,
-          department: LOGGED_IN_DEPT,
-          type: leaveType,
-          startDate,
-          endDate,
-          days,
-          reason,
-        }),
-      });
+      submitLeave({
+        employeeId: LOGGED_IN_EMP,
+        employeeName: LOGGED_IN_NAME,
+        type: leaveType,
+        from: startDate,
+        to: endDate,
+        days,
+        reason,
+        department: LOGGED_IN_DEPT
+      } as any);
 
-      if (res.ok) {
-        setSuccessMsg('Leave request submitted successfully!');
-        setStartDate('');
-        setEndDate('');
-        setReason('');
-        loadLeaves();
-      } else {
-        const data = await res.json();
-        setErrorMsg(data.error || 'Failed to submit leave request.');
-      }
+      setSuccessMsg('Leave request submitted successfully!');
+      setStartDate('');
+      setEndDate('');
+      setReason('');
     } catch (err) {
-      setErrorMsg('Network error. Failed to submit.');
+      setErrorMsg('Failed to submit.');
     }
     setSubmitting(false);
   };
 
-  const handleStatusUpdate = async (id: string, status: 'Approved' | 'Rejected') => {
+  const handleStatusUpdate = (id: string, status: 'Approved' | 'Rejected') => {
     try {
-      const res = await fetch(`/api/leaves/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        loadLeaves();
+      if (status === 'Approved') {
+        approveLeave(id);
+      } else {
+        rejectLeave(id, 'Rejected by ' + (currentUser?.name ?? 'Admin'));
       }
     } catch (err) {
       console.error('Failed to update leave status', err);
@@ -138,8 +94,8 @@ const Leaves: React.FC = () => {
 
 
   const filteredLeaves = (currentRole === 'Admin' || currentRole === 'HR')
-    ? leaves
-    : leaves.filter(l => l.employeeId === LOGGED_IN_EMP);
+    ? leaveRequests
+    : leaveRequests.filter(l => l.employeeId === LOGGED_IN_EMP);
 
   return (
     <div className="w-full pb-20 animate-[fadeInPage_250ms_ease-out]">
@@ -167,19 +123,19 @@ const Leaves: React.FC = () => {
                 <div>
                   <div className="flex justify-between text-xs text-varistor-muted mb-1">
                     <span>Casual Leave Balance</span>
-                    <span className="font-bold text-varistor-dark">7 / 12 Taken</span>
+                    <span className="font-bold text-varistor-dark">{leaveBalance?.casual?.used ?? 0} / {leaveBalance?.casual?.total ?? 12} Taken</span>
                   </div>
                   <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-varistor-lime h-full w-[58%]" />
+                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, ((leaveBalance?.casual?.used ?? 0) / (leaveBalance?.casual?.total ?? 12)) * 100)}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs text-varistor-muted mb-1">
                     <span>Sick Leave Balance</span>
-                    <span className="font-bold text-varistor-dark">4 / 6 Taken</span>
+                    <span className="font-bold text-varistor-dark">{leaveBalance?.sick?.used ?? 0} / {leaveBalance?.sick?.total ?? 10} Taken</span>
                   </div>
                   <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-amber-400 h-full w-[66%]" />
+                    <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, ((leaveBalance?.sick?.used ?? 0) / (leaveBalance?.sick?.total ?? 10)) * 100)}%` }} />
                   </div>
                 </div>
               </div>
@@ -280,9 +236,7 @@ const Leaves: React.FC = () => {
               <span className="text-xs text-varistor-muted">{filteredLeaves.length} request(s)</span>
             </div>
 
-            {loading ? (
-              <div className="p-10 text-center text-xs text-varistor-muted">Loading leaves...</div>
-            ) : filteredLeaves.length === 0 ? (
+            {filteredLeaves.length === 0 ? (
               <div className="p-12 text-center text-xs text-varistor-muted italic">
                 No leave requests found.
               </div>
@@ -310,9 +264,9 @@ const Leaves: React.FC = () => {
                         <td className="px-4 py-3 font-semibold text-varistor-dark">{item.type}</td>
                         <td className="px-4 py-3 font-mono text-varistor-dark">
                           <div className="flex items-center gap-1">
-                            <span>{item.startDate}</span>
+                            <span>{item.from}</span>
                             <ArrowRight size={10} className="text-gray-400" />
-                            <span>{item.endDate}</span>
+                            <span>{item.to}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-varistor-dark font-mono">{item.days}</td>

@@ -33,6 +33,13 @@ const AppContent: React.FC = () => {
   
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogin = (isFirstLogin: boolean) => {
     setIsLoggedIn(true);
@@ -100,7 +107,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  if (window.location.pathname === '/reset') {
+  if (window.location.pathname === '/reset' || window.location.pathname === '/reset-password' || window.location.hash.includes('type=recovery')) {
     return <ResetPassword />;
   }
 

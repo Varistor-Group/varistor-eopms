@@ -22,6 +22,16 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Employee ID already exists.');
   END IF;
 
+  -- 1b. Check if personal email already exists in employees table
+  IF EXISTS (SELECT 1 FROM public.employees WHERE personal_email = p_personal_email) THEN
+    RETURN json_build_object('success', false, 'error', 'An employee with this personal email already exists.');
+  END IF;
+
+  -- 1c. Check if username already exists in employees table
+  IF EXISTS (SELECT 1 FROM public.employees WHERE username = p_username) THEN
+    RETURN json_build_object('success', false, 'error', 'An employee with this username already exists.');
+  END IF;
+
   -- 2. Check if email already exists in Auth
   IF EXISTS (SELECT 1 FROM auth.users WHERE email = p_personal_email) THEN
     RETURN json_build_object('success', false, 'error', 'An account with this email already exists.');
