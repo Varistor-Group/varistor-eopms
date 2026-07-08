@@ -17,8 +17,8 @@ export const Button: React.FC<ButtonProps> = ({
   
   const variants = {
     primary: 'bg-brand-lime text-brand-ink hover:bg-[#92cc2e] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed',
-    secondary: 'bg-white border border-gray-200 text-brand-ink hover:bg-gray-50 active:scale-[0.98] disabled:opacity-50',
-    ghost: 'bg-transparent text-gray-600 hover:text-brand-ink hover:bg-gray-100 disabled:opacity-50',
+    secondary: 'bg-varistor-surface border border-varistor-border text-brand-ink hover:bg-varistor-surfaceMuted active:scale-[0.98] disabled:opacity-50',
+    ghost: 'bg-transparent text-varistor-muted hover:text-brand-ink hover:bg-varistor-surfaceMuted disabled:opacity-50',
   };
 
   return (

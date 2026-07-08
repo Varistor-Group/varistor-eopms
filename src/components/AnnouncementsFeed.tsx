@@ -60,9 +60,9 @@ export const AnnouncementsFeed: React.FC = () => {
 
   const getBadgeStyles = (type: string) => {
     switch (type) {
-      case 'Policy': return 'bg-red-50 text-red-700 border-red-200';
-      case 'Birthday': return 'bg-[#f7fee7] text-varistor-limeText border-varistor-successBorder';
-      default: return 'bg-[#f1f3f0] text-varistor-dark border-varistor-border';
+      case 'Policy': return 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder';
+      case 'Birthday': return 'bg-varistor-limeLight text-varistor-limeText border-varistor-successBorder';
+      default: return 'bg-varistor-surfaceMuted text-varistor-dark border-varistor-border';
     }
   };
 
@@ -77,7 +77,7 @@ export const AnnouncementsFeed: React.FC = () => {
         {hasAccess && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-black hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-varistor text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all duration-150"
+            className="bg-varistor-dark text-varistor-pageBg hover:opacity-90 font-bold py-2 px-4 rounded-varistor text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all duration-150"
           >
             {showForm ? <X size={14} /> : <Plus size={14} />}
             {showForm ? 'Cancel Post' : 'Post Announcement'}
@@ -87,7 +87,7 @@ export const AnnouncementsFeed: React.FC = () => {
 
       {/* Admin Create Form */}
       {showForm && hasAccess && (
-        <div className="bg-white border border-varistor-border rounded-varistor p-6 shadow-varistor animate-[fadeIn_200ms_ease-out]">
+        <div className="bg-varistor-surface border border-varistor-border rounded-varistor p-6 shadow-varistor animate-[fadeIn_200ms_ease-out]">
           <h3 className="text-xs font-bold text-varistor-dark uppercase tracking-wider mb-4 flex items-center gap-1.5">
             <Megaphone size={15} className="text-varistor-lime" />
             Publish New Announcement
@@ -103,7 +103,7 @@ export const AnnouncementsFeed: React.FC = () => {
                   placeholder="e.g. Town-hall details / Policy update / Festive bonus"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-white border border-varistor-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-varistor-lime transition-colors text-varistor-dark"
+                  className="w-full bg-varistor-surface border border-varistor-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-varistor-lime transition-colors text-varistor-dark"
                   required
                 />
               </div>
@@ -115,7 +115,7 @@ export const AnnouncementsFeed: React.FC = () => {
                   value={newType}
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onChange={(e) => setNewType(e.target.value as any)}
-                  className="w-full bg-white border border-varistor-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-varistor-lime cursor-pointer text-varistor-dark font-medium"
+                  className="w-full bg-varistor-surface border border-varistor-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-varistor-lime cursor-pointer text-varistor-dark font-medium"
                 >
                   <option value="Standard">Standard Board News</option>
                   <option value="Policy">Policy Update</option>
@@ -133,7 +133,7 @@ export const AnnouncementsFeed: React.FC = () => {
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                   rows={4}
-                  className="w-full bg-white border border-varistor-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-varistor-lime transition-colors text-varistor-dark leading-relaxed"
+                  className="w-full bg-varistor-surface border border-varistor-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-varistor-lime transition-colors text-varistor-dark leading-relaxed"
                   required
                 />
               </div>
@@ -148,7 +148,7 @@ export const AnnouncementsFeed: React.FC = () => {
                     className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                       newAuthor === 'HR'
                         ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
-                        : 'bg-white border-varistor-border text-varistor-muted hover:border-gray-300'
+                        : 'bg-varistor-surface border-varistor-border text-varistor-muted hover:border-varistor-muted'
                     }`}
                   >
                     HR Office
@@ -159,7 +159,7 @@ export const AnnouncementsFeed: React.FC = () => {
                     className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                       newAuthor === 'Admin'
                         ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
-                        : 'bg-white border-varistor-border text-varistor-muted hover:border-gray-300'
+                        : 'bg-varistor-surface border-varistor-border text-varistor-muted hover:border-varistor-muted'
                     }`}
                   >
                     System Admin
@@ -168,11 +168,11 @@ export const AnnouncementsFeed: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#f1f3f0]">
+            <div className="flex justify-end gap-2 pt-2 border-t border-varistor-border">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="bg-white border border-varistor-border text-varistor-dark px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#fafbfa] transition-colors cursor-pointer"
+                className="bg-varistor-surface border border-varistor-border text-varistor-dark px-4 py-2 rounded-lg text-xs font-bold hover:bg-varistor-surfaceMuted transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -189,7 +189,7 @@ export const AnnouncementsFeed: React.FC = () => {
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-varistor border border-varistor-border p-4 shadow-varistor flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="bg-varistor-surface rounded-varistor border border-varistor-border p-4 shadow-varistor flex flex-col md:flex-row gap-4 items-center justify-between">
         {/* Search Input */}
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-2.5 text-varistor-muted" size={15} />
@@ -198,33 +198,33 @@ export const AnnouncementsFeed: React.FC = () => {
             placeholder="Search announcements..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#f1f3f0] border border-transparent rounded-full pl-9 pr-4 py-2 text-xs focus:outline-none focus:bg-white focus:border-varistor-lime transition-all text-varistor-dark"
+            className="w-full bg-varistor-surfaceMuted border border-transparent rounded-full pl-9 pr-4 py-2 text-xs focus:outline-none focus:bg-varistor-surface focus:border-varistor-lime transition-all text-varistor-dark"
           />
         </div>
 
         {/* Tab Filters */}
-        <div className="flex flex-wrap bg-[#edf0ec] p-0.5 rounded-lg text-[11px] font-semibold">
+        <div className="flex flex-wrap bg-varistor-surfaceMuted p-0.5 rounded-lg text-[11px] font-semibold">
           <button
             onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'all' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'all' ? 'bg-varistor-surface text-varistor-dark shadow-sm' : 'text-varistor-muted hover:text-varistor-dark'}`}
           >
             All
           </button>
           <button
             onClick={() => setActiveFilter('Standard')}
-            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Standard' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Standard' ? 'bg-varistor-surface text-varistor-dark shadow-sm' : 'text-varistor-muted hover:text-varistor-dark'}`}
           >
             Standard
           </button>
           <button
             onClick={() => setActiveFilter('Policy')}
-            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Policy' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Policy' ? 'bg-varistor-surface text-varistor-dark shadow-sm' : 'text-varistor-muted hover:text-varistor-dark'}`}
           >
             Policies
           </button>
           <button
             onClick={() => setActiveFilter('Birthday')}
-            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Birthday' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
+            className={`px-3 py-1.5 rounded-md transition-varistor cursor-pointer ${activeFilter === 'Birthday' ? 'bg-varistor-surface text-varistor-dark shadow-sm' : 'text-varistor-muted hover:text-varistor-dark'}`}
           >
             Birthdays
           </button>
@@ -234,7 +234,7 @@ export const AnnouncementsFeed: React.FC = () => {
       {/* Announcements Feed Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredAnnouncements.length === 0 ? (
-          <div className="col-span-full bg-white border border-varistor-border rounded-varistor p-12 text-center shadow-varistor">
+          <div className="col-span-full bg-varistor-surface border border-varistor-border rounded-varistor p-12 text-center shadow-varistor">
             <Megaphone size={32} className="text-varistor-muted mx-auto mb-2 opacity-50" />
             <p className="text-sm font-semibold text-varistor-muted">No announcements found matching the filter.</p>
           </div>
@@ -246,7 +246,7 @@ export const AnnouncementsFeed: React.FC = () => {
               <div
                 key={ann.id}
                 onClick={() => readAnnouncement(ann.id)}
-                className={`bg-white rounded-varistor border p-5 shadow-varistor flex flex-col justify-between transition-all duration-200 cursor-pointer ${
+                className={`bg-varistor-surface rounded-varistor border p-5 shadow-varistor flex flex-col justify-between transition-all duration-200 cursor-pointer ${
                   ann.isRead 
                     ? 'border-varistor-border opacity-95 hover:shadow-md' 
                     : 'border-varistor-lime shadow-[0_2px_8px_rgba(132,204,22,0.06)] hover:shadow-lg'
@@ -263,7 +263,7 @@ export const AnnouncementsFeed: React.FC = () => {
                         {ann.author_role} · {formatRelativeTime(ann.created_at)}
                       </span>
                       {ann.isRead ? (
-                        <span className="text-[9px] text-[#6b7264] bg-[#f1f3f0] px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Marked as Read">
+                        <span className="text-[9px] text-varistor-muted bg-varistor-surfaceMuted px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Marked as Read">
                           <Check size={10} strokeWidth={2.5} />
                           Read
                         </span>
@@ -274,18 +274,18 @@ export const AnnouncementsFeed: React.FC = () => {
                   </div>
 
                   {/* Announcement Title */}
-                  <h3 className="text-sm font-bold text-varistor-dark leading-snug mb-2 group-hover:text-black">
+                  <h3 className="text-sm font-bold text-varistor-dark leading-snug mb-2">
                     {ann.title}
                   </h3>
 
                   {/* Content details */}
-                  <p className="text-xs text-[#555a52] leading-relaxed mb-4">
+                  <p className="text-xs text-varistor-muted leading-relaxed mb-4">
                     {ann.content}
                   </p>
                 </div>
 
                 {/* Footer Reactions / Action Panel */}
-                <div className="pt-3 border-t border-[#f1f3f0] flex flex-wrap gap-2 items-center justify-between mt-auto">
+                <div className="pt-3 border-t border-varistor-border flex flex-wrap gap-2 items-center justify-between mt-auto">
                   {/* Reaction icons counters */}
                   <div className="flex flex-wrap gap-1.5">
                     {ann.reactions.map((r) => {
@@ -303,7 +303,7 @@ export const AnnouncementsFeed: React.FC = () => {
                           className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                             r.reactedByUser 
                               ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText font-bold shadow-sm' 
-                              : 'bg-[#f8faf7] border-[#eef1ed] text-[#555a52] hover:bg-white hover:border-gray-300'
+                              : 'bg-varistor-surfaceMuted border-varistor-border text-varistor-muted hover:bg-varistor-surface hover:border-varistor-muted'
                           }`}
                         >
                           <span>{r.emoji}</span>
@@ -321,7 +321,7 @@ export const AnnouncementsFeed: React.FC = () => {
                         reactToAnnouncement(ann.id, '🎉');
                         readAnnouncement(ann.id);
                       }}
-                      className="text-xs font-bold text-varistor-limeText bg-[#f7fee7] hover:bg-varistor-lime hover:text-black border border-varistor-successBorder hover:border-transparent px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition-all duration-150 cursor-pointer"
+                      className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight hover:bg-varistor-lime hover:text-black border border-varistor-successBorder hover:border-transparent px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition-all duration-150 cursor-pointer"
                     >
                       <Sparkles size={12} className="animate-bounce" />
                       React Wishes 🎉

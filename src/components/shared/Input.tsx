@@ -14,13 +14,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         </label>
         <input
           ref={ref}
-          className={`px-3 py-2 border rounded-xl outline-none transition-all duration-200 focus:ring-2 focus:ring-brand-lime/50 bg-white
-            ${error ? 'border-red-500' : 'border-gray-200 focus:border-brand-lime'}
+          className={`px-3 py-2 border rounded-xl outline-none transition-all duration-200 focus:ring-2 focus:ring-brand-lime/50 bg-varistor-surface text-varistor-dark
+            ${error ? 'border-varistor-dangerText' : 'border-varistor-border focus:border-brand-lime'}
             ${className}`}
           {...props}
         />
         {error && (
-          <span className="text-xs text-red-500 font-medium">
+          <span className="text-xs text-varistor-dangerText font-medium">
             {error}
           </span>
         )}

@@ -142,13 +142,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleTabClick(item.id, item.enabled)}
             className={`w-full flex items-center px-3 py-3 text-sm font-medium rounded-varistor border-l-[3px] transition-varistor group relative ${isActive
               ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
-              : 'text-[#555a52] border-transparent hover:bg-[#eef1ed] hover:text-black'
+              : 'text-varistor-muted border-transparent hover:bg-varistor-surfaceMuted hover:text-varistor-dark'
               } ${!item.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Icon
               size={18}
               strokeWidth={1.5}
-              className={`flex-shrink-0 transition-transform group-hover:scale-105 ${isActive ? 'text-varistor-dark' : 'text-[#6b7264]'
+              className={`flex-shrink-0 transition-transform group-hover:scale-105 ${isActive ? 'text-varistor-dark' : 'text-varistor-muted'
                 }`}
             />
             {/* Expanded Text */}
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Non-enabled Module Tooltip */}
             {!item.enabled && (
-              <span className="absolute left-full ml-2 px-2 py-1 text-xs bg-black text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-nowrap">
+              <span className="absolute left-full ml-2 px-2 py-1 text-xs bg-varistor-dark text-varistor-pageBg rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-nowrap">
                 Owned by another intern
               </span>
             )}
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar Shell */}
-      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-white border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px]">
+      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-varistor-surface border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px]">
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
@@ -223,18 +223,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-varistor-surface w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
             <div>
-              <span className="font-semibold text-[#111]">Varistor EOPMS</span>
+              <span className="font-semibold text-varistor-dark">Varistor EOPMS</span>
             </div>
           </div>
           <button
             onClick={() => setIsOpenMobile(false)}
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="p-1 rounded-full hover:bg-varistor-surfaceMuted"
           >
             <X size={20} className="text-varistor-dark" />
           </button>

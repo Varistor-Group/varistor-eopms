@@ -130,7 +130,7 @@ export interface FieldEmployeeLocation {
 
 // ─── Team Chat (Area E) ──────────────────────────────────────────────────────
 
-export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+export type ChannelId = string;
 
 export interface ChatChannel {
   id: ChannelId;
@@ -142,6 +142,13 @@ export interface ChatChannel {
 export interface ChatAttachment {
   name: string;
   size: string;
+  type?: string;
+  dataUrl?: string;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  userName: string;
 }
 
 export interface ChatMessage {
@@ -153,6 +160,7 @@ export interface ChatMessage {
   isSelf: boolean;
   text?: string;
   attachment?: ChatAttachment;
+  reactions?: ChatReaction[];
   timestamp: string;
 }
 

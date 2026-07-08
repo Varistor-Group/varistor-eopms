@@ -44,7 +44,7 @@ export const PointsBalance: React.FC = () => {
           {weeklyData.map((data, index) => (
             <div key={index} className="flex flex-col items-center group relative">
               {/* Tooltip */}
-              <div className="absolute bottom-full mb-1 px-1.5 py-0.5 bg-black text-white text-[9px] rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+              <div className="absolute bottom-full mb-1 px-1.5 py-0.5 bg-black text-[#ffffff] text-[9px] rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                 +{data.points} VP
               </div>
               {/* Bar */}

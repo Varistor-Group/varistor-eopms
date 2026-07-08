@@ -2,14 +2,110 @@
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
+
+.dark {
+  /*
+   * Overrides Tailwind's own `white` token, not just our custom varistor-*
+   * tokens. Most cards across the app (including pages this branch doesn't
+   * own) pair literal `bg-white` with `text-varistor-dark` - since that text
+   * token already flips to a light color in dark mode, leaving bg-white
+   * unflipped would make that text unreadable (light-on-white -> near
+   * invisible). This keeps those cards legible without editing every file.
+   */
+  --color-white: #1b1f18;
+  --varistor-pageBg: #12140f;
+  --varistor-dark: #f2f4ee;
+  --varistor-border: #2e332a;
+  --varistor-muted: #9aa190;
+  --varistor-surface: #1b1f18;
+  --varistor-surfaceMuted: #242820;
+  --varistor-limeLight: #1f2a10;
+  --varistor-limeTint: #28350f;
+  --varistor-limeText: #c8f279;
+  --varistor-successBg: #28350f;
+  --varistor-successText: #c8f279;
+  --varistor-successBorder: #3d5015;
+  --varistor-pendingBg: #242820;
+  --varistor-pendingText: #c4c9bf;
+  --varistor-pendingBorder: #333831;
+  --varistor-dangerBg: #2a1515;
+  --varistor-dangerText: #f87171;
+  --varistor-dangerBorder: #4a1f1f;
+  --brand-ink: #f2f4ee;
+}
+
+/*
+ * Pins pre-auth screens (Login, ResetPassword) to the light brand theme
+ * regardless of the app's dark mode state - these are the branded entry
+ * points, not "app content", and resetting the same tokens the rest of the
+ * app reads means every shared component nested here (Input, Button, Modal)
+ * renders correctly too, not just this page's own classes.
+ */
+.force-light {
+  color-scheme: light;
+  --color-white: #ffffff;
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
 
 @layer base {
+  /*
+   * Tells the browser to render native form controls (select dropdowns,
+   * checkboxes, scrollbars) in their dark variant. Without this, a <select>
+   * inherits our dark text color but its native popup keeps a white
+   * background, making unselected options unreadable.
+   */
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
     font-size: 14px;
     margin: 0;
     /* Safe area insets for mobile (notches, navbars) */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    transition: background-color 200ms ease-out, color 200ms ease-out;
   }
 }
 
