@@ -1,209 +1,15 @@
 /**
- * MOCK LEAVE MANAGEMENT SERVICE
- *
- * Mirrors the pattern in src/api/employees.ts — in-memory stores that act as
- * the DB until Supabase is connected.
+ * LEAVE MANAGEMENT SERVICE — Supabase
+ * Replaces the localStorage-backed store.
  */
 
+import { supabase } from '../lib/supabase';
 import type { LeaveRequest, LeaveBalance } from '../types';
 
-// ─── Leave balances (one entry per employee in mockEmployeeStore) ────────────
-
-export const mockLeaveBalances: LeaveBalance[] = [
-  {
-    employeeId: '2', // sathvik (the logged-in Employee)
-    casual:  { total: 12, used: 5 },
-    sick:    { total: 10, used: 3 },
-    earned:  { total: 15, used: 6 },
-    unpaidTaken: 2,
-  },
-  {
-    employeeId: '2131', // akash kumar (Admin)
-    casual:  { total: 12, used: 2 },
-    sick:    { total: 10, used: 1 },
-    earned:  { total: 15, used: 4 },
-    unpaidTaken: 0,
-  },
-  {
-    employeeId: 'VAR-003', // Priya Sharma (HR)
-    casual:  { total: 12, used: 4 },
-    sick:    { total: 10, used: 2 },
-    earned:  { total: 15, used: 3 },
-    unpaidTaken: 0,
-  },
-  {
-    employeeId: 'VAR-005', // Ravi Kumar (HR)
-    casual:  { total: 12, used: 1 },
-    sick:    { total: 10, used: 0 },
-    earned:  { total: 15, used: 2 },
-    unpaidTaken: 1,
-  },
-  {
-    employeeId: 'VAR-031', // Rohan Deshmukh (Field)
-    casual:  { total: 12, used: 6 },
-    sick:    { total: 10, used: 2 },
-    earned:  { total: 15, used: 5 },
-    unpaidTaken: 0,
-  },
-  {
-    employeeId: 'VAR-032', // Kavya Iyer (Field)
-    casual:  { total: 12, used: 3 },
-    sick:    { total: 10, used: 4 },
-    earned:  { total: 15, used: 1 },
-    unpaidTaken: 0,
-  },
-  {
-    employeeId: 'VAR-033', // Mohammed Faisal (Field)
-    casual:  { total: 12, used: 7 },
-    sick:    { total: 10, used: 1 },
-    earned:  { total: 15, used: 8 },
-    unpaidTaken: 3,
-  },
-  {
-    employeeId: 'VAR-034', // Sneha Reddy (Field)
-    casual:  { total: 12, used: 2 },
-    sick:    { total: 10, used: 0 },
-    earned:  { total: 15, used: 4 },
-    unpaidTaken: 0,
-  },
-  {
-    employeeId: 'VAR-035', // Arjun Nair (Field)
-    casual:  { total: 12, used: 5 },
-    sick:    { total: 10, used: 3 },
-    earned:  { total: 15, used: 0 },
-    unpaidTaken: 1,
-  },
-];
-
-// ─── Leave requests ───────────────────────────────────────────────────────────
-
-export const mockLeaveRequests: LeaveRequest[] = [
-  {
-    id: 'LV-0044',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Casual',
-    from: '2026-07-03',
-    to: '2026-07-03',
-    days: 1,
-    reason: 'Bank work',
-    status: 'Pending',
-    submittedAt: '2026-07-01T09:00:00Z',
-  },
-  {
-    id: 'LV-0033',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Sick',
-    from: '2026-06-10',
-    to: '2026-06-14',
-    days: 5,
-    reason: 'Family vacation to Goa',
-    status: 'Pending',
-    submittedAt: '2026-06-05T11:30:00Z',
-  },
-  {
-    id: 'LV-0018',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Sick',
-    from: '2026-05-04',
-    to: '2026-05-05',
-    days: 2,
-    reason: 'Viral fever, doctor advised rest',
-    status: 'Approved',
-    reviewerName: 'Priya Menon (Ops Head)',
-    submittedAt: '2026-05-04T08:10:00Z',
-    reviewedAt: '2026-05-04T10:45:00Z',
-  },
-  {
-    id: 'LV-0096',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Casual',
-    from: '2026-04-18',
-    to: '2026-04-18',
-    days: 1,
-    reason: 'Personal errand',
-    status: 'Rejected',
-    reviewerName: 'Rahul Shah (Ops Head)',
-    rejectionComment: 'Quarter close week – please reschedule',
-    submittedAt: '2026-04-15T09:20:00Z',
-    reviewedAt: '2026-04-16T12:00:00Z',
-  },
-  {
-    id: 'LV-0043',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Casual',
-    from: '2026-03-28',
-    to: '2026-03-30',
-    days: 3,
-    reason: "Cousin's wedding",
-    status: 'Approved',
-    reviewerName: 'Priya Menon',
-    submittedAt: '2026-03-20T15:00:00Z',
-    reviewedAt: '2026-03-21T09:30:00Z',
-  },
-  {
-    id: 'LV-0017',
-    employeeId: '2',
-    employeeName: 'sathvik',
-    type: 'Sick',
-    from: '2026-02-12',
-    to: '2026-02-12',
-    days: 1,
-    reason: 'Migraine',
-    status: 'Approved',
-    reviewerName: 'Priya Menon',
-    submittedAt: '2026-02-12T07:45:00Z',
-    reviewedAt: '2026-02-12T09:00:00Z',
-  },
-  {
-    id: 'LV-0051',
-    employeeId: 'VAR-003',
-    employeeName: 'Priya Sharma',
-    type: 'Earned',
-    from: '2026-07-13',
-    to: '2026-07-15',
-    days: 3,
-    reason: 'Trip to Kerala with family',
-    status: 'Pending',
-    submittedAt: '2026-06-30T10:15:00Z',
-  },
-  {
-    id: 'LV-0029',
-    employeeId: 'VAR-003',
-    employeeName: 'Priya Sharma',
-    type: 'Casual',
-    from: '2026-05-22',
-    to: '2026-05-22',
-    days: 1,
-    reason: 'School admission for daughter',
-    status: 'Approved',
-    reviewerName: 'Admin',
-    submittedAt: '2026-05-18T14:00:00Z',
-    reviewedAt: '2026-05-19T09:10:00Z',
-  },
-];
-
-// ─── Indian public holidays 2026 ─────────────────────────────────────────────
-
 export const INDIA_HOLIDAYS_2026: string[] = [
-  '2026-01-26', // Republic Day
-  '2026-03-25', // Holi
-  '2026-04-02', // Good Friday
-  '2026-04-14', // Dr. Ambedkar Jayanti
-  '2026-04-29', // Eid ul-Fitr (approx)
-  '2026-06-06', // Eid ul-Adha (approx)
-  '2026-08-15', // Independence Day
-  '2026-10-02', // Gandhi Jayanti
-  '2026-10-22', // Dussehra (approx)
-  '2026-11-11', // Diwali (approx)
-  '2026-12-25', // Christmas
+  '2026-01-26','2026-03-25','2026-04-02','2026-04-14','2026-04-29',
+  '2026-06-06','2026-08-15','2026-10-02','2026-10-22','2026-11-11','2026-12-25',
 ];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function isWeekend(isoDate: string): boolean {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
@@ -214,13 +20,11 @@ export function isHoliday(isoDate: string): boolean {
   return INDIA_HOLIDAYS_2026.includes(isoDate);
 }
 
-// Calculate working days between two dates (exclude weekends and public holidays)
 export function calcWorkingDays(from: string, to: string): number {
   if (!from || !to) return 0;
   const start = new Date(`${from}T00:00:00`);
   const end = new Date(`${to}T00:00:00`);
   if (end < start) return 0;
-
   let days = 0;
   const cursor = new Date(start);
   while (cursor <= end) {
@@ -231,34 +35,105 @@ export function calcWorkingDays(from: string, to: string): number {
   return days;
 }
 
-// Get leave balance for an employee
-export function getLeaveBalance(employeeId: string): LeaveBalance | undefined {
-  return mockLeaveBalances.find(b => b.employeeId === employeeId);
+// ─── DB row ↔ domain mappers ──────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToLeaveRequest(row: any): LeaveRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    type: row.type,
+    from: row.from_date,
+    to: row.to_date,
+    days: row.days,
+    reason: row.reason,
+    status: row.status,
+    reviewerId: row.reviewer_id ?? undefined,
+    reviewerName: row.reviewer_name ?? undefined,
+    rejectionComment: row.rejection_comment ?? undefined,
+    submittedAt: row.submitted_at,
+    reviewedAt: row.reviewed_at ?? undefined,
+  };
 }
 
-// Get all leave requests (optionally filtered by employeeId)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToLeaveBalance(row: any): LeaveBalance {
+  return {
+    employeeId: row.employee_id,
+    casual: { total: row.casual_total, used: row.casual_used },
+    sick: { total: row.sick_total, used: row.sick_used },
+    earned: { total: row.earned_total, used: row.earned_used },
+    unpaidTaken: row.unpaid_taken,
+  };
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+
+export async function getLeaveBalance(employeeId: string): Promise<LeaveBalance> {
+  const { data, error } = await supabase
+    .from('leave_balances')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .single();
+
+  if (error || !data) {
+    // Auto-create balance if missing
+    const { data: newBal } = await supabase
+      .from('leave_balances')
+      .insert({ employee_id: employeeId })
+      .select()
+      .single();
+    return newBal ? rowToLeaveBalance(newBal) : { employeeId, casual: { total: 12, used: 0 }, sick: { total: 10, used: 0 }, earned: { total: 15, used: 0 }, unpaidTaken: 0 };
+  }
+  return rowToLeaveBalance(data);
+}
+
 export function getLeaveRequests(employeeId?: string): LeaveRequest[] {
-  const list = employeeId
-    ? mockLeaveRequests.filter(r => r.employeeId === employeeId)
-    : mockLeaveRequests;
-  return [...list];
+  // Sync wrapper — components that call this should use getLeaveRequestsAsync instead.
+  // Kept for backwards-compat; returns whatever is in the in-memory cache.
+  return mockLeaveRequests.filter(r => !employeeId || r.employeeId === employeeId);
 }
 
-let leaveIdCounter = 100;
+export async function getLeaveRequestsAsync(employeeId?: string): Promise<LeaveRequest[]> {
+  let query = supabase.from('leave_requests').select('*').order('submitted_at', { ascending: false });
+  if (employeeId) query = query.eq('employee_id', employeeId);
+  const { data, error } = await query;
+  if (error) { console.error('[getLeaveRequestsAsync]', error.message); return []; }
+  const requests = (data ?? []).map(rowToLeaveRequest);
+  mockLeaveRequests.splice(0, mockLeaveRequests.length, ...requests);
+  return requests;
+}
 
-// Submit a new leave request — adds to mockLeaveRequests, deducts nothing until approved
 export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>): LeaveRequest {
-  const newRequest: LeaveRequest = {
+  // Sync wrapper that fires-and-forgets to Supabase
+  const optimistic: LeaveRequest = {
     ...input,
-    id: `LV-${String(leaveIdCounter++).padStart(4, '0')}`,
+    id: `LV-${String(Date.now()).slice(-6)}`,
     status: 'Pending',
     submittedAt: new Date().toISOString(),
   };
-  mockLeaveRequests.unshift(newRequest);
-  return newRequest;
+  mockLeaveRequests.unshift(optimistic);
+
+  // Async persist
+  supabase.from('leave_requests').insert({
+    id: optimistic.id,
+    employee_id: input.employeeId,
+    employee_name: input.employeeName,
+    department: (input as LeaveRequest & { department?: string }).department ?? '',
+    type: input.type,
+    from_date: input.from,
+    to_date: input.to,
+    days: input.days,
+    reason: input.reason,
+    status: 'Pending',
+  }).then(({ error }) => {
+    if (error) console.error('[submitLeaveRequest]', error.message);
+  });
+
+  return optimistic;
 }
 
-// Approve a leave request — updates status, sets reviewerName, deducts from balance
 export function approveLeaveRequest(leaveId: string, reviewerName: string): void {
   const request = mockLeaveRequests.find(r => r.id === leaveId);
   if (!request || request.status !== 'Pending') return;
@@ -267,17 +142,40 @@ export function approveLeaveRequest(leaveId: string, reviewerName: string): void
   request.reviewerName = reviewerName;
   request.reviewedAt = new Date().toISOString();
 
-  const balance = getLeaveBalance(request.employeeId);
-  if (!balance) return;
-  switch (request.type) {
-    case 'Casual': balance.casual.used += request.days; break;
-    case 'Sick': balance.sick.used += request.days; break;
-    case 'Earned': balance.earned.used += request.days; break;
-    case 'Unpaid': balance.unpaidTaken += request.days; break;
-  }
+  // Persist to Supabase
+  supabase.from('leave_requests').update({
+    status: 'Approved',
+    reviewer_name: reviewerName,
+    reviewed_at: request.reviewedAt,
+  }).eq('id', leaveId).then(({ error }) => {
+    if (error) console.error('[approveLeaveRequest]', error.message);
+  });
+
+  // Deduct from balance via direct column update
+  const balanceColumnMap: Record<string, keyof { casual_used: number; sick_used: number; earned_used: number }> = {
+    Casual: 'casual_used',
+    Sick: 'sick_used',
+    Earned: 'earned_used',
+  };
+  const balanceCol = balanceColumnMap[request.type];
+
+  supabase.from('leave_balances').select('casual_used,sick_used,earned_used,unpaid_taken').eq('employee_id', request.employeeId).single()
+    .then(({ data }) => {
+      if (!data) return;
+      if (balanceCol) {
+        const newVal = (data[balanceCol] as number) + request.days;
+        const updates: Record<string, number> = {};
+        updates[balanceCol] = newVal;
+        supabase.from('leave_balances').update(updates as any).eq('employee_id', request.employeeId)
+          .then(({ error }) => { if (error) console.error(error); });
+      } else {
+        // Unpaid
+        supabase.from('leave_balances').update({ unpaid_taken: data.unpaid_taken + request.days }).eq('employee_id', request.employeeId)
+          .then(({ error }) => { if (error) console.error(error); });
+      }
+    });
 }
 
-// Reject a leave request — updates status, requires a comment
 export function rejectLeaveRequest(leaveId: string, reviewerName: string, comment: string): void {
   const request = mockLeaveRequests.find(r => r.id === leaveId);
   if (!request || request.status !== 'Pending') return;
@@ -286,4 +184,17 @@ export function rejectLeaveRequest(leaveId: string, reviewerName: string, commen
   request.reviewerName = reviewerName;
   request.rejectionComment = comment;
   request.reviewedAt = new Date().toISOString();
+
+  supabase.from('leave_requests').update({
+    status: 'Rejected',
+    reviewer_name: reviewerName,
+    rejection_comment: comment,
+    reviewed_at: request.reviewedAt,
+  }).eq('id', leaveId).then(({ error }) => {
+    if (error) console.error('[rejectLeaveRequest]', error.message);
+  });
 }
+
+// In-memory cache (populated on first load)
+export let mockLeaveRequests: LeaveRequest[] = [];
+export let mockLeaveBalances: LeaveBalance[] = [];

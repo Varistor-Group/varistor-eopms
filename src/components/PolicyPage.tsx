@@ -1,55 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ScrollText, Plus, Pencil, Trash2, ShieldAlert, Shield,
-  Info, Calendar, Tag, ChevronDown, ChevronUp, X, Check
+  ScrollText, Plus, Pencil, Trash2,
+  Calendar, Tag, ChevronDown, ChevronUp, X, Check
 } from 'lucide-react';
 import {
   getPolicies, addPolicy, updatePolicy, deletePolicy,
-  type Policy, type PolicySeverity, type PolicyCategory
+  type Policy, type PolicyTarget
 } from '../api/policy';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Button } from './shared/Button';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SEVERITY_CONFIG: Record<PolicySeverity, {
-  label: string; icon: React.ElementType;
-  cardBorder: string; badgeCls: string; dotCls: string;
-}> = {
-  mandatory: {
-    label: 'Mandatory',
-    icon: ShieldAlert,
-    cardBorder: 'border-red-200',
-    badgeCls: 'bg-red-50 text-red-700 border border-red-200',
-    dotCls: 'bg-red-500',
-  },
-  standard: {
-    label: 'Standard',
-    icon: Shield,
-    cardBorder: 'border-varistor-border',
-    badgeCls: 'bg-varistor-pendingBg text-varistor-pendingText border border-varistor-pendingBorder',
-    dotCls: 'bg-amber-400',
-  },
-  advisory: {
-    label: 'Advisory',
-    icon: Info,
-    cardBorder: 'border-blue-100',
-    badgeCls: 'bg-blue-50 text-blue-600 border border-blue-100',
-    dotCls: 'bg-blue-400',
-  },
-};
-
-const CATEGORY_COLOURS: Record<string, string> = {
-  HR:         'bg-purple-50 text-purple-700 border-purple-200',
-  Operations: 'bg-orange-50 text-orange-700 border-orange-200',
-  Legal:      'bg-slate-100 text-slate-700 border-slate-200',
-  IT:         'bg-cyan-50 text-cyan-700 border-cyan-200',
-  Finance:    'bg-green-50 text-green-700 border-green-200',
-  General:    'bg-gray-100 text-gray-600 border-gray-200',
-};
-
-const ALL_CATEGORIES: PolicyCategory[] = ['HR', 'Operations', 'Legal', 'IT', 'Finance', 'General'];
-const ALL_SEVERITIES: PolicySeverity[] = ['mandatory', 'standard', 'advisory'];
+const ALL_TARGETS: PolicyTarget[] = ['Field', 'Office', 'Both'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,23 +25,19 @@ const toContent = (bullets: string[]): string =>
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const SeverityBadge: React.FC<{ severity: PolicySeverity }> = ({ severity }) => {
-  const cfg = SEVERITY_CONFIG[severity];
-  const Icon = cfg.icon;
+const TargetBadge: React.FC<{ target: string }> = ({ target }) => {
+  const isField = target === 'Field';
+  const isOffice = target === 'Office';
+  const cls = isField ? 'bg-orange-50 text-orange-700 border-orange-200' 
+            : isOffice ? 'bg-blue-50 text-blue-700 border-blue-200' 
+            : 'bg-purple-50 text-purple-700 border-purple-200';
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${cfg.badgeCls}`}>
-      <Icon size={10} strokeWidth={2} />
-      {cfg.label}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${cls}`}>
+      <Tag size={9} />
+      {target}
     </span>
   );
 };
-
-const CategoryBadge: React.FC<{ category: string }> = ({ category }) => (
-  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${CATEGORY_COLOURS[category] ?? CATEGORY_COLOURS.General}`}>
-    <Tag size={9} />
-    {category}
-  </span>
-);
 
 // ── Add / Edit Form ───────────────────────────────────────────────────────────
 
@@ -93,8 +52,7 @@ const EMPTY_BULLETS = ['', '', ''];
 
 const PolicyForm: React.FC<PolicyFormProps> = ({ initial, onSave, onCancel, isSaving }) => {
   const [title, setTitle] = useState(initial?.title ?? '');
-  const [category, setCategory] = useState<PolicyCategory>(initial?.category ?? 'HR');
-  const [severity, setSeverity] = useState<PolicySeverity>(initial?.severity ?? 'standard');
+  const [target, setTarget] = useState<PolicyTarget>(initial?.target ?? 'Both');
   const [effectiveDate, setEffectiveDate] = useState(initial?.effectiveDate ?? new Date().toISOString().split('T')[0]);
   const [bullets, setBullets] = useState<string[]>(
     initial ? toBullets(initial.content) : EMPTY_BULLETS
@@ -112,7 +70,7 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ initial, onSave, onCancel, isSa
     e.preventDefault();
     const validBullets = bullets.filter(b => b.trim());
     if (!title.trim() || validBullets.length === 0) return;
-    await onSave({ title: title.trim(), category, severity, content: toContent(validBullets), effectiveDate });
+    await onSave({ title: title.trim(), target, content: toContent(validBullets), effectiveDate });
   };
 
   const inputCls = 'w-full bg-varistor-pageBg border border-varistor-border text-varistor-dark text-sm rounded-lg focus:ring-varistor-lime focus:border-varistor-lime p-2.5 font-medium';
@@ -135,19 +93,24 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ initial, onSave, onCancel, isSa
         />
       </div>
 
-      {/* Category + Severity + Date in a row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Target + Date in a row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-varistor-dark">Category</label>
-          <select value={category} onChange={e => setCategory(e.target.value as PolicyCategory)} className={inputCls}>
-            {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-varistor-dark">Severity</label>
-          <select value={severity} onChange={e => setSeverity(e.target.value as PolicySeverity)} className={inputCls}>
-            {ALL_SEVERITIES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-          </select>
+          <label className="text-xs font-semibold text-varistor-dark">Applicable To</label>
+          <div className="flex bg-varistor-pageBg border border-varistor-border rounded-lg p-1">
+            {ALL_TARGETS.map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTarget(t)}
+                className={`flex-1 text-sm font-semibold py-1.5 rounded-md transition-colors ${
+                  target === t ? 'bg-white shadow-sm text-varistor-limeText border border-varistor-border' : 'text-varistor-muted hover:text-varistor-dark'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-varistor-dark">Effective Date</label>
@@ -218,12 +181,9 @@ interface PolicyCardProps {
 const PolicyCard: React.FC<PolicyCardProps> = ({ policy, index, canEdit, onEdit, onDelete }) => {
   const [expanded, setExpanded] = useState(true);
   const bullets = toBullets(policy.content);
-  const cfg = SEVERITY_CONFIG[policy.severity] ?? SEVERITY_CONFIG.standard;
 
   return (
-    <div className={`bg-white rounded-varistor border-l-4 border border-varistor-border shadow-varistor overflow-hidden transition-shadow hover:shadow-md ${cfg.cardBorder}`}
-      style={{ borderLeftColor: policy.severity === 'mandatory' ? '#ef4444' : policy.severity === 'advisory' ? '#60a5fa' : '#d1d5db' }}
-    >
+    <div className={`bg-white rounded-varistor border-l-4 border border-varistor-border shadow-varistor overflow-hidden transition-shadow hover:shadow-md border-l-varistor-lime`}>
       {/* Card Header */}
       <div
         className="flex items-start justify-between px-5 py-4 cursor-pointer select-none"
@@ -238,8 +198,7 @@ const PolicyCard: React.FC<PolicyCardProps> = ({ policy, index, canEdit, onEdit,
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <h3 className="text-sm font-bold text-varistor-dark tracking-tight">{policy.title}</h3>
-              <SeverityBadge severity={policy.severity} />
-              <CategoryBadge category={policy.category} />
+              <TargetBadge target={policy.target} />
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-varistor-muted font-medium">
               <Calendar size={10} />
@@ -356,12 +315,7 @@ export const PolicyPage: React.FC = () => {
     setEditingPolicy(null);
   };
 
-  // Group by severity for display order: mandatory first, then standard, then advisory
-  const ordered = [
-    ...policies.filter(p => p.severity === 'mandatory'),
-    ...policies.filter(p => p.severity === 'standard'),
-    ...policies.filter(p => p.severity === 'advisory'),
-  ];
+  const ordered = [...policies].sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
 
   return (
     <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
@@ -384,23 +338,6 @@ export const PolicyPage: React.FC = () => {
             Add Policy
           </Button>
         )}
-      </div>
-
-      {/* Severity Legend */}
-      <div className="flex flex-wrap items-center gap-3">
-        {ALL_SEVERITIES.map(s => {
-          const cfg = SEVERITY_CONFIG[s];
-          const Icon = cfg.icon;
-          const count = policies.filter(p => p.severity === s).length;
-          return (
-            <div key={s} className="flex items-center gap-1.5 text-xs text-varistor-muted font-medium">
-              <span className={`w-2 h-2 rounded-full ${cfg.dotCls}`} />
-              <Icon size={11} strokeWidth={2} />
-              {cfg.label}
-              <span className="font-bold text-varistor-dark">({count})</span>
-            </div>
-          );
-        })}
       </div>
 
       {/* Add / Edit Form */}

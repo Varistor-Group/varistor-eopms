@@ -128,13 +128,15 @@ export const Attendance: React.FC = () => {
   const isHR = currentRole === 'HR' || currentRole === 'Admin';
   const isAdmin = currentRole === 'Admin';
   const isManager = currentRole === 'Reporting Manager';
-  const isEmployee = currentRole === 'Employee' || currentRole === 'Field Employee';
+  // Employee self-view: regular employee, field employee, or reporting manager
   const isFieldEmployee = currentRole === 'Field Employee';
+  const isOfficeEmployee = currentRole === 'Employee' || currentRole === 'Reporting Manager';
   const canEdit = isHR;
-  const canDownload = isHR || isManager;
+  const canDownload = isHR;
 
-  // ── Tab state ──────────────────────────────────────────────────────────────
-  const [mainTab, setMainTab] = useState<'office' | 'field'>('office');
+  // Field employees are locked to field tab; office employees/managers to office tab; HR/Admin can switch
+  const defaultTab: 'office' | 'field' = isFieldEmployee ? 'field' : 'office';
+  const [mainTab, setMainTab] = useState<'office' | 'field'>(defaultTab);
 
   // ── Date/month selectors ───────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(todayISO());
@@ -543,22 +545,24 @@ export const Attendance: React.FC = () => {
         />
       </div>
 
-      {/* ── Main tab switcher ─────────────────────────────────────────────── */}
-      <div className="flex gap-1 bg-varistor-pageBg border border-varistor-border p-1 rounded-varistor">
-        {(['office', 'field'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setMainTab(tab)}
-            className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${
-              mainTab === tab
-                ? 'bg-white text-varistor-dark shadow-varistor border border-varistor-border'
-                : 'text-varistor-muted hover:text-varistor-dark'
-            }`}
-          >
-            {tab === 'office' ? '🏢 Office Attendance' : '🏃 Field Attendance'}
-          </button>
-        ))}
-      </div>
+      {/* ── Main tab switcher — only shown to HR/Admin who can see both ── */}
+      {isHR && (
+        <div className="flex gap-1 bg-varistor-pageBg border border-varistor-border p-1 rounded-varistor">
+          {(['office', 'field'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setMainTab(tab)}
+              className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${
+                mainTab === tab
+                  ? 'bg-white text-varistor-dark shadow-varistor border border-varistor-border'
+                  : 'text-varistor-muted hover:text-varistor-dark'
+              }`}
+            >
+              {tab === 'office' ? '🏢 Office Attendance' : '🏃 Field Attendance'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* TAB 1: OFFICE ATTENDANCE */}
@@ -706,7 +710,7 @@ export const Attendance: React.FC = () => {
           )}
 
           {/* ── Section 3: Employee Self-View ──────────────────────────────── */}
-          {isEmployee && (
+          {(isOfficeEmployee) && (
             <div className="space-y-4">
               {/* Summary card */}
               <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5">

@@ -8,7 +8,8 @@
     @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
     font-size: 14px;
     margin: 0;
-    padding: 0;
+    /* Safe area insets for mobile (notches, navbars) */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 }
 

@@ -13,6 +13,8 @@ export const useVariPoints = () => {
     pointsBalance: context.pointsBalance,
     currentRole: context.currentRole,
     setCurrentRole: context.setCurrentRole,
+    currentUser: context.currentUser,
+    setCurrentUser: context.setCurrentUser,
     assertAdministrativePenalty: context.assertAdministrativePenalty,
     addToast: context.addToast,
     dismissToast: context.dismissToast,

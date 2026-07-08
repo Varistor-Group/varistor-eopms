@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Megaphone, Users, Award, Calendar } from 'lucide-react';
+import { Megaphone, Users, Award, Calendar, Camera } from 'lucide-react';
 import { mockEmployeeStore } from '../../api/employees';
+import { useVariPoints } from '../../hooks/useVariPoints';
+import { ProfilePictureEditor } from '../ProfilePictureEditor';
 
 export const AdminDashboardView: React.FC = () => {
+  const { currentUser } = useVariPoints();
   // Global company data
   const employees = mockEmployeeStore;
-  
+
+  // Profile picture editing
+  const [editingAvatar, setEditingAvatar] = useState(false);
+
   // Mock data generation for demo purposes
   const generateMockPerformance = () => {
     return employees.map(emp => ({
@@ -21,12 +27,42 @@ export const AdminDashboardView: React.FC = () => {
   const [mockData] = useState(generateMockPerformance());
 
   return (
-    <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <h1 className="text-2xl font-bold text-varistor-dark">Global Admin Overview</h1>
+    <div className="space-y-8 md:space-y-6 animate-[fadeInPage_250ms_ease-out] px-2 md:px-0">
+
+      {/* Welcome / Profile header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative group flex-shrink-0">
+            <img
+              src={currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name ?? 'Admin')}&background=84CC16&color=fff&size=64&bold=true`}
+              alt={currentUser?.name ?? 'Admin'}
+              className="w-14 h-14 rounded-full border-2 border-varistor-lime/20 shadow-sm object-cover"
+            />
+            <button
+              onClick={() => setEditingAvatar(v => !v)}
+              className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              title="Change profile photo"
+            >
+              <Camera size={16} className="text-white" strokeWidth={1.8} />
+            </button>
+            {editingAvatar && (
+              <ProfilePictureEditor
+                onClose={() => setEditingAvatar(false)}
+                className="absolute top-16 left-0 mt-2"
+              />
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-varistor-dark">Global Admin Overview</h1>
+            <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.name} · {currentUser?.department}</p>
+          </div>
+        </div>
+        <div className="text-[11px] text-varistor-muted bg-white border border-varistor-border px-3 py-1.5 rounded-full shadow-sm font-semibold">
+          Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-6 mt-4 md:mt-0">
         {/* Performance & Points Leaderboard */}
         <div className="lg:col-span-2 bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -72,9 +108,16 @@ export const AdminDashboardView: React.FC = () => {
         <div className="space-y-6">
           {/* Leaves Tracking */}
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar size={20} className="text-orange-500" />
-              <h2 className="text-lg font-bold text-varistor-dark">Pending Leaves</h2>
+            <div
+              className="flex items-center justify-between gap-2 mb-4 cursor-pointer group"
+              onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'leaves' }))}
+              title="Go to Leave Management"
+            >
+              <div className="flex items-center gap-2">
+                <Calendar size={20} className="text-orange-500" />
+                <h2 className="text-lg font-bold text-varistor-dark group-hover:text-orange-500 transition-colors">Pending Leaves</h2>
+              </div>
+              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wide group-hover:text-orange-600">View all →</span>
             </div>
             <div className="space-y-3">
               {mockData.filter(d => d.pendingLeaves > 0).map(d => (
@@ -83,7 +126,12 @@ export const AdminDashboardView: React.FC = () => {
                     <p className="font-semibold text-sm text-varistor-dark">{d.name}</p>
                     <p className="text-xs text-varistor-muted">{d.pendingLeaves} days requested</p>
                   </div>
-                  <button className="bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-bold hover:bg-orange-200 transition-colors cursor-pointer">Review</button>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'leaves' }))}
+                    className="bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-bold hover:bg-orange-200 transition-colors cursor-pointer"
+                  >
+                    Review
+                  </button>
                 </div>
               ))}
               {mockData.filter(d => d.pendingLeaves > 0).length === 0 && (

@@ -1,22 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Input } from './shared/Input';
 import { Button } from './shared/Button';
+import { updatePassword } from '../api/auth';
 
 export const ResetPassword: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string; general?: string }>({});
 
-  useEffect(() => {
-    // Extract token from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenParam = urlParams.get('token');
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-    setToken(tokenParam);
-  }, []);
+  // Token is handled automatically by Supabase via auth session
 
   const validateForm = useCallback(() => {
     const errs: typeof errors = {};
@@ -37,17 +31,13 @@ export const ResetPassword: React.FC = () => {
     setIsLoading(true);
     setErrors({});
     
-    // Simulate network delay for API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const { success, error } = await updatePassword(newPassword);
     
-    if (!token) {
-      setErrors({ general: 'Invalid or missing reset token.' });
-      setIsLoading(false);
-      return;
+    if (!success) {
+      setErrors({ general: error || 'Failed to reset password. The link might have expired.' });
+    } else {
+      setIsSuccess(true);
     }
-    
-    // Mock success
-    setIsSuccess(true);
     setIsLoading(false);
   };
 
@@ -66,7 +56,7 @@ export const ResetPassword: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
-            <div className="bg-white p-2.5 rounded-xl shadow-sm border border-black/5 flex items-center justify-center">
+            <div className="bg-[#111111] p-2.5 rounded-xl shadow-sm border border-[#111111]/20 flex items-center justify-center">
               <img src="/logo.png" alt="Varistor Logo" className="h-8 md:h-10 w-auto object-contain block" />
             </div>
           </div>
@@ -88,12 +78,6 @@ export const ResetPassword: React.FC = () => {
           <h2 className="text-2xl md:text-3xl font-bold text-[#111111] mb-8">
             Create new password
           </h2>
-
-          {!token && !isSuccess && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600 font-medium mb-6">
-              Missing reset token. Please use the exact link from your email.
-            </div>
-          )}
 
           {isSuccess ? (
             <div className="space-y-6 text-center py-4">
@@ -140,7 +124,7 @@ export const ResetPassword: React.FC = () => {
                 type="submit"
                 className="w-full"
                 isLoading={isLoading}
-                disabled={isLoading || !token}
+                disabled={isLoading}
               >
                 Reset Password
               </Button>

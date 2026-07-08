@@ -1,5 +1,5 @@
-import React from 'react';
-import { Megaphone } from 'lucide-react';
+import React, { useState } from 'react';
+import { Megaphone, Camera } from 'lucide-react';
 import { PerformanceMeter } from '../PerformanceMeter';
 import { PointsBalance } from '../PointsBalance';
 import { TaskSummary } from '../TaskSummary';
@@ -10,16 +10,20 @@ import { useKanbanTasks } from '../../hooks/useKanbanTasks';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { useFieldTracking } from '../../hooks/useFieldTracking';
 import { mockEmployeeStore } from '../../api/employees';
+import { ProfilePictureEditor } from '../ProfilePictureEditor';
 
 export const EmployeeDashboardView: React.FC = () => {
   const { tasks } = useKanbanTasks();
-  const { currentRole, announcements, reactToAnnouncement, readAnnouncement } = useVariPoints();
+  const { currentRole, currentUser, announcements, reactToAnnouncement, readAnnouncement } = useVariPoints();
 
-  // Find the mocked current user based on role
+  // Profile picture editing
+  const [editingAvatar, setEditingAvatar] = useState(false);
+
+  // Find the mocked current user based on role (for field tracking only)
   const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
-  const currentUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
+  const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
 
-  const { isTracking } = useFieldTracking(currentUser.employeeId, !!currentUser.is_field_employee);
+  const { isTracking } = useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'done').length;
@@ -45,18 +49,28 @@ export const EmployeeDashboardView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 md:space-y-6 px-2 md:px-0">
       {/* Welcome Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 sm:gap-4 mb-4 md:mb-0">
         <div className="flex items-center gap-4">
-          <img 
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.fullName)}&background=84CC16&color=fff&size=64&bold=true`} 
-            alt={currentUser.fullName}
-            className="w-16 h-16 rounded-full border-2 border-varistor-lime/20 shadow-sm"
-          />
+          {/* Avatar with camera overlay */}
+          <div className="relative group flex-shrink-0">
+            <img
+              src={currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || mockStoreUser?.fullName || 'Employee')}&background=84CC16&color=fff&size=64&bold=true`}
+              alt={currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}
+              className="w-16 h-16 rounded-full border-2 border-varistor-lime/20 shadow-sm object-cover"
+            />
+            <button
+              onClick={() => setEditingAvatar(v => !v)}
+              className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              title="Change profile photo"
+            >
+              <Camera size={18} className="text-white" strokeWidth={1.8} />
+            </button>
+          </div>
           <div>
-            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser.fullName}</h1>
-            <p className="text-xs text-varistor-muted mt-0.5">{currentUser.department} Team · Role: {currentUser.role}</p>
+            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}</h1>
+            <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser?.department ?? 'General'} Team · {currentUser?.role ?? mockStoreUser?.role ?? 'Employee'}</p>
             <div className="mt-2 flex items-center">
             {isTracking ? (
               <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
@@ -70,6 +84,13 @@ export const EmployeeDashboardView: React.FC = () => {
               </span>
             )}
             </div>
+            {/* Inline avatar URL editor */}
+            {editingAvatar && (
+              <ProfilePictureEditor 
+                onClose={() => setEditingAvatar(false)} 
+                className="absolute top-16 left-0 mt-2" 
+              />
+            )}
           </div>
         </div>
         <div className="text-[11px] text-varistor-muted bg-white border border-varistor-border px-3 py-1.5 rounded-full shadow-sm font-semibold">
@@ -81,7 +102,7 @@ export const EmployeeDashboardView: React.FC = () => {
       <BirthdayCard />
 
       {/* 3-Column Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-6 mt-4 md:mt-0">
         
         {/* Column 1: Performance Meter & Today's Tasks */}
         <div className="space-y-6">

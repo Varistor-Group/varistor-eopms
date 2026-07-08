@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Kanban,
@@ -14,7 +14,9 @@ import {
   UserPlus,
   ShieldAlert,
   ScrollText,
-  ClipboardCheck
+  ClipboardCheck,
+  ListChecks,
+  Download
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -31,7 +33,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   setIsOpenMobile
 }) => {
-  const { currentRole } = useVariPoints();
+  const { currentRole, currentUser } = useVariPoints();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
@@ -40,25 +65,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else if (currentRole === 'HR') {
-    // HR participates in Vari Points — same rules as employees
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
-      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
@@ -71,12 +99,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (currentRole === 'Reporting Manager') {
     menuItems = [
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
-      { id: 'task-management', label: 'Task Management', icon: ShieldAlert, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: false },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else {
@@ -157,17 +187,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation list */}
         {renderNavList()}
 
+        {/* Install App Button */}
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border lg:block hidden">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={18} />
+              Install App
+            </button>
+          </div>
+        )}
+
         {/* User Card (Bottom) */}
         <div className="p-4 border-t border-varistor-border lg:block hidden">
           <div className="flex items-center gap-3">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
-              alt="Aarav Patel"
+              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+              alt={currentUser?.name ?? 'User'}
               className="w-9 h-9 rounded-full object-cover border border-varistor-border"
             />
             <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-varistor-dark truncate">Aarav Patel</p>
-              <p className="text-[10px] text-varistor-muted truncate">Operations Dept</p>
+              <p className="text-xs font-semibold text-varistor-dark truncate">{currentUser?.name ?? 'User'}</p>
+              <p className="text-[10px] text-varistor-muted truncate">{currentUser?.department ?? ''}</p>
             </div>
           </div>
         </div>
@@ -176,13 +219,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Drawer Overlay */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-50 lg:hidden"
+          className="fixed inset-0 bg-[rgba(0,0,0,0.4)] transition-opacity duration-300 z-[1000] lg:hidden"
           onClick={() => setIsOpenMobile(false)}
         />
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-50 transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-white w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
@@ -201,16 +244,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {renderNavList()}
 
+        {deferredPrompt && (
+          <div className="p-4 border-t border-varistor-border">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <Download size={20} />
+              Install App
+            </button>
+          </div>
+        )}
+
         <div className="p-4 border-t border-varistor-border">
           <div className="flex items-center gap-3">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60"
-              alt="Aarav Patel"
+              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+              alt={currentUser?.name ?? 'User'}
               className="w-10 h-10 rounded-full object-cover"
             />
             <div>
-              <p className="text-sm font-semibold text-varistor-dark">Aarav Patel</p>
-              <p className="text-xs text-varistor-muted">Operations Dept</p>
+              <p className="text-sm font-semibold text-varistor-dark">{currentUser?.name ?? 'User'}</p>
+              <p className="text-xs text-varistor-muted">{currentUser?.department ?? ''}</p>
             </div>
           </div>
         </div>

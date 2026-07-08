@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { getEmployees, deleteEmployee } from '../api/employees';
+import { getEmployees, deleteEmployee, sendRecoveryEmail } from '../api/employees';
 import { mockEmployeeStore } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
-import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown, Mail } from 'lucide-react';
 import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
@@ -183,6 +183,22 @@ export const EmployeeManagementPortal: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Send recovery credentials email to ${emp.fullName}?`)) {
+                            const { success, error } = await sendRecoveryEmail(emp);
+                            if (success) {
+                              addToast(`Recovery email sent to ${emp.fullName}`, 0, 'credit');
+                            } else {
+                              addToast(error || 'Failed to send recovery email', 0, 'debit');
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-varistor-muted hover:text-varistor-limeText hover:bg-varistor-limeTint rounded-md transition-colors"
+                        title="Send Recovery Email"
+                      >
+                        <Mail size={16} />
+                      </button>
                       <button
                         onClick={() => { setSelectedEmployee(emp); setView('edit'); }}
                         className="p-1.5 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-pageBg rounded-md transition-colors"

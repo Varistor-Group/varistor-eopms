@@ -95,7 +95,7 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
   const netPayWords = numberToWords(record.netPay);
 
-  const c = record.components || {};
+  const c: any = record.components || {};
   const monthlySalary = record.monthlySalary ?? record.ctc ?? 0;
   const basic = c.basic ?? 0;
   const hra = c.hra ?? 0;
@@ -392,8 +392,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       setRows(parsed);
       setFileName(`Attendance Tab data (${MONTH})`);
       setStep('preview');
-    } catch (err: any) {
-      setParseError(`Failed to fetch attendance data: ${err.message}`);
+    } catch (err) {
+      setParseError(`Failed to fetch attendance data: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

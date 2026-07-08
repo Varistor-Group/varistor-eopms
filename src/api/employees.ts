@@ -1,15 +1,9 @@
 /**
- * MOCK EMPLOYEES SERVICE
- *
- * TODO: Replace with real Supabase implementation:
- *  1. supabase.auth.admin.createUser({ email, password, ... })
- *  2. supabase.from('employees').insert(data)
- *  3. Trigger welcome email via Supabase Edge Function / Resend
- *
- * Expected return shape:
- *  { success: boolean, employee: Employee | null, error: string | null }
+ * EMPLOYEES SERVICE — Supabase
+ * Replaces the localStorage-backed mock store.
  */
 
+import { supabase } from '../lib/supabase';
 import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
 
 export interface Employee {
@@ -27,6 +21,7 @@ export interface Employee {
   status: 'Active' | 'Inactive';
   variPoints: number;
   is_field_employee?: boolean;
+  avatarUrl?: string;
 }
 
 export type Department =
@@ -35,7 +30,9 @@ export type Department =
   | 'Operations'
   | 'Ops Heads'
   | 'Tech'
-  | 'Digital Marketing';
+  | 'Digital Marketing'
+  | 'Management'
+  | 'Human Resources';
 
 export interface CreateEmployeeInput {
   fullName: string;
@@ -47,119 +44,212 @@ export interface CreateEmployeeInput {
   reportingManager: string;
   role: UserRole;
   is_field_employee?: boolean;
+  avatarUrl?: string;
 }
 
-// Temporary mock array for legacy components that haven't been migrated to the JSON DB yet
-export const mockEmployeeStore: Employee[] = [
-  {
-    fullName: "akash kumar",
-    employeeId: "2131",
-    username: "21331",
-    personalEmail: "cobbstark01@gmail.com",
-    phone: "+917022630114",
-    department: "Operations",
-    reportingManager: "na",
-    role: "Admin",
-    id: "2131",
-    tempPassword: "AK@2026!896",
-    createdAt: "2026-07-01T07:27:17.041Z",
-    status: "Active",
-    variPoints: 0,
-    is_field_employee: false
-  },
-  {
-    id: 'VAR-033',
-    fullName: 'Mohammed Faisal',
-    employeeId: 'VAR-033',
-    username: 'mohammed.faisal',
-    personalEmail: 'md.faisal@gmail.com',
-    phone: '+91 96860 78090',
-    department: 'Sales',
-    reportingManager: 'Aarav Patel',
-    role: 'Field Employee',
-    tempPassword: 'MF@2026!305',
-    createdAt: '2026-02-18T08:45:00Z',
-    status: 'Active',
-    variPoints: 780,
-  },
-  {
-    id: 'VAR-034',
-    fullName: 'Sneha Reddy',
-    employeeId: 'VAR-034',
-    username: 'sneha.reddy',
-    personalEmail: 'sneha.reddy@gmail.com',
-    phone: '+91 90080 23445',
-    department: 'Operations',
-    reportingManager: 'Aarav Patel',
-    role: 'Field Employee',
-    tempPassword: 'SR@2026!664',
-    createdAt: '2026-03-01T09:15:00Z',
-    status: 'Active',
-    variPoints: 1340,
-  },
-  {
-    id: 'VAR-035',
-    fullName: 'Arjun Nair',
-    employeeId: 'VAR-035',
-    username: 'arjun.nair',
-    personalEmail: 'arjun.nair@gmail.com',
-    phone: '+91 98410 56728',
-    department: 'Digital Marketing',
-    reportingManager: 'Aarav Patel',
-    role: 'Field Employee',
-    tempPassword: 'AN@2026!129',
-    createdAt: '2026-03-12T11:20:00Z',
-    status: 'Active',
-    variPoints: 610,
-  },
-  {
-    id: 'VAR-001',
-    fullName: 'Manager User',
-    employeeId: 'VAR-001',
-    username: 'manager.user',
-    personalEmail: 'manager@example.com',
-    phone: '+91 00000 00000',
-    department: 'Operations',
-    reportingManager: 'Admin User',
-    role: 'Reporting Manager',
-    tempPassword: 'Manager@2026!',
-    createdAt: '2026-01-01T09:00:00Z',
-    status: 'Active',
-    variPoints: 2000,
-  },
-  {
-    id: 'VAR-003',
-    fullName: 'Priya Sharma',
-    employeeId: 'VAR-003',
-    username: 'priya.sharma',
-    personalEmail: 'priya.sharma@gmail.com',
-    phone: '+91 97654 32109',
-    department: 'Finance',
-    reportingManager: 'Admin User',
-    role: 'HR',
-    tempPassword: 'Hr@2026!',
-    createdAt: '2026-01-10T09:00:00Z',
-    status: 'Active',
-    variPoints: 1540,
-  },
-  {
-    id: 'VAR-005',
-    fullName: 'Ravi Kumar',
-    employeeId: 'VAR-005',
-    username: 'ravi.kumar',
-    personalEmail: 'ravi.kumar@gmail.com',
-    phone: '+91 91234 56789',
-    department: 'Finance',
-    reportingManager: 'Admin User',
-    role: 'HR',
-    tempPassword: 'Hr2@2026!',
-    createdAt: '2026-02-01T09:00:00Z',
-    status: 'Active',
-    variPoints: 980,
-  },
-];
+// ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
 
-// ─── Field Tracker mock location store ───────────────────────────────────────
+function rowToEmployee(row: Record<string, unknown>): Employee {
+  return {
+    id: row.id as string,
+    fullName: row.full_name as string,
+    employeeId: row.employee_id as string,
+    username: row.username as string,
+    personalEmail: row.personal_email as string,
+    phone: (row.phone as string) ?? '',
+    department: row.department as Department,
+    reportingManager: (row.reporting_manager as string) ?? '',
+    role: row.role as UserRole,
+    tempPassword: (row.temp_password as string) ?? '',
+    createdAt: row.created_at as string,
+    status: row.status as 'Active' | 'Inactive',
+    variPoints: (row.vari_points as number) ?? 0,
+    is_field_employee: (row.is_field_employee as boolean) ?? false,
+    avatarUrl: (row.avatar_url as string) ?? '',
+  };
+}
+
+// ─── CRUD ────────────────────────────────────────────────────────────────────
+
+export async function getEmployees(): Promise<Employee[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('[getEmployees]', error.message);
+    return [];
+  }
+  return (data ?? []).map(rowToEmployee);
+}
+
+function generateTempPassword(name: string): string {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const year = new Date().getFullYear();
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `${initials}@${year}!${rand}`;
+}
+
+export async function createEmployee(input: CreateEmployeeInput): Promise<{
+  success: boolean;
+  employee: Employee | null;
+  error: string | null;
+  emailError?: string | null;
+}> {
+  if (!input.fullName || !input.employeeId || !input.personalEmail || !input.department) {
+    return { success: false, employee: null, error: 'Missing required fields.' };
+  }
+
+  const tempPassword = generateTempPassword(input.fullName);
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc('create_employee_with_auth', {
+    p_employee_id: input.employeeId,
+    p_full_name: input.fullName,
+    p_username: input.username,
+    p_personal_email: input.personalEmail,
+    p_phone: input.phone,
+    p_department: input.department,
+    p_reporting_manager: input.reportingManager,
+    p_role: input.role,
+    p_temp_password: tempPassword,
+    p_is_field_employee: input.is_field_employee ?? false,
+    p_avatar_url: input.avatarUrl ?? '',
+  });
+
+  if (rpcError) {
+    return { success: false, employee: null, error: rpcError.message };
+  }
+
+  // The RPC returns a JSON object. We typecast it to check success.
+  const result = rpcData as unknown as { success: boolean; error?: string; employee_id?: string };
+  
+  if (!result.success) {
+    return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
+  }
+
+  // Fetch the newly created employee row to return it
+  const { data: empRow } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('id', input.employeeId)
+    .single();
+
+  // Create leave balance entry
+  await supabase.from('leave_balances').insert({ employee_id: input.employeeId });
+
+  // Log activity
+  await supabase.from('activity_log').insert({
+    action: 'CREATE_EMPLOYEE',
+    performed_by: input.employeeId,
+    details: `Created employee ${input.fullName} (${input.employeeId})`,
+  });
+
+  let emailErrorMsg: string | null = null;
+  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
+
+  if (resendApiKey) {
+    try {
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'onboarding@resend.dev',
+          to: input.personalEmail,
+          subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+              <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                <h1 style="color: white; margin: 0;">Welcome to Varistor EOPMS!</h1>
+              </div>
+              <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+                <p>Hi ${input.fullName},</p>
+                <p>Your account has been successfully created. Here are your login credentials:</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                  <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${input.username}</p>
+                  <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${input.employeeId}</p>
+                  <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${tempPassword}</code></p>
+                </div>
+                <p>Please log in using the app URL and change your password as soon as possible.</p>
+              </div>
+            </div>
+          `
+        })
+      });
+
+      if (!emailRes.ok) {
+        const errData = await emailRes.json().catch(() => null);
+        emailErrorMsg = errData?.message || 'Failed to send welcome email via Resend API.';
+        console.error('[Resend Error]', errData);
+      }
+    } catch (e: any) {
+      emailErrorMsg = e.message;
+      console.error('[Resend Exception]', e);
+    }
+  } else {
+      emailErrorMsg = 'VITE_RESEND_API_KEY is not configured in .env.';
+  }
+
+  return { success: true, employee: empRow ? rowToEmployee(empRow) : null, error: null, emailError: emailErrorMsg };
+}
+
+export async function updateEmployee(
+  id: string,
+  updates: Partial<Employee>
+): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('employees')
+    .update({
+      ...(updates.fullName !== undefined && { full_name: updates.fullName }),
+      ...(updates.phone !== undefined && { phone: updates.phone }),
+      ...(updates.department !== undefined && { department: updates.department }),
+      ...(updates.reportingManager !== undefined && { reporting_manager: updates.reportingManager }),
+      ...(updates.role !== undefined && { role: updates.role }),
+      ...(updates.status !== undefined && { status: updates.status }),
+      ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
+      ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
+      ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return { success: false, employee: null, error: error.message };
+  return { success: true, employee: rowToEmployee(data as Record<string, unknown>), error: null };
+}
+
+export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
+  const { data, error } = await supabase.rpc('delete_employee_with_auth', { p_employee_id: id });
+  
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  // The RPC returns a JSON object. We typecast it to check success.
+  const result = data as unknown as { success: boolean; error?: string };
+  
+  if (!result.success) {
+    return { success: false, error: result.error || 'Failed to delete employee.' };
+  }
+  
+  return { success: true, error: null };
+}
+
+export async function updateFieldStatus(
+  employeeId: string,
+  isField: boolean
+): Promise<{ success: boolean; error: string | null }> {
+  const { error } = await supabase
+    .from('employees')
+    .update({ is_field_employee: isField })
+    .eq('id', employeeId);
+  if (error) return { success: false, error: error.message };
+  return { success: true, error: null };
+}
+
+// ─── Field location tracking (still in-memory, real-time TBD) ─────────────────
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 const todayAt = (h: number, min: number) => {
@@ -168,139 +258,26 @@ const todayAt = (h: number, min: number) => {
   return d.toISOString();
 };
 
-// Seeded with realistic coordinates spread around Bangalore/Chennai
 export const mockFieldLocations: FieldEmployeeLocation[] = [
-  {
-    employeeId: 'VAR-031',
-    employeeName: 'Rohan Deshmukh',
-    department: 'Sales',
-    lat: 12.9716, // MG Road, Bangalore
-    lng: 77.5946,
-    accuracy: 8,
-    batteryLevel: 82,
-    status: 'Active',
-    lastUpdated: minutesAgo(2),
-    todayCheckIn: todayAt(9, 5),
-    distanceTravelledKm: 14.2,
-    routeHistory: [
-      [12.9352, 77.6245],
-      [12.9451, 77.6100],
-      [12.9563, 77.6010],
-      [12.9660, 77.5970],
-      [12.9716, 77.5946],
-    ],
-  },
-  {
-    employeeId: 'VAR-032',
-    employeeName: 'Kavya Iyer',
-    department: 'Operations',
-    lat: 12.9345, // Jayanagar, Bangalore
-    lng: 77.5820,
-    accuracy: 12,
-    batteryLevel: 57,
-    status: 'Active',
-    lastUpdated: minutesAgo(5),
-    todayCheckIn: todayAt(8, 50),
-    distanceTravelledKm: 9.8,
-    routeHistory: [
-      [12.9081, 77.6010],
-      [12.9155, 77.5932],
-      [12.9240, 77.5880],
-      [12.9345, 77.5820],
-    ],
-  },
-  {
-    employeeId: 'VAR-033',
-    employeeName: 'Mohammed Faisal',
-    department: 'Sales',
-    lat: 13.0067, // Hebbal, Bangalore
-    lng: 77.5890,
-    accuracy: 25,
-    batteryLevel: 31,
-    status: 'Idle',
-    lastUpdated: minutesAgo(24),
-    todayCheckIn: todayAt(9, 30),
-    distanceTravelledKm: 21.5,
-    routeHistory: [
-      [12.9716, 77.5946],
-      [12.9855, 77.5910],
-      [12.9975, 77.5902],
-      [13.0067, 77.5890],
-    ],
-  },
-  {
-    employeeId: 'VAR-034',
-    employeeName: 'Sneha Reddy',
-    department: 'Operations',
-    lat: 12.9698, // Whitefield, Bangalore
-    lng: 77.7499,
-    accuracy: 10,
-    batteryLevel: 91,
-    status: 'Active',
-    lastUpdated: minutesAgo(1),
-    todayCheckIn: todayAt(9, 0),
-    distanceTravelledKm: 6.4,
-    routeHistory: [
-      [12.9569, 77.7011],
-      [12.9610, 77.7205],
-      [12.9655, 77.7350],
-      [12.9698, 77.7499],
-    ],
-  },
-  {
-    employeeId: 'VAR-035',
-    employeeName: 'Arjun Nair',
-    department: 'Digital Marketing',
-    lat: 13.0827, // Chennai Central
-    lng: 80.2707,
-    accuracy: 40,
-    batteryLevel: 12,
-    status: 'Offline',
-    lastUpdated: minutesAgo(95),
-    todayCheckIn: todayAt(8, 40),
-    todayCheckOut: todayAt(17, 10),
-    distanceTravelledKm: 18.9,
-    routeHistory: [
-      [13.0475, 80.2090],
-      [13.0569, 80.2320],
-      [13.0700, 80.2510],
-      [13.0827, 80.2707],
-    ],
-  },
+  { employeeId: 'VAR-031', employeeName: 'Rohan Deshmukh', department: 'Sales', lat: 12.9716, lng: 77.5946, accuracy: 8, batteryLevel: 82, status: 'Active', lastUpdated: minutesAgo(2), todayCheckIn: todayAt(9, 5), distanceTravelledKm: 14.2, routeHistory: [[12.9352,77.6245],[12.9451,77.6100],[12.9716,77.5946]] },
+  { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081,77.6010],[12.9345,77.5820]] },
+  { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716,77.5946],[13.0067,77.5890]] },
 ];
 
-export async function getFieldEmployees(): Promise<Employee[]> {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return mockEmployeeStore.filter(e => e.role === 'Field Employee');
-}
-
-// ─── Location Tracking (Mock Service Layer) ──────────────────────────────────
-
-// In-memory array for locations (as requested for mock state)
 let mockLocationHistory: LocationEntry[] = [];
 
 export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void> {
-  const newEntry: LocationEntry = {
-    ...data,
-    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-  };
-
+  const newEntry: LocationEntry = { ...data, id: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
   mockLocationHistory.push(newEntry);
-
-  // Keep only the last 100 entries per employee to avoid memory bloat
   const employeeEntries = mockLocationHistory.filter(e => e.employeeId === data.employeeId);
   if (employeeEntries.length > 100) {
-    const sorted = employeeEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    const toRemove = sorted.slice(0, sorted.length - 100).map(e => e.id);
+    const toRemove = employeeEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).slice(0, employeeEntries.length - 100).map(e => e.id);
     mockLocationHistory = mockLocationHistory.filter(e => !toRemove.includes(e.id));
   }
 }
 
 export async function getLatestLocations(): Promise<LatestLocation[]> {
   const employees = await getEmployees();
-  const latestLocations: LatestLocation[] = [];
-
-  // Group by employeeId to find the latest
   const latestMap = new Map<string, LocationEntry>();
   mockLocationHistory.forEach(entry => {
     const current = latestMap.get(entry.employeeId);
@@ -308,72 +285,28 @@ export async function getLatestLocations(): Promise<LatestLocation[]> {
       latestMap.set(entry.employeeId, entry);
     }
   });
-
+  const result: LatestLocation[] = [];
   employees.forEach(emp => {
     if (emp.is_field_employee) {
       const empId = emp.employeeId || emp.id;
-      let entry = latestMap.get(empId);
-
-      // If no location exists yet, provide and record a temporary starting location in Bangalore
-      if (!entry) {
-        entry = {
-          id: 'temp-' + empId + '-' + Date.now(),
-          employeeId: empId,
-          latitude: 12.9716 + (Math.random() * 0.05 - 0.025), // slight randomization
-          longitude: 77.5946 + (Math.random() * 0.05 - 0.025),
-          accuracy: 50,
-          timestamp: new Date().toISOString()
-        };
-        // Save it to history so it persists during this session
-        mockLocationHistory.push(entry);
-        latestMap.set(empId, entry);
-      }
-
-      latestLocations.push({
-        ...entry,
-        employeeName: emp.fullName,
-        department: emp.department,
-      });
+      const entry = latestMap.get(empId) ?? { id: 'temp-' + empId, employeeId: empId, latitude: 12.9716, longitude: 77.5946, accuracy: 50, timestamp: new Date().toISOString() };
+      result.push({ ...entry, employeeName: emp.fullName, department: emp.department });
     }
   });
-
-  return latestLocations;
+  return result;
 }
 
 export async function getLocationHistory(employeeId: string, from: Date, to: Date): Promise<LocationEntry[]> {
-  const fromTime = from.getTime();
-  const toTime = to.getTime();
-
-  return mockLocationHistory
-    .filter(e => e.employeeId === employeeId)
-    .filter(e => {
-      const time = new Date(e.timestamp).getTime();
-      return time >= fromTime && time <= toTime;
-    })
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return mockLocationHistory.filter(e => e.employeeId === employeeId && new Date(e.timestamp).getTime() >= from.getTime() && new Date(e.timestamp).getTime() <= to.getTime()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 }
 
 export async function getFieldLocations(): Promise<FieldEmployeeLocation[]> {
-  // Fetch real employees from the DB
   const employees = await getEmployees();
-
-  // Consider Sales and Operations employees as field staff for the simulation
   const fieldStaff = employees.filter(e => e.department === 'Sales' || e.department === 'Operations');
-
-  if (fieldStaff.length === 0) {
-    return [];
-  }
-
-  // Map real employees to our mock coordinate routes so the map has data
+  if (fieldStaff.length === 0) return [];
   return fieldStaff.map((emp, index) => {
     const mockLoc = mockFieldLocations[index % mockFieldLocations.length];
-    return {
-      ...mockLoc,
-      employeeId: emp.employeeId,
-      employeeName: emp.fullName,
-      department: emp.department,
-      routeHistory: [...mockLoc.routeHistory]
-    };
+    return { ...mockLoc, employeeId: emp.employeeId, employeeName: emp.fullName, department: emp.department, routeHistory: [...mockLoc.routeHistory] };
   });
 }
 
@@ -383,139 +316,63 @@ export function updateFieldLocation(employeeId: string, patch: Partial<FieldEmpl
   mockFieldLocations[index] = { ...mockFieldLocations[index], ...patch };
 }
 
-// Mock activity log
+export async function getFieldEmployees(): Promise<Employee[]> {
+  const { data, error } = await supabase.from('employees').select('*').eq('is_field_employee', true);
+  if (error) return [];
+  return (data ?? []).map(rowToEmployee);
+}
+
 export const mockActivityLog: { timestamp: string; action: string; by: string; details: string }[] = [];
+// Kept for backwards compatibility — writes now go to Supabase activity_log table
+export let mockEmployeeStore: Employee[] = [];
+// Lazy sync: populate on first access
+getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
-function generateTempPassword(name: string): string {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
-  const year = new Date().getFullYear();
-  const rand = Math.floor(100 + Math.random() * 900);
-  return `${initials}@${year}!${rand}`;
-}
-
-export async function updateFieldStatus(employeeId: string, isField: boolean): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const res = await fetch(`http://localhost:3001/api/employees/${employeeId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_field_employee: isField })
-    });
-    if (!res.ok) throw new Error('Failed to update field status');
-    return { success: true, error: null };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    // Fallback for mock store if DB unreachable
-    const idx = mockEmployeeStore.findIndex(e => e.id === employeeId || e.employeeId === employeeId);
-    if (idx !== -1) {
-      mockEmployeeStore[idx].is_field_employee = isField;
-      return { success: true, error: null };
-    }
-    return { success: false, error: 'Server unreachable and user not in mock store' };
-  }
-}
-
-export async function createEmployee(input: CreateEmployeeInput): Promise<{
-  success: boolean;
-  employee: Employee | null;
-  error: string | null;
-  emailError?: string | null;
-}> {
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 900));
-
-  // Validation
-  if (!input.fullName || !input.employeeId || !input.personalEmail || !input.department) {
-    return { success: false, employee: null, error: 'Missing required fields.' };
+export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {
+  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
+  if (!resendApiKey) {
+    return { success: false, error: 'VITE_RESEND_API_KEY is not configured in .env.' };
   }
 
-  // Build full Employee object
-  const newEmployee: Employee = {
-    ...input,
-    id: input.employeeId,
-    tempPassword: generateTempPassword(input.fullName),
-    createdAt: new Date().toISOString(),
-    status: 'Active',
-    variPoints: 0,
-  };
-
-  // Call JSON DB API
-  let employee: Employee;
   try {
-    const res = await fetch('http://localhost:3001/api/employees', {
+    const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newEmployee)
-    });
-    const result = await res.json();
-    if (!result.success) {
-      return { success: false, employee: null, error: result.error };
-    }
-    employee = result.employee;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    return { success: false, employee: null, error: 'Database server unreachable.' };
-  }
-
-  console.log('[JSON DB] Employee created:', employee);
-
-  let emailError = null;
-  try {
-    const res = await fetch('http://localhost:3001/api/send-credentials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        name: employee.fullName,
-        email: employee.personalEmail,
-        employeeId: employee.employeeId,
-        tempPassword: employee.tempPassword
-      }),
+        from: 'onboarding@resend.dev',
+        to: employee.personalEmail,
+        subject: 'Recovery: Varistor EOPMS Login Credentials',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+            <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="color: white; margin: 0;">Varistor EOPMS Credentials</h1>
+            </div>
+            <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+              <p>Hi ${employee.fullName},</p>
+              <p>An administrator has requested to resend your login credentials. Here they are:</p>
+              <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${employee.username}</p>
+                <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${employee.employeeId}</p>
+                <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${employee.tempPassword}</code></p>
+              </div>
+              <p>Please log in using the app URL and change your password as soon as possible.</p>
+            </div>
+          </div>
+        `
+      })
     });
-    const result = await res.json();
-    if (!result.success) {
-      emailError = result.error || 'Failed to send welcome email.';
+
+    if (!emailRes.ok) {
+      const errData = await emailRes.json().catch(() => null);
+      return { success: false, error: errData?.message || 'Failed to send recovery email via Resend API.' };
     }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    emailError = 'Email server unreachable.';
-  }
 
-  return { success: true, employee, error: null, emailError };
-}
-
-export async function getEmployees(): Promise<Employee[]> {
-  try {
-    const res = await fetch('http://localhost:3001/api/employees');
-    return await res.json();
-  } catch (err) {
-    console.error('Failed to fetch employees', err);
-    return [];
-  }
-}
-
-export async function updateEmployee(id: string, updates: Partial<Employee>): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
-  try {
-    const res = await fetch(`http://localhost:3001/api/employees/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
-    });
-    const result = await res.json();
-    return { success: result.success, employee: result.employee, error: result.error || null };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    return { success: false, employee: null, error: 'Database server unreachable.' };
-  }
-}
-
-export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const res = await fetch(`http://localhost:3001/api/employees/${id}`, {
-      method: 'DELETE'
-    });
-    const result = await res.json();
-    return { success: result.success, error: result.error || null };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
-    return { success: false, error: 'Database server unreachable.' };
+    return { success: true, error: null };
+  } catch (e: any) {
+    console.error('[Resend Exception]', e);
+    return { success: false, error: e.message };
   }
 }

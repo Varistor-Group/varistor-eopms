@@ -111,7 +111,7 @@ export function numberToWords(num: number): string {
     rupeesStr = 'Zero';
   } else {
     let tempVal = rupeesVal;
-    
+
     // Crores
     const crores = Math.floor(tempVal / 10000000);
     tempVal %= 10000000;
@@ -239,76 +239,23 @@ export function computeNet(params: {
 
 export const payrollAuditLog: PayrollAuditEntry[] = [];
 
-// ─── Seed 40 employees ───────────────────────────────────────────────────────
+const PAYROLL_KEY = 'eopms_payroll_records';
 
-const NAMES = [
-  'Aarav Patel', 'Priya Sharma', 'Rohan Mehta', 'Sneha Iyer', 'Vikram Singh',
-  'Ananya Das', 'Karthik Nair', 'Divya Reddy', 'Arjun Gupta', 'Pooja Joshi',
-  'Siddharth Rao', 'Nisha Kapoor', 'Rahul Verma', 'Kavya Pillai', 'Manish Tiwari',
-  'Aisha Khan', 'Deepak Pandey', 'Ritu Saxena', 'Gaurav Bose', 'Lalita Yadav',
-  'Suresh Chatterjee', 'Meera Nambiar', 'Akash Jain', 'Tanvi Kulkarni', 'Harsh Malhotra',
-  'Shruti Mishra', 'Nikhil Shah', 'Swathi Krishnan', 'Amit Desai', 'Pallavi Bhatt',
-  'Rajesh Choudhary', 'Geeta Rawat', 'Varun Srivastava', 'Nidhi Tripathi', 'Mohan Kaur',
-  'Rekha Ghosh', 'Praveen Kumar', 'Sunita Babu', 'Arun Negi', 'Madhuri Pandkar'
-];
+function loadPayrollRecords(): PayrollRecord[] {
+  try {
+    const raw = localStorage.getItem(PAYROLL_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  localStorage.setItem(PAYROLL_KEY, JSON.stringify([]));
+  return [];
+}
 
-const DEPARTMENTS = ['Finance', 'Sales', 'Operations', 'Tech', 'Digital Marketing', 'Ops Heads'];
-const CTC_RANGE = [360000, 420000, 480000, 540000, 600000, 660000, 720000, 840000, 960000, 1200000];
-
-function seedRecords(): PayrollRecord[] {
-  return NAMES.map((name, i) => {
-    const monthlySalary = Math.round(CTC_RANGE[i % CTC_RANGE.length] / 12); // Monthly Salary
-    const comp = computeNet({
-      monthlySalary,
-      totalDays: 30,
-      payDays: 30
-    });
-    return {
-      id: `pay-${String(i + 1).padStart(3, '0')}`,
-      employeeId: i === 0 ? 'VAR-024' : `VAR-${String(i + 1).padStart(3, '0')}`,
-      employeeName: name,
-      department: DEPARTMENTS[i % DEPARTMENTS.length],
-      designation: i % 2 === 0 ? 'DEVELOPER' : 'WELDER',
-      month: 'Jun 2026',
-      ctc: monthlySalary,
-      monthlySalary,
-      totalDays: 30,
-      payDays: 30,
-      clBalance: 0,
-      pfUan: '101234567890',
-      hasPf: true,
-      hasEsi: true,
-      hasPt: true,
-      slipReleased: false, // must be explicitly dispatched by HR
-      components: {
-        basic: comp.basic,
-        hra: comp.hra,
-        pfEmployee: comp.pfEmployee,
-        pfEmployer: comp.pfEmployer,
-        esi: comp.esi,
-        pt: comp.pt,
-        tds: comp.tds,
-        specialAllowance: comp.specialAllowance,
-        medical: comp.medical,
-        ta: comp.ta,
-        lta: comp.lta,
-        reimbursement: comp.reimbursement,
-        incentives: comp.incentives,
-        overtime: comp.overtime,
-        otherDeductions: comp.otherDeductions,
-      },
-      netPay: comp.netPay,
-      status: i < 5 ? 'approved' : 'draft',
-      revision: 1,
-      approvedBy: i < 5 ? 'hr@varistor.in' : undefined,
-      approvedAt: i < 5 ? '2026-06-14T10:00:00Z' : undefined,
-      autoFormula: true,
-    };
-  });
+function savePayrollRecords(records: PayrollRecord[]) {
+  localStorage.setItem(PAYROLL_KEY, JSON.stringify(records));
 }
 
 /** In-memory store (simulates DB). Mutations are reflected immediately. */
-let _records: PayrollRecord[] = seedRecords();
+let _records: PayrollRecord[] = loadPayrollRecords();
 
 // ─── API functions ───────────────────────────────────────────────────────────
 
@@ -329,6 +276,7 @@ export async function updatePayrollRecord(
   patch: Partial<Omit<PayrollRecord, 'id' | 'employeeId' | 'employeeName' | 'status'>>
 ): Promise<PayrollRecord | null> {
   await delay(80);
+  _records = loadPayrollRecords();
   const idx = _records.findIndex(r => r.id === id);
   if (idx === -1) return null;
   const rec = _records[idx];
@@ -393,11 +341,13 @@ export async function updatePayrollRecord(
     updated.netPay = gross - totalDeductions + c.reimbursement + c.incentives + c.overtime;
   }
   _records[idx] = updated;
+  savePayrollRecords(_records);
   return updated;
 }
 
 export async function approvePayroll(ids: string[], approverEmail: string): Promise<void> {
   await delay(400);
+  _records = loadPayrollRecords();
   const now = new Date().toISOString();
   ids.forEach(id => {
     const idx = _records.findIndex(r => r.id === id);
@@ -418,10 +368,12 @@ export async function approvePayroll(ids: string[], approverEmail: string): Prom
       console.log(`[Payroll Audit] APPROVED ${_records[idx].employeeId} net=${_records[idx].netPay} by=${approverEmail} at=${now}`);
     }
   });
+  savePayrollRecords(_records);
 }
 
 export async function createRevision(id: string, approverEmail: string): Promise<PayrollRecord | null> {
   await delay(300);
+  _records = loadPayrollRecords();
   const idx = _records.findIndex(r => r.id === id);
   if (idx === -1) return null;
   const rec = _records[idx];
@@ -434,6 +386,7 @@ export async function createRevision(id: string, approverEmail: string): Promise
     approvedAt: undefined,
   };
   _records.push(revised);
+  savePayrollRecords(_records);
   payrollAuditLog.push({
     timestamp: new Date().toISOString(),
     action: 'REVISION_CREATED',
@@ -446,6 +399,7 @@ export async function createRevision(id: string, approverEmail: string): Promise
 
 export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
   await delay(600);
+  _records = loadPayrollRecords();
   _records = _records.map(r => {
     if (r.status === 'approved') return r;
     const monthlySalary = ctcMultiplier ? Math.round(r.monthlySalary * ctcMultiplier) : r.monthlySalary;
