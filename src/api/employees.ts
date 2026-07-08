@@ -144,7 +144,55 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     details: `Created employee ${input.fullName} (${input.employeeId})`,
   });
 
-  return { success: true, employee: empRow ? rowToEmployee(empRow) : null, error: null, emailError: null };
+  let emailErrorMsg: string | null = null;
+  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
+
+  if (resendApiKey) {
+    try {
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'onboarding@resend.dev',
+          to: input.personalEmail,
+          subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+              <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                <h1 style="color: white; margin: 0;">Welcome to Varistor EOPMS!</h1>
+              </div>
+              <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+                <p>Hi ${input.fullName},</p>
+                <p>Your account has been successfully created. Here are your login credentials:</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                  <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${input.username}</p>
+                  <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${input.employeeId}</p>
+                  <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${tempPassword}</code></p>
+                </div>
+                <p>Please log in using the app URL and change your password as soon as possible.</p>
+              </div>
+            </div>
+          `
+        })
+      });
+
+      if (!emailRes.ok) {
+        const errData = await emailRes.json().catch(() => null);
+        emailErrorMsg = errData?.message || 'Failed to send welcome email via Resend API.';
+        console.error('[Resend Error]', errData);
+      }
+    } catch (e: any) {
+      emailErrorMsg = e.message;
+      console.error('[Resend Exception]', e);
+    }
+  } else {
+      emailErrorMsg = 'VITE_RESEND_API_KEY is not configured in .env.';
+  }
+
+  return { success: true, employee: empRow ? rowToEmployee(empRow) : null, error: null, emailError: emailErrorMsg };
 }
 
 export async function updateEmployee(
@@ -173,8 +221,19 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase.from('employees').delete().eq('id', id);
-  if (error) return { success: false, error: error.message };
+  const { data, error } = await supabase.rpc('delete_employee_with_auth', { p_employee_id: id });
+  
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  // The RPC returns a JSON object. We typecast it to check success.
+  const result = data as unknown as { success: boolean; error?: string };
+  
+  if (!result.success) {
+    return { success: false, error: result.error || 'Failed to delete employee.' };
+  }
+  
   return { success: true, error: null };
 }
 
@@ -268,3 +327,52 @@ export const mockActivityLog: { timestamp: string; action: string; by: string; d
 export let mockEmployeeStore: Employee[] = [];
 // Lazy sync: populate on first access
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
+
+export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {
+  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
+  if (!resendApiKey) {
+    return { success: false, error: 'VITE_RESEND_API_KEY is not configured in .env.' };
+  }
+
+  try {
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'onboarding@resend.dev',
+        to: employee.personalEmail,
+        subject: 'Recovery: Varistor EOPMS Login Credentials',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+            <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="color: white; margin: 0;">Varistor EOPMS Credentials</h1>
+            </div>
+            <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
+              <p>Hi ${employee.fullName},</p>
+              <p>An administrator has requested to resend your login credentials. Here they are:</p>
+              <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${employee.username}</p>
+                <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${employee.employeeId}</p>
+                <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${employee.tempPassword}</code></p>
+              </div>
+              <p>Please log in using the app URL and change your password as soon as possible.</p>
+            </div>
+          </div>
+        `
+      })
+    });
+
+    if (!emailRes.ok) {
+      const errData = await emailRes.json().catch(() => null);
+      return { success: false, error: errData?.message || 'Failed to send recovery email via Resend API.' };
+    }
+
+    return { success: true, error: null };
+  } catch (e: any) {
+    console.error('[Resend Exception]', e);
+    return { success: false, error: e.message };
+  }
+}

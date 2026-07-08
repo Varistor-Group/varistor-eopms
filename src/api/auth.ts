@@ -136,7 +136,8 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
   });
 
   if (error) {
-    return { success: false, error: 'Failed to send reset link.' };
+    console.error('Password reset error:', error);
+    return { success: false, error: `Failed to send reset link: ${error.message}` };
   }
 
   return { success: true, message: 'Reset link sent — check your inbox' };
