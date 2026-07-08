@@ -1,27 +1,23 @@
 {
   "employee_cl_balances": {
-    "VAR-024": { "total": 12, "used": 0 },
-    "VAR-001": { "total": 12, "used": 0 },
-    "VAR-002": { "total": 12, "used": 0 },
-    "213":    { "total": 12, "used": 0 },
-    "2131":   { "total": 12, "used": 0 }
+    "VAR-001": {
+      "total": 12,
+      "used": 0
+    },
+    "VAR-002": {
+      "total": 12,
+      "used": 0
+    },
+    "VAR-003": {
+      "total": 12,
+      "used": 0
+    },
+    "VAR-004": {
+      "total": 12,
+      "used": 0
+    }
   },
   "employees": [
-    {
-      "id": "VAR-024",
-      "fullName": "Aarav Patel",
-      "employeeId": "VAR-024",
-      "username": "aarav.patel",
-      "personalEmail": "aarav.patel@gmail.com",
-      "phone": "+91 98765 43210",
-      "department": "Operations",
-      "reportingManager": "Admin User",
-      "role": "Employee",
-      "tempPassword": "Employee@2026!",
-      "createdAt": "2026-01-15T09:00:00Z",
-      "status": "Active",
-      "variPoints": 1800
-    },
     {
       "id": "VAR-001",
       "fullName": "Admin User",
@@ -39,7 +35,7 @@
     },
     {
       "id": "VAR-002",
-      "fullName": "HR User",
+      "fullName": "Priya Sharma",
       "employeeId": "VAR-002",
       "username": "hr",
       "personalEmail": "hr@varistor.in",
@@ -47,32 +43,37 @@
       "department": "Operations",
       "reportingManager": "Admin User",
       "role": "HR",
-      "tempPassword": "HR@2026!",
+      "tempPassword": "Hr@2026!",
       "createdAt": "2025-01-01T09:00:00Z",
       "status": "Active",
       "variPoints": 2000
     },
     {
-      "fullName": "akash kumar",
-      "employeeId": "213",
-      "username": "adasd",
-      "personalEmail": "akash@varistor.in",
-      "phone": "+917022630114",
-      "department": "Finance",
-      "reportingManager": "asdasdsa",
-      "role": "Admin"
+      "id": "VAR-003",
+      "fullName": "Aarav Patel",
+      "employeeId": "VAR-003",
+      "username": "aarav.patel",
+      "personalEmail": "employee@varistor.in",
+      "phone": "+91 98765 43210",
+      "department": "Operations",
+      "reportingManager": "Admin User",
+      "role": "Employee",
+      "tempPassword": "Employee@2026!",
+      "createdAt": "2026-01-15T09:00:00Z",
+      "status": "Active",
+      "variPoints": 1800
     },
     {
-      "fullName": "akash kumar",
-      "employeeId": "2131",
-      "username": "21331",
-      "personalEmail": "cobbstark01@gmail.com",
-      "phone": "+917022630114",
-      "department": "Operations",
-      "reportingManager": "na",
+      "id": "VAR-004",
+      "fullName": "Akash Kumar",
+      "employeeId": "VAR-004",
+      "username": "akash.kumar",
+      "personalEmail": "akash@varistor.in",
+      "phone": "+91 70226 30114",
+      "department": "Finance",
+      "reportingManager": "Admin User",
       "role": "Admin",
-      "id": "2131",
-      "tempPassword": "AK@2026!896",
+      "tempPassword": "Admin@2026!",
       "createdAt": "2026-07-01T07:27:17.041Z",
       "status": "Active",
       "variPoints": 0

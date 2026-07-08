@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight, User } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { getEmployees, type Employee } from '../api/employees';
+import { fetchAllClBalances, updateClBalance, type ClBalance } from '../api/payroll';
 
 const Leaves: React.FC = () => {
   const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser, leaveBalance } = useVariPoints();
@@ -13,9 +15,56 @@ const Leaves: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const LOGGED_IN_EMP = currentUser?.id ?? 'VAR-024';
+  const LOGGED_IN_EMP = currentUser?.id ?? 'VAR-003';
   const LOGGED_IN_NAME = currentUser?.name ?? 'Aarav Patel';
   const LOGGED_IN_DEPT = currentUser?.department ?? 'Operations';
+
+  // State for HR/Admin managing leave balances
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
+  // State for Employee viewing live CL balance
+  const [ownClBalance, setOwnClBalance] = useState<ClBalance | null>(null);
+
+  useEffect(() => {
+    if (currentRole === 'Admin' || currentRole === 'HR') {
+      setLoadingBalances(true);
+      Promise.all([getEmployees(), fetchAllClBalances()])
+        .then(([emps, bals]) => {
+          setEmployees(emps);
+          setClBalances(bals);
+          setLoadingBalances(false);
+        })
+        .catch(err => {
+          console.error('Failed to load employee leave balances', err);
+          setLoadingBalances(false);
+        });
+    }
+  }, [currentRole]);
+
+  useEffect(() => {
+    if (currentRole === 'Employee' && LOGGED_IN_EMP) {
+      fetch(`http://localhost:3001/api/cl-balances/${LOGGED_IN_EMP}`)
+        .then(res => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then(setOwnClBalance)
+        .catch(() => setOwnClBalance({ total: 12, used: 0 }));
+    }
+  }, [currentRole, LOGGED_IN_EMP, leaveRequests]);
+
+  const handleCLBalanceChange = async (employeeId: string, value: string) => {
+    const total = parseInt(value, 10);
+    if (isNaN(total) || total < 0) return;
+    try {
+      const updated = await updateClBalance(employeeId, total);
+      setClBalances(prev => ({ ...prev, [employeeId]: updated }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Minimum date selection: today + 2 days
   const getMinDateStr = () => {
@@ -123,10 +172,12 @@ const Leaves: React.FC = () => {
                 <div>
                   <div className="flex justify-between text-xs text-varistor-muted mb-1">
                     <span>Casual Leave Balance</span>
-                    <span className="font-bold text-varistor-dark">{leaveBalance?.casual?.used ?? 0} / {leaveBalance?.casual?.total ?? 12} Taken</span>
+                    <span className="font-bold text-varistor-dark">
+                      {ownClBalance ? `${ownClBalance.used} / ${ownClBalance.total}` : `${leaveBalance?.casual?.used ?? 0} / ${leaveBalance?.casual?.total ?? 12}`} Taken
+                    </span>
                   </div>
                   <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, ((leaveBalance?.casual?.used ?? 0) / (leaveBalance?.casual?.total ?? 12)) * 100)}%` }} />
+                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, (((ownClBalance?.used ?? leaveBalance?.casual?.used ?? 0) / (ownClBalance?.total ?? leaveBalance?.casual?.total ?? 12)) * 100))}%` }} />
                   </div>
                 </div>
                 <div>
@@ -226,8 +277,45 @@ const Leaves: React.FC = () => {
           </div>
         )}
 
+        {/* HR / Admin Manage CL Balances Column */}
+        {(currentRole === 'Admin' || currentRole === 'HR') && (
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
+              <h3 className="text-sm font-bold text-varistor-dark border-b pb-2 mb-4">Manage CL Balances</h3>
+              {loadingBalances ? (
+                <div className="text-xs text-varistor-muted py-4 text-center">Loading balances…</div>
+              ) : (
+                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+                  {employees.map(emp => {
+                    const bal = clBalances[emp.employeeId] ?? { total: 12, used: 0 };
+                    return (
+                      <div key={emp.id} className="flex items-center justify-between py-2 border-b border-varistor-border last:border-b-0">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <p className="text-xs font-bold text-varistor-dark truncate">{emp.fullName}</p>
+                          <p className="text-[10px] text-varistor-muted font-mono">{emp.employeeId} · {bal.used} used</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <label className="text-[10px] font-semibold text-varistor-muted">Total CL:</label>
+                          <input
+                            type="number"
+                            defaultValue={bal.total}
+                            onBlur={e => handleCLBalanceChange(emp.employeeId, e.target.value)}
+                            min={0}
+                            className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                            title="Edit Casual Leave total balance"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Requests Table Column */}
-        <div className={`${currentRole === 'Employee' ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
+        <div className={`${(currentRole === 'Employee' || currentRole === 'Admin' || currentRole === 'HR') ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
             <div className="px-5 py-4 border-b border-varistor-border flex justify-between items-center">
               <h3 className="text-sm font-bold text-varistor-dark">

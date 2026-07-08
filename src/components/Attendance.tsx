@@ -42,6 +42,8 @@ import {
   getConfidenceBadgeClass,
   getConfidenceLabel,
 } from '../lib/faceVerification';
+import { syncPayrollFromAttendance } from '../api/payroll';
+
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -199,6 +201,24 @@ export const Attendance: React.FC = () => {
   const [weekOffDay, setWeekOffDay] = useState('Sun');
   const [satHalfDay, setSatHalfDay] = useState(true);
   const [savedWo, setSavedWo] = useState(false);
+  const [syncingPayroll, setSyncingPayroll] = useState(false);
+
+  async function handleSyncPayroll() {
+    if (monthlyReport.length === 0) {
+      addToast('No monthly report data available to sync.', 0, 'debit');
+      return;
+    }
+    setSyncingPayroll(true);
+    try {
+      await syncPayrollFromAttendance(reportMonth, monthlyReport);
+      addToast('Draft payslips successfully generated/updated from attendance!', 0, 'credit');
+    } catch (err) {
+      console.error(err);
+      addToast('Failed to generate payslips from attendance report.', 0, 'debit');
+    } finally {
+      setSyncingPayroll(false);
+    }
+  }
 
   // ── Geolocation (field employees) ─────────────────────────────────────────
   const [geoLocation, setGeoLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -800,6 +820,16 @@ export const Attendance: React.FC = () => {
                       <>
                         <Button variant="secondary" className="text-xs" onClick={exportMonthlyExcel}><FileSpreadsheet size={13} strokeWidth={1.5} /> Excel</Button>
                         <Button variant="secondary" className="text-xs" onClick={() => exportPDF('monthly')}><Printer size={13} strokeWidth={1.5} /> PDF</Button>
+                        {isHR && (
+                          <Button
+                            variant="primary"
+                            className="text-xs"
+                            onClick={handleSyncPayroll}
+                            isLoading={syncingPayroll}
+                          >
+                            <RefreshCw size={13} strokeWidth={1.5} /> Sync to Payroll
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>

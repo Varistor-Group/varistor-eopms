@@ -241,13 +241,177 @@ export const payrollAuditLog: PayrollAuditEntry[] = [];
 
 const PAYROLL_KEY = 'eopms_payroll_records';
 
+const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
+  {
+    id: 'pay-VAR-001-Jun-2026',
+    employeeId: 'VAR-001',
+    employeeName: 'Admin User',
+    department: 'Ops Heads',
+    designation: 'Admin',
+    month: 'Jun 2026',
+    ctc: 150000,
+    monthlySalary: 150000,
+    netPay: 148000,
+    status: 'draft',
+    revision: 1,
+    autoFormula: true,
+    totalDays: 30,
+    payDays: 30,
+    clBalance: 12,
+    pfUan: '100987654321',
+    hasPf: true,
+    hasEsi: false,
+    hasPt: true,
+    slipReleased: false,
+    components: {
+      basic: 75000,
+      hra: 37500,
+      pfEmployee: 1800,
+      pfEmployer: 1800,
+      esi: 0,
+      pt: 200,
+      tds: 0,
+      specialAllowance: 27750,
+      medical: 1250,
+      ta: 2500,
+      lta: 3500,
+      reimbursement: 0,
+      incentives: 0,
+      overtime: 0,
+      otherDeductions: 0,
+    }
+  },
+  {
+    id: 'pay-VAR-002-Jun-2026',
+    employeeId: 'VAR-002',
+    employeeName: 'Priya Sharma',
+    department: 'Operations',
+    designation: 'HR',
+    month: 'Jun 2026',
+    ctc: 50000,
+    monthlySalary: 50000,
+    netPay: 46200,
+    status: 'draft',
+    revision: 1,
+    autoFormula: true,
+    totalDays: 30,
+    payDays: 30,
+    clBalance: 12,
+    pfUan: '100987654322',
+    hasPf: true,
+    hasEsi: false,
+    hasPt: true,
+    slipReleased: false,
+    components: {
+      basic: 25000,
+      hra: 12500,
+      pfEmployee: 1800,
+      pfEmployer: 1800,
+      esi: 0,
+      pt: 200,
+      tds: 0,
+      specialAllowance: 2750,
+      medical: 1250,
+      ta: 2500,
+      lta: 3500,
+      reimbursement: 0,
+      incentives: 0,
+      overtime: 0,
+      otherDeductions: 0,
+    }
+  },
+  {
+    id: 'pay-VAR-003-Jun-2026',
+    employeeId: 'VAR-003',
+    employeeName: 'Aarav Patel',
+    department: 'Operations',
+    designation: 'Employee',
+    month: 'Jun 2026',
+    ctc: 35000,
+    monthlySalary: 35000,
+    netPay: 31200,
+    status: 'draft',
+    revision: 1,
+    autoFormula: true,
+    totalDays: 30,
+    payDays: 30,
+    clBalance: 12,
+    pfUan: '100987654323',
+    hasPf: true,
+    hasEsi: false,
+    hasPt: true,
+    slipReleased: false,
+    components: {
+      basic: 17500,
+      hra: 8750,
+      pfEmployee: 1800,
+      pfEmployer: 1800,
+      esi: 0,
+      pt: 200,
+      tds: 0,
+      specialAllowance: -1250,
+      medical: 1250,
+      ta: 2500,
+      lta: 3500,
+      reimbursement: 0,
+      incentives: 0,
+      overtime: 0,
+      otherDeductions: 0,
+    }
+  },
+  {
+    id: 'pay-VAR-004-Jun-2026',
+    employeeId: 'VAR-004',
+    employeeName: 'Akash Kumar',
+    department: 'Finance',
+    designation: 'Admin',
+    month: 'Jun 2026',
+    ctc: 45000,
+    monthlySalary: 45000,
+    netPay: 41200,
+    status: 'draft',
+    revision: 1,
+    autoFormula: true,
+    totalDays: 30,
+    payDays: 30,
+    clBalance: 12,
+    pfUan: '100987654324',
+    hasPf: true,
+    hasEsi: false,
+    hasPt: true,
+    slipReleased: false,
+    components: {
+      basic: 22500,
+      hra: 11250,
+      pfEmployee: 1800,
+      pfEmployer: 1800,
+      esi: 0,
+      pt: 200,
+      tds: 0,
+      specialAllowance: 250,
+      medical: 1250,
+      ta: 2500,
+      lta: 3500,
+      reimbursement: 0,
+      incentives: 0,
+      overtime: 0,
+      otherDeductions: 0,
+    }
+  }
+];
+
 function loadPayrollRecords(): PayrollRecord[] {
   try {
     const raw = localStorage.getItem(PAYROLL_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Discard legacy database records
+      const clean = parsed.filter((r: any) => ['VAR-001', 'VAR-002', 'VAR-003', 'VAR-004'].includes(r.employeeId));
+      if (clean.length > 0) return clean;
+    }
   } catch { /* ignore */ }
-  localStorage.setItem(PAYROLL_KEY, JSON.stringify([]));
-  return [];
+  localStorage.setItem(PAYROLL_KEY, JSON.stringify(DEFAULT_SEED_RECORDS));
+  return DEFAULT_SEED_RECORDS;
 }
 
 function savePayrollRecords(records: PayrollRecord[]) {
@@ -459,6 +623,136 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Format YYYY-MM to MMM YYYY, e.g. 2026-07 -> Jul 2026 */
+export function formatMonthToMMMYear(monthStr: string): string {
+  const [year, month] = monthStr.split('-');
+  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+/** Generates or updates draft payroll records based on attendance monthly report */
+export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
+  await delay(200);
+  _records = loadPayrollRecords();
+  
+  const displayMonth = formatMonthToMMMYear(monthStr);
+
+  // Load employees to fetch role/designation
+  let employees: any[] = [];
+  try {
+    const res = await fetch('http://localhost:3001/api/employees');
+    if (res.ok) {
+      employees = await res.json();
+    }
+  } catch (e) {
+    console.error('Failed to fetch employees for sync', e);
+  }
+
+  // Fetch CL balances
+  let clBalances: Record<string, ClBalance> = {};
+  try {
+    const res = await fetch('http://localhost:3001/api/cl-balances');
+    if (res.ok) {
+      clBalances = await res.json();
+    }
+  } catch (e) {
+    console.error('Failed to fetch CL balances for sync', e);
+  }
+
+  reportRows.forEach(row => {
+    const emp = employees.find(e => e.employeeId === row.employee_id || e.id === row.employee_id);
+    const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
+    const lopDays = Math.max(0, clBal.used - clBal.total);
+
+    const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
+
+    const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
+    const totalDays = row.present + row.late + row.halfDay + row.absent + row.weekOff + row.holidays + row.leaves || 30;
+    const payDays = row.payableDays;
+
+    const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
+    const ta = existingIdx !== -1 ? _records[existingIdx].components.ta : 2500;
+    const lta = existingIdx !== -1 ? _records[existingIdx].components.lta : 3500;
+    const reimbursement = existingIdx !== -1 ? _records[existingIdx].components.reimbursement : 0;
+    const incentives = existingIdx !== -1 ? _records[existingIdx].components.incentives : 0;
+    const overtime = existingIdx !== -1 ? _records[existingIdx].components.overtime : 0;
+    const tds = existingIdx !== -1 ? _records[existingIdx].components.tds : 0;
+    const otherDeductions = existingIdx !== -1 ? _records[existingIdx].components.otherDeductions : 0;
+
+    const hasPf = existingIdx !== -1 ? _records[existingIdx].hasPf : true;
+    const hasEsi = existingIdx !== -1 ? _records[existingIdx].hasEsi : true;
+    const hasPt = existingIdx !== -1 ? _records[existingIdx].hasPt : true;
+
+    const comp = computeNet({
+      monthlySalary,
+      totalDays,
+      payDays,
+      medical,
+      ta,
+      lta,
+      reimbursement,
+      incentives,
+      overtime,
+      tds,
+      otherDeductions,
+      lopDays,
+      hasPf,
+      hasEsi,
+      hasPt,
+    });
+
+    const payrollRec: PayrollRecord = {
+      id: existingIdx !== -1 ? _records[existingIdx].id : `pay-${row.employee_id}-${monthStr}`,
+      employeeId: row.employee_id,
+      employeeName: row.employeeName,
+      department: row.department,
+      designation: emp?.role || 'Employee',
+      month: displayMonth,
+      ctc: monthlySalary,
+      monthlySalary,
+      netPay: comp.netPay,
+      status: existingIdx !== -1 ? _records[existingIdx].status : 'draft',
+      revision: existingIdx !== -1 ? _records[existingIdx].revision : 1,
+      autoFormula: true,
+      totalDays,
+      payDays,
+      clBalance: clBal.total,
+      pfUan: existingIdx !== -1 ? _records[existingIdx].pfUan : '—',
+      hasPf,
+      hasEsi,
+      hasPt,
+      slipReleased: existingIdx !== -1 ? _records[existingIdx].slipReleased : false,
+      components: {
+        basic: comp.basic,
+        hra: comp.hra,
+        pfEmployee: comp.pfEmployee,
+        pfEmployer: comp.pfEmployer,
+        esi: comp.esi,
+        pt: comp.pt,
+        tds: comp.tds,
+        specialAllowance: comp.specialAllowance,
+        medical: comp.medical,
+        ta: comp.ta,
+        lta: comp.lta,
+        reimbursement: comp.reimbursement,
+        incentives: comp.incentives,
+        overtime: comp.overtime,
+        otherDeductions: comp.otherDeductions,
+      }
+    };
+
+    if (existingIdx !== -1) {
+      if (_records[existingIdx].status === 'draft') {
+        _records[existingIdx] = payrollRec;
+      }
+    } else {
+      _records.push(payrollRec);
+    }
+  });
+
+  savePayrollRecords(_records);
+}
+
 // ─── CL Balance helpers ────────────────────────────────────────────────────────
 
 export interface ClBalance {
@@ -469,7 +763,7 @@ export interface ClBalance {
 /** Fetch one employee's CL balance from the server */
 export async function fetchClBalance(employeeId: string): Promise<ClBalance> {
   try {
-    const res = await fetch(`/api/cl-balances/${employeeId}`);
+    const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`);
     if (!res.ok) return { total: 12, used: 0 };
     return res.json();
   } catch {
@@ -480,7 +774,7 @@ export async function fetchClBalance(employeeId: string): Promise<ClBalance> {
 /** Fetch all CL balances (HR view) */
 export async function fetchAllClBalances(): Promise<Record<string, ClBalance>> {
   try {
-    const res = await fetch('/api/cl-balances');
+    const res = await fetch('http://localhost:3001/api/cl-balances');
     if (!res.ok) return {};
     return res.json();
   } catch {
@@ -490,7 +784,7 @@ export async function fetchAllClBalances(): Promise<Record<string, ClBalance>> {
 
 /** Update an employee's CL total via the server */
 export async function updateClBalance(employeeId: string, total: number): Promise<ClBalance> {
-  const res = await fetch(`/api/cl-balances/${employeeId}`, {
+  const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ total }),
@@ -553,7 +847,7 @@ export interface BulkSendResult {
  * Calls the Express backend at /api/payroll/send-slips.
  */
 export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
-  const res = await fetch('/api/payroll/send-slips', {
+  const res = await fetch('http://localhost:3001/api/payroll/send-slips', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slips: rows }),

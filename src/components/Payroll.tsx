@@ -1234,60 +1234,48 @@ const SalaryEngine: React.FC = () => {
                         <td key={f} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.components[f])}</td>
                       ))}
                       <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
-                      {/* PF toggle */}
+                      {/* PF checkbox */}
                       <td className="px-4 py-3 text-center">
                         {isAdmin && !isApproved ? (
-                          <button
-                            onClick={() => handleToggleFlag(rec.id, 'hasPf', !rec.hasPf)}
-                            title={rec.hasPf ? 'PF applied — click to disable' : 'PF disabled — click to enable'}
-                            className={`w-8 h-4 rounded-full transition-colors relative ${
-                              rec.hasPf ? 'bg-varistor-lime' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
-                              rec.hasPf ? 'left-4' : 'left-0.5'
-                            }`} />
-                          </button>
+                          <input
+                            type="checkbox"
+                            checked={rec.hasPf}
+                            onChange={(e) => handleToggleFlag(rec.id, 'hasPf', e.target.checked)}
+                            title={rec.hasPf ? 'PF applied — uncheck to disable' : 'PF disabled — check to enable'}
+                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                          />
                         ) : (
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                             rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
                           }`}>{rec.hasPf ? 'On' : 'Off'}</span>
                         )}
                       </td>
-                      {/* ESI toggle */}
+                      {/* ESI checkbox */}
                       <td className="px-4 py-3 text-center">
                         {isAdmin && !isApproved ? (
-                          <button
-                            onClick={() => handleToggleFlag(rec.id, 'hasEsi', !rec.hasEsi)}
-                            title={rec.hasEsi ? 'ESI applied — click to disable' : 'ESI disabled — click to enable'}
-                            className={`w-8 h-4 rounded-full transition-colors relative ${
-                              rec.hasEsi ? 'bg-varistor-lime' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
-                              rec.hasEsi ? 'left-4' : 'left-0.5'
-                            }`} />
-                          </button>
+                          <input
+                            type="checkbox"
+                            checked={rec.hasEsi}
+                            onChange={(e) => handleToggleFlag(rec.id, 'hasEsi', e.target.checked)}
+                            title={rec.hasEsi ? 'ESI applied — uncheck to disable' : 'ESI disabled — check to enable'}
+                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                          />
                         ) : (
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                             rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
                           }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
                         )}
                       </td>
-                      {/* PT toggle */}
+                      {/* PT checkbox */}
                       <td className="px-4 py-3 text-center">
                         {isAdmin && !isApproved ? (
-                          <button
-                            onClick={() => handleToggleFlag(rec.id, 'hasPt', !rec.hasPt)}
-                            title={rec.hasPt ? 'PT applied — click to disable' : 'PT disabled — click to enable'}
-                            className={`w-8 h-4 rounded-full transition-colors relative ${
-                              rec.hasPt ? 'bg-varistor-lime' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
-                              rec.hasPt ? 'left-4' : 'left-0.5'
-                            }`} />
-                          </button>
+                          <input
+                            type="checkbox"
+                            checked={rec.hasPt}
+                            onChange={(e) => handleToggleFlag(rec.id, 'hasPt', e.target.checked)}
+                            title={rec.hasPt ? 'PT applied — uncheck to disable' : 'PT disabled — check to enable'}
+                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                          />
                         ) : (
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                             rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
@@ -1332,13 +1320,15 @@ const SalaryEngine: React.FC = () => {
 // ─── Employee Salary Slip View ────────────────────────────────────────────────
 
 const EmployeePayrollView: React.FC = () => {
+  const { currentUser } = useVariPoints();
+  const empId = currentUser?.id ?? 'VAR-003';
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<PayrollRecord | null>(null);
 
   useEffect(() => {
-    getPayrollRecords(LOGGED_IN_EMP).then(data => { setRecords(data); setLoading(false); });
-  }, []);
+    getPayrollRecords(empId).then(data => { setRecords(data); setLoading(false); });
+  }, [empId]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">

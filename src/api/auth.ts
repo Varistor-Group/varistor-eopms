@@ -83,6 +83,7 @@ export async function mockLogin(email: string, password: string): Promise<{ user
   };
 }
 
+
 // ─── Sign Out ─────────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
