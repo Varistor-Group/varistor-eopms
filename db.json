@@ -1,4 +1,11 @@
 {
+  "employee_cl_balances": {
+    "VAR-024": { "total": 12, "used": 0 },
+    "VAR-001": { "total": 12, "used": 0 },
+    "VAR-002": { "total": 12, "used": 0 },
+    "213":    { "total": 12, "used": 0 },
+    "2131":   { "total": 12, "used": 0 }
+  },
   "employees": [
     {
       "id": "VAR-024",

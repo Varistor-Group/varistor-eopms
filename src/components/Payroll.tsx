@@ -17,11 +17,16 @@ import {
   applyFormulaToAll,
   payrollAuditLog,
   sendBulkSlips,
+  releaseSlips,
+  fetchAllClBalances,
+  updateClBalance,
+  computeLopDays,
   numberToWords,
   computeNet,
   type PayrollRecord,
   type SlipRow,
-  type BulkSendResult
+  type BulkSendResult,
+  type ClBalance
 } from '../api/payroll';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
@@ -568,6 +573,15 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       setProgress(100);
       setSendResult(result);
       setStep('done');
+
+      // Mark slips as released so employees can now view them
+      const sentEmployeeIds = rows
+        .filter(r => !result.failed.find(f => f.email === r.email))
+        .map(r => r.employeeId)
+        .filter((id): id is string => !!id);
+      if (sentEmployeeIds.length > 0) {
+        await releaseSlips(sentEmployeeIds);
+      }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       clearInterval(interval);
@@ -846,6 +860,7 @@ const FORMULAS = [
   { component: 'PF Employee', formula: '= 1800 if basic >= 15000 else round(basic * 12%)', auto: true },
   { component: 'ESI', formula: '= 0 if monthly_ctc > 21000 else ceil(gross * 3.25%)', auto: true },
   { component: 'PT', formula: '= 200 if gross >= 15001 else 0', auto: true },
+  { component: 'LOP Deduction', formula: '= (used_cl - cl_total) * (monthly_salary / total_days) if used > total else 0', auto: true },
 ];
 
 const SalaryEngine: React.FC = () => {
@@ -863,11 +878,17 @@ const SalaryEngine: React.FC = () => {
   const [sortField, setSortField] = useState<keyof PayrollRecord>('employeeName');
   const [sortAsc, setSortAsc] = useState(true);
   const [filterDept, setFilterDept] = useState('All');
+  /** CL balances map: employeeId -> { total, used } */
+  const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await getPayrollRecords();
+    const [data, balances] = await Promise.all([
+      getPayrollRecords(),
+      fetchAllClBalances(),
+    ]);
     setRecords(data);
+    setClBalances(balances);
     setLoading(false);
   }, []);
 
@@ -908,9 +929,21 @@ const SalaryEngine: React.FC = () => {
 
   const handleCTCChange = async (id: string, value: string) => {
     const ctc = parseInt(value.replace(/,/g, ''), 10);
-    if (isNaN(ctc)) return;
+    if (isNaN(ctc) || ctc <= 0) return;
     const updated = await updatePayrollRecord(id, { ctc });
     if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+  };
+
+  const handleToggleFlag = async (id: string, flag: 'hasPf' | 'hasEsi' | 'hasPt', value: boolean) => {
+    const updated = await updatePayrollRecord(id, { [flag]: value });
+    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+  };
+
+  const handleCLBalanceChange = async (employeeId: string, value: string) => {
+    const total = parseInt(value, 10);
+    if (isNaN(total) || total < 0) return;
+    const updated = await updateClBalance(employeeId, total);
+    setClBalances(prev => ({ ...prev, [employeeId]: updated }));
   };
 
   const handleApprove = async () => {
@@ -925,6 +958,9 @@ const SalaryEngine: React.FC = () => {
 
   const handleApplyAll = async () => {
     setApplyingAll(true);
+    // Apply formulas to each record individually so LOP days are included
+    const balances = await fetchAllClBalances();
+    setClBalances(balances);
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
@@ -1107,11 +1143,14 @@ const SalaryEngine: React.FC = () => {
                     { key: 'employeeName', label: 'Employee' },
                     { key: 'department', label: 'Dept' },
                     { key: 'ctc', label: 'Monthly CTC' },
+                    { key: null, label: 'CL Balance' },
+                    { key: null, label: 'LOP' },
                     { key: null, label: 'Basic' },
                     { key: null, label: 'HRA' },
+                    { key: null, label: 'Net Pay' },
                     { key: null, label: 'PF' },
-                    { key: null, label: 'TDS' },
-                    { key: 'netPay', label: 'Net Pay' },
+                    { key: null, label: 'ESI' },
+                    { key: null, label: 'PT' },
                     { key: 'status', label: 'Status' },
                     { key: null, label: 'Actions' },
                   ].map((col, i) => (
@@ -1132,6 +1171,8 @@ const SalaryEngine: React.FC = () => {
                 {visible.map(rec => {
                   const isSelected = selectedIds.has(rec.id);
                   const isApproved = rec.status === 'approved';
+                  const clBal = clBalances[rec.employeeId] ?? { total: 12, used: 0 };
+                  const lopDays = computeLopDays(clBal);
                   return (
                     <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
                       <td className="px-4 py-3">
@@ -1148,6 +1189,7 @@ const SalaryEngine: React.FC = () => {
                         <div className="text-[11px] text-varistor-muted">{rec.employeeId}</div>
                       </td>
                       <td className="px-4 py-3 text-varistor-muted">{rec.department}</td>
+                      {/* Monthly CTC */}
                       <td className="px-4 py-3">
                         {isAdmin && !isApproved ? (
                           <input
@@ -1160,10 +1202,98 @@ const SalaryEngine: React.FC = () => {
                           <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
                         )}
                       </td>
-                      {(['basic', 'hra', 'pfEmployee', 'tds'] as const).map(f => (
+                      {/* CL Balance */}
+                      <td className="px-4 py-3">
+                        {isAdmin ? (
+                          <div className="flex flex-col gap-0.5">
+                            <input
+                              type="number"
+                              defaultValue={clBal.total}
+                              onBlur={e => handleCLBalanceChange(rec.employeeId, e.target.value)}
+                              min={0}
+                              className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                              title="Total CL days entitlement"
+                            />
+                            <span className="text-[10px] text-varistor-muted">{clBal.used} used</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-mono">{clBal.total - clBal.used} / {clBal.total}</span>
+                        )}
+                      </td>
+                      {/* LOP Days */}
+                      <td className="px-4 py-3 text-center">
+                        {lopDays > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[11px] font-bold rounded border border-red-200">
+                            -{lopDays}d
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-300">—</span>
+                        )}
+                      </td>
+                      {(['basic', 'hra'] as const).map(f => (
                         <td key={f} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.components[f])}</td>
                       ))}
-                      <td className="px-4 py-3"><span className="font-bold text-varistor-limeText tabular-nums">{fmt(rec.netPay)}</span></td>
+                      <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
+                      {/* PF toggle */}
+                      <td className="px-4 py-3 text-center">
+                        {isAdmin && !isApproved ? (
+                          <button
+                            onClick={() => handleToggleFlag(rec.id, 'hasPf', !rec.hasPf)}
+                            title={rec.hasPf ? 'PF applied — click to disable' : 'PF disabled — click to enable'}
+                            className={`w-8 h-4 rounded-full transition-colors relative ${
+                              rec.hasPf ? 'bg-varistor-lime' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
+                              rec.hasPf ? 'left-4' : 'left-0.5'
+                            }`} />
+                          </button>
+                        ) : (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                          }`}>{rec.hasPf ? 'On' : 'Off'}</span>
+                        )}
+                      </td>
+                      {/* ESI toggle */}
+                      <td className="px-4 py-3 text-center">
+                        {isAdmin && !isApproved ? (
+                          <button
+                            onClick={() => handleToggleFlag(rec.id, 'hasEsi', !rec.hasEsi)}
+                            title={rec.hasEsi ? 'ESI applied — click to disable' : 'ESI disabled — click to enable'}
+                            className={`w-8 h-4 rounded-full transition-colors relative ${
+                              rec.hasEsi ? 'bg-varistor-lime' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
+                              rec.hasEsi ? 'left-4' : 'left-0.5'
+                            }`} />
+                          </button>
+                        ) : (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                          }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
+                        )}
+                      </td>
+                      {/* PT toggle */}
+                      <td className="px-4 py-3 text-center">
+                        {isAdmin && !isApproved ? (
+                          <button
+                            onClick={() => handleToggleFlag(rec.id, 'hasPt', !rec.hasPt)}
+                            title={rec.hasPt ? 'PT applied — click to disable' : 'PT disabled — click to enable'}
+                            className={`w-8 h-4 rounded-full transition-colors relative ${
+                              rec.hasPt ? 'bg-varistor-lime' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${
+                              rec.hasPt ? 'left-4' : 'left-0.5'
+                            }`} />
+                          </button>
+                        ) : (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                          }`}>{rec.hasPt ? 'On' : 'Off'}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {isApproved ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-varistor-limeTint text-varistor-limeText text-[11px] font-semibold rounded-full">
@@ -1217,7 +1347,10 @@ const EmployeePayrollView: React.FC = () => {
     </div>
   );
 
-  const rec = records[0];
+  // Only show slips that HR has released
+  const releasedRecords = records.filter(r => r.slipReleased);
+  const hasUnreleased = records.length > 0 && releasedRecords.length === 0;
+  const rec = releasedRecords[0];
 
   return (
     <div className="max-w-2xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
@@ -1229,12 +1362,28 @@ const EmployeePayrollView: React.FC = () => {
         <p className="text-sm text-varistor-muted mt-0.5">Read-only · Showing your slips only · {MONTH}</p>
       </div>
 
-      {!rec ? (
+      {/* Current month not released yet */}
+      {hasUnreleased && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-varistor p-6 mb-5 flex items-start gap-4">
+          <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Clock size={20} className="text-yellow-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-yellow-800 text-sm">Salary slip not yet released</p>
+            <p className="text-xs text-yellow-700 mt-0.5">
+              Your salary slip for <span className="font-semibold">{MONTH}</span> has been processed but not yet dispatched by HR.
+              You will receive an email once it is released.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!rec && !hasUnreleased ? (
         <div className="bg-white rounded-varistor border border-varistor-border p-10 text-center shadow-varistor">
           <AlertCircle size={32} className="text-varistor-muted mx-auto mb-3" />
           <p className="text-sm text-varistor-muted">No payroll records found for your account.</p>
         </div>
-      ) : (
+      ) : rec ? (
         <>
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 mb-5">
             <div className="flex items-start justify-between mb-4">
@@ -1267,9 +1416,9 @@ const EmployeePayrollView: React.FC = () => {
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
             <div className="px-5 py-4 border-b border-varistor-border flex items-center justify-between">
               <p className="font-semibold text-varistor-dark text-sm">Available Slips</p>
-              <span className="text-xs text-varistor-muted">{records.length} slip{records.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-varistor-muted">{releasedRecords.length} slip{releasedRecords.length !== 1 ? 's' : ''}</span>
             </div>
-            {records.map(r => (
+            {releasedRecords.map(r => (
               <div key={r.id} className="flex items-center justify-between px-5 py-4 border-b border-varistor-border last:border-0 hover:bg-varistor-pageBg transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-varistor-limeLight rounded-lg flex items-center justify-center">
@@ -1291,7 +1440,7 @@ const EmployeePayrollView: React.FC = () => {
           </div>
           <p className="text-[11px] text-varistor-muted text-center mt-4">✉ Slip auto-mailed on 15th of each month · 10:00 IST via cron + Resend</p>
         </>
-      )}
+      ) : null}
     </div>
   );
 };

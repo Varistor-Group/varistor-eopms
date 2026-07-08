@@ -759,6 +759,44 @@ app.post('/api/payroll/send-slips', async (req, res) => {
   }
 });
 
+// ── CL Balance Routes ─────────────────────────────────────────────────────────
+
+// GET all CL balances (HR view)
+app.get('/api/cl-balances', async (req, res) => {
+  const db = await readDB();
+  res.json(db.employee_cl_balances || {});
+});
+
+// GET one employee's CL balance
+app.get('/api/cl-balances/:employeeId', async (req, res) => {
+  const db = await readDB();
+  const balances = db.employee_cl_balances || {};
+  const bal = balances[req.params.employeeId];
+  if (!bal) {
+    return res.json({ total: 12, used: 0 }); // default
+  }
+  res.json(bal);
+});
+
+// PUT — HR sets total CL days for an employee
+app.put('/api/cl-balances/:employeeId', async (req, res) => {
+  try {
+    const db = await readDB();
+    if (!db.employee_cl_balances) db.employee_cl_balances = {};
+    const empId = req.params.employeeId;
+    const existing = db.employee_cl_balances[empId] || { total: 12, used: 0 };
+    const newTotal = parseInt(req.body.total, 10);
+    if (isNaN(newTotal) || newTotal < 0) {
+      return res.status(400).json({ success: false, error: 'Invalid total value.' });
+    }
+    db.employee_cl_balances[empId] = { ...existing, total: newTotal };
+    await writeDB(db);
+    res.json({ success: true, balance: db.employee_cl_balances[empId] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Leaves Routes
 app.get('/api/leaves', async (req, res) => {
   const db = await readDB();
@@ -767,11 +805,18 @@ app.get('/api/leaves', async (req, res) => {
 
 app.post('/api/leaves', async (req, res) => {
   try {
+    // Enforce mandatory reason
+    const reason = (req.body.reason || '').trim();
+    if (!reason || reason.length < 10) {
+      return res.status(400).json({ success: false, error: 'A reason of at least 10 characters is required.' });
+    }
+
     const db = await readDB();
     if (!db.leaves) db.leaves = [];
     const newLeave = {
       id: 'leave-' + Date.now().toString(),
       ...req.body,
+      reason,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
@@ -802,15 +847,37 @@ app.put('/api/leaves/:id', async (req, res) => {
     if (index === -1) {
       return res.status(404).json({ success: false, error: 'Leave request not found.' });
     }
-    db.leaves[index].status = req.body.status;
+
+    const leave = db.leaves[index];
+    const prevStatus = leave.status;
+    const newStatus = req.body.status;
+    db.leaves[index].status = newStatus;
+
+    // Track CL used in employee_cl_balances when Casual Leave is approved/unapproved
+    if (leave.type === 'Casual Leave' || leave.type === 'Casual') {
+      if (!db.employee_cl_balances) db.employee_cl_balances = {};
+      const empId = leave.employeeId;
+      if (!db.employee_cl_balances[empId]) {
+        db.employee_cl_balances[empId] = { total: 12, used: 0 };
+      }
+      const days = parseInt(leave.days, 10) || 0;
+      // Approving: increment used
+      if (newStatus === 'Approved' && prevStatus !== 'Approved') {
+        db.employee_cl_balances[empId].used = (db.employee_cl_balances[empId].used || 0) + days;
+      }
+      // Revoking approval (e.g. back to Pending or Rejected): decrement used
+      if (prevStatus === 'Approved' && newStatus !== 'Approved') {
+        db.employee_cl_balances[empId].used = Math.max(0, (db.employee_cl_balances[empId].used || 0) - days);
+      }
+    }
 
     // Log activity
     if (!db.activity_log) db.activity_log = [];
     db.activity_log.push({
       id: Date.now().toString(),
-      action: `LEAVE_${req.body.status.toUpperCase()}`,
+      action: `LEAVE_${newStatus.toUpperCase()}`,
       by: 'hr@varistor.in',
-      details: `${req.body.status} leave request for ${db.leaves[index].employeeName}`,
+      details: `${newStatus} leave request for ${db.leaves[index].employeeName}`,
       timestamp: new Date().toISOString()
     });
 

@@ -53,6 +53,14 @@ export interface PayrollRecord {
   clBalance: number;
   pfUan: string;
   monthlySalary: number;
+  /** Whether PF deduction applies to this employee (default true) */
+  hasPf: boolean;
+  /** Whether ESI deduction applies to this employee (default true) */
+  hasEsi: boolean;
+  /** Whether PT deduction applies to this employee (default true) */
+  hasPt: boolean;
+  /** True once HR has dispatched this slip — makes it visible to the employee */
+  slipReleased: boolean;
 }
 
 export interface PayrollAuditEntry {
@@ -151,7 +159,14 @@ export function computeNet(params: {
   overtime?: number;
   tds?: number;
   otherDeductions?: number;
-  monthlyCtc?: number;
+  /** Number of Loss-of-Pay days to deduct (excess over CL entitlement) */
+  lopDays?: number;
+  /** Whether PF deduction applies (default true) */
+  hasPf?: boolean;
+  /** Whether ESI deduction applies (default true) */
+  hasEsi?: boolean;
+  /** Whether PT deduction applies (default true) */
+  hasPt?: boolean;
 }) {
   const totalDays = params.totalDays ?? 30;
   const payDays = params.payDays ?? 30;
@@ -169,15 +184,27 @@ export function computeNet(params: {
   const basic = Math.round(prorata * 0.5);
   const hra = Math.round(basic * 0.5);
   const specialAllowance = prorata - (basic + hra + medical + ta + lta);
-  const pfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
-  const pfEmployer = pfEmployee; // matches PF Employee
+  const hasPf = params.hasPf !== false;
+  const hasEsi = params.hasEsi !== false;
+  const hasPt = params.hasPt !== false;
+
+  const rawPfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
+  const pfEmployee = hasPf ? rawPfEmployee : 0;
+  const pfEmployer = hasPf ? rawPfEmployee : 0;
 
   const gross = prorata;
   const monthlyCtc = params.monthlyCtc ?? monthlySalary;
-  const esi = monthlyCtc > 21000 ? 0 : Math.ceil(gross * 0.0325);
-  const pt = gross >= 15001 ? 200 : 0;
+  const rawEsi = monthlyCtc > 21000 ? 0 : Math.ceil(gross * 0.0325);
+  const esi = hasEsi ? rawEsi : 0;
+  const rawPt = gross >= 15001 ? 200 : 0;
+  const pt = hasPt ? rawPt : 0;
 
-  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  // LOP deduction: each excess leave day = dailyRate
+  const lopDays = Math.max(0, params.lopDays ?? 0);
+  const dailyRate = Math.round(monthlySalary / totalDays);
+  const lopDeduction = lopDays * dailyRate;
+
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions + lopDeduction;
   const netPay = gross - totalDeductions + reimbursement + incentives + overtime;
 
   return {
@@ -201,6 +228,8 @@ export function computeNet(params: {
     reimbursement,
     incentives,
     overtime,
+    lopDays,
+    lopDeduction,
     netPay,
     gross
   };
@@ -247,6 +276,10 @@ function seedRecords(): PayrollRecord[] {
       payDays: 30,
       clBalance: 0,
       pfUan: '101234567890',
+      hasPf: true,
+      hasEsi: true,
+      hasPt: true,
+      slipReleased: false, // must be explicitly dispatched by HR
       components: {
         basic: comp.basic,
         hra: comp.hra,
@@ -302,7 +335,18 @@ export async function updatePayrollRecord(
   if (rec.status === 'approved') return null; // Locked
 
   const updated: PayrollRecord = { ...rec, ...patch };
-  if (patch.autoFormula || (patch.monthlySalary !== undefined && updated.autoFormula) || (patch.ctc !== undefined && updated.autoFormula) || (patch.payDays !== undefined && updated.autoFormula) || (patch.totalDays !== undefined && updated.autoFormula)) {
+  const needsRecompute =
+    patch.autoFormula ||
+    (updated.autoFormula && (
+      patch.monthlySalary !== undefined ||
+      patch.ctc !== undefined ||
+      patch.payDays !== undefined ||
+      patch.totalDays !== undefined ||
+      patch.hasPf !== undefined ||
+      patch.hasEsi !== undefined ||
+      patch.hasPt !== undefined
+    ));
+  if (needsRecompute) {
     if (patch.ctc !== undefined) {
       updated.monthlySalary = patch.ctc;
     } else if (patch.monthlySalary !== undefined) {
@@ -320,6 +364,9 @@ export async function updatePayrollRecord(
       overtime: updated.components.overtime,
       tds: updated.components.tds,
       otherDeductions: updated.components.otherDeductions,
+      hasPf: updated.hasPf,
+      hasEsi: updated.hasEsi,
+      hasPt: updated.hasPt,
     });
     updated.components = {
       basic: comp.basic,
@@ -442,8 +489,69 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
   });
 }
 
+/**
+ * Marks slips as released so employees can view them.
+ * Called after HR successfully dispatches bulk salary slips.
+ * Accepts either employeeIds or payroll record ids.
+ */
+export async function releaseSlips(employeeIds: string[]): Promise<void> {
+  await delay(50);
+  _records = _records.map(r =>
+    employeeIds.includes(r.employeeId) ? { ...r, slipReleased: true } : r
+  );
+}
+
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─── CL Balance helpers ────────────────────────────────────────────────────────
+
+export interface ClBalance {
+  total: number;
+  used: number;
+}
+
+/** Fetch one employee's CL balance from the server */
+export async function fetchClBalance(employeeId: string): Promise<ClBalance> {
+  try {
+    const res = await fetch(`/api/cl-balances/${employeeId}`);
+    if (!res.ok) return { total: 12, used: 0 };
+    return res.json();
+  } catch {
+    return { total: 12, used: 0 };
+  }
+}
+
+/** Fetch all CL balances (HR view) */
+export async function fetchAllClBalances(): Promise<Record<string, ClBalance>> {
+  try {
+    const res = await fetch('/api/cl-balances');
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
+}
+
+/** Update an employee's CL total via the server */
+export async function updateClBalance(employeeId: string, total: number): Promise<ClBalance> {
+  const res = await fetch(`/api/cl-balances/${employeeId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ total }),
+  });
+  if (!res.ok) throw new Error('Failed to update CL balance');
+  const data = await res.json();
+  return data.balance;
+}
+
+/**
+ * Given an employee's CL balance and approved leave records for the month,
+ * returns how many excess (LOP) days they have.
+ */
+export function computeLopDays(clBalance: ClBalance): number {
+  return Math.max(0, clBalance.used - clBalance.total);
 }
 
 // ─── Bulk Slip Email types & API ─────────────────────────────────────────────
