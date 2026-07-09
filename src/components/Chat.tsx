@@ -46,7 +46,10 @@ function renderMessageText(text: string) {
 }
 
 export const Chat: React.FC = () => {
-  const { currentRole } = useVariPoints();
+  const { currentRole, currentUser } = useVariPoints();
+  const selfName = currentUser?.name ?? 'You';
+  const selfRole = currentRole;
+  const selfAvatar = currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selfName)}&background=84CC16&color=fff&size=80&bold=true`;
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
   const canManageChannels = currentRole === 'Admin';
   const [channels, setChannels] = useState<ChatChannel[]>(() => chatApi.getChannels());
@@ -72,7 +75,7 @@ export const Chat: React.FC = () => {
 
   const loadChannelMessages = async (channelId: ChannelId) => {
     setIsLoading(true);
-    const data = await chatApi.fetchMessages(channelId);
+    const data = await chatApi.fetchMessages(channelId, selfName);
     setMessages(data);
     setIsLoading(false);
     chatApi.markChannelRead(channelId);
@@ -112,8 +115,13 @@ export const Chat: React.FC = () => {
     const text = draft.trim();
     if (!text && !pendingAttachment) return;
 
-    const message = await chatApi.sendMessage(activeChannelId, text || undefined, pendingAttachment ?? undefined);
-    setMessages(prev => [...prev, message]);
+    const message = await chatApi.sendMessage(
+      activeChannelId,
+      text || undefined,
+      pendingAttachment ?? undefined,
+      { name: selfName, role: selfRole, avatarUrl: selfAvatar, selfName }
+    );
+    setMessages(prev => [...prev, { ...message, isSelf: true }]);
     setDraft('');
     setPendingAttachment(null);
     setShowEmojiPicker(false);

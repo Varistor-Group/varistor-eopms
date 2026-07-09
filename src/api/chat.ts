@@ -94,20 +94,28 @@ export const chatApi = {
     return buildChannels();
   },
 
-  async fetchMessages(channelId: ChannelId): Promise<ChatMessage[]> {
+  async fetchMessages(channelId: ChannelId, selfName?: string): Promise<ChatMessage[]> {
     await delay();
+    const resolvedSelfName = selfName ?? SELF_NAME;
     return loadMessages()
       .filter(m => m.channelId === channelId)
+      .map(m => ({ ...m, isSelf: m.authorName === resolvedSelfName }))
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   },
 
-  async sendMessage(channelId: ChannelId, text?: string, attachment?: { name: string; size: string; type?: string; dataUrl?: string }): Promise<ChatMessage> {
+  async sendMessage(
+    channelId: ChannelId,
+    text?: string,
+    attachment?: { name: string; size: string; type?: string; dataUrl?: string },
+    sender?: { name: string; role: string; avatarUrl: string; selfName: string }
+  ): Promise<ChatMessage> {
+    const resolvedSender = sender ?? { name: SELF_NAME, role: 'Operations', avatarUrl: SELF_AVATAR, selfName: SELF_NAME };
     const message: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       channelId,
-      authorName: SELF_NAME,
-      authorRole: 'Operations',
-      authorAvatar: SELF_AVATAR,
+      authorName: resolvedSender.name,
+      authorRole: resolvedSender.role,
+      authorAvatar: resolvedSender.avatarUrl,
       isSelf: true,
       text,
       attachment,

@@ -1104,7 +1104,9 @@ const MOCK_EMPLOYEE_NAMES = {
   app.post('/api/attendance/export-pdf', (req, res) => {
     try {
       const { rows = [], month = 'Report', type = 'monthly' } = req.body;
-      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+
+      // ── Page setup: A4 landscape for more column space ──────────────────────
+      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
       const bufs = [];
       doc.on('data', d => bufs.push(d));
       doc.on('end', () => {
@@ -1114,59 +1116,130 @@ const MOCK_EMPLOYEE_NAMES = {
         res.send(pdfBuffer);
       });
 
-      // Header
-      doc.fontSize(18).fillColor('#111111').text(`Varistor EOPMS — Attendance Report`, { align: 'center' });
-      doc.fontSize(11).fillColor('#868e80').text(`Month: ${month} · Generated: ${new Date().toLocaleDateString('en-IN')}`, { align: 'center' });
-      doc.moveDown(1);
+      const pageW = doc.page.width;
+      const marginL = doc.page.margins.left;
+      const usableW = pageW - marginL - doc.page.margins.right;
 
-      // Table header
+      // ── Header ──────────────────────────────────────────────────────────────
+      doc.rect(marginL, 36, usableW, 32).fill('#84CC16');
+      doc.fillColor('#1a2e05').fontSize(15).font('Helvetica-Bold')
+        .text('Varistor EOPMS — Attendance Report', marginL + 10, 45, { lineBreak: false });
+      const subtitle = `${type === 'monthly' ? 'Monthly' : 'Daily'}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`;
+      doc.fillColor('#1a2e05').fontSize(9).font('Helvetica')
+        .text(subtitle, 0, 49, { align: 'right', lineBreak: false });
+
+      doc.y = 36 + 32 + 10; // below header bar
+
+      // ── Column definitions ───────────────────────────────────────────────────
       const cols = type === 'monthly'
-        ? ['Employee', 'Dept', 'Present', 'Leaves', 'W.O', 'Holidays', 'Total Hrs', 'Payable Days']
-        : ['Employee', 'Dept', 'Date', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status'];
-      const colWidths = type === 'monthly'
-        ? [110, 80, 45, 45, 40, 50, 55, 65]
-        : [110, 85, 65, 75, 75, 55, 50];
+        ? [
+            { label: 'Emp ID',      key: 'employee_id',   w: 60 },
+            { label: 'Employee',    key: 'employeeName',  w: 140 },
+            { label: 'Dept',        key: 'department',    w: 90  },
+            { label: 'Present',     key: 'present',       w: 52  },
+            { label: 'Leaves',      key: 'leaves',        w: 48  },
+            { label: 'W.O',         key: 'weekOff',       w: 40  },
+            { label: 'Holidays',    key: 'holidays',      w: 52  },
+            { label: 'Half-day',    key: 'halfDay',       w: 52  },
+            { label: 'Absent',      key: 'absent',        w: 48  },
+            { label: 'Total Hrs',   key: 'totalHrs',      w: 58  },
+            { label: 'Payable Days',key: 'payableDays',   w: 70  },
+          ]
+        : [
+            { label: 'Emp ID',      key: 'employee_id',   w: 60  },
+            { label: 'Employee',    key: 'employeeName',  w: 150 },
+            { label: 'Dept',        key: 'department',    w: 100 },
+            { label: 'Date',        key: 'date',          w: 75  },
+            { label: 'Punch IN',    key: 'punch_in',      w: 80  },
+            { label: 'Punch OUT',   key: 'punch_out',     w: 80  },
+            { label: 'Work Hrs',    key: 'work_hours',    w: 60  },
+            { label: 'Status',      key: 'status',        w: 65  },
+          ];
 
-      const rowH = 20;
+      // Scale widths to fill exact usable width
+      const totalW = cols.reduce((s, c) => s + c.w, 0);
+      const scale = usableW / totalW;
+      cols.forEach(c => { c.w = Math.floor(c.w * scale); });
 
-      // Draw header row
-      const headerY = doc.y;
-      doc.rect(doc.page.margins.left, headerY, doc.page.width - 80, rowH).fill('#84CC16');
-      doc.fillColor('#111111').fontSize(9);
-      
-      let currentX = doc.page.margins.left;
-      cols.forEach((col, i) => {
-        doc.text(col, currentX + 4, headerY + 5, { width: colWidths[i], lineBreak: false });
-        currentX += colWidths[i];
-      });
-      doc.y = headerY + rowH; // reset doc.y to the bottom of the header row
-      doc.moveDown(0.2);
+      const rowH = 18;
 
-      // Data rows — 25 per page
-      rows.forEach((row, idx) => {
-        if (idx > 0 && idx % 25 === 0) {
-          doc.addPage();
+      function drawRow(y, values, isBg, isHeader) {
+        // Row background
+        if (isHeader) {
+          doc.rect(marginL, y, usableW, rowH).fill('#2d5a00');
+        } else if (isBg) {
+          doc.rect(marginL, y, usableW, rowH).fill('#f0fce4');
+        } else {
+          doc.rect(marginL, y, usableW, rowH).fill('#ffffff');
         }
-        const rowY = doc.y;
-        if (idx % 2 === 0) {
-          doc.rect(doc.page.margins.left, rowY, doc.page.width - 80, rowH).fill('#f7fee7');
-        }
-        
-        doc.fillColor('#111111').fontSize(8);
-        
-        const values = type === 'monthly'
-          ? [row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.totalHrs, row.payableDays]
-          : [row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
-          
-        let cellX = doc.page.margins.left;
+
+        // Cell text + vertical dividers
+        let x = marginL;
         values.forEach((val, i) => {
-          doc.text(String(val ?? ''), cellX + 4, rowY + 5, { width: colWidths[i], lineBreak: false });
-          cellX += colWidths[i];
+          const w = cols[i].w;
+          const str = String(val ?? '');
+
+          doc
+            .fillColor(isHeader ? '#ffffff' : '#111111')
+            .fontSize(isHeader ? 8 : 7.5)
+            .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
+            .text(str, x + 4, y + (rowH - 8) / 2, {
+              width: w - 8,
+              lineBreak: false,
+              ellipsis: true,
+            });
+
+          // Vertical separator (except after last col)
+          if (i < values.length - 1) {
+            doc.strokeColor(isHeader ? '#4d8a00' : '#d0e8b8')
+              .lineWidth(0.4)
+              .moveTo(x + w, y).lineTo(x + w, y + rowH).stroke();
+          }
+          x += w;
         });
-        
-        doc.y = rowY + rowH; // reset doc.y to exactly below this row
-        doc.moveDown(0.2);
+
+        // Bottom border for each row
+        doc.strokeColor(isHeader ? '#1a4000' : '#c5e0a0')
+          .lineWidth(0.4)
+          .moveTo(marginL, y + rowH).lineTo(marginL + usableW, y + rowH).stroke();
+      }
+
+      // ── Column header ────────────────────────────────────────────────────────
+      const headerY = doc.y;
+      drawRow(headerY, cols.map(c => c.label), false, true);
+      doc.y = headerY + rowH;
+
+      // ── Data rows ────────────────────────────────────────────────────────────
+      let pageRowCount = 0;
+      const rowsPerPage = Math.floor((doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 80) / rowH);
+
+      rows.forEach((row, idx) => {
+        if (pageRowCount > 0 && pageRowCount % rowsPerPage === 0) {
+          // Footer on current page
+          doc.fontSize(7).fillColor('#888888').font('Helvetica')
+            .text(`Page ${Math.ceil(idx / rowsPerPage)}`, 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+          doc.addPage();
+          // Reprint column headers on new page
+          const newHeaderY = doc.page.margins.top;
+          doc.y = newHeaderY;
+          drawRow(newHeaderY, cols.map(c => c.label), false, true);
+          doc.y = newHeaderY + rowH;
+          pageRowCount = 0;
+        }
+
+        const rowY = doc.y;
+        const values = type === 'monthly'
+          ? [row.employee_id || '', row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.halfDay ?? 0, row.absent, row.totalHrs, row.payableDays]
+          : [row.employee_id || '', row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+
+        drawRow(rowY, values, idx % 2 === 1, false);
+        doc.y = rowY + rowH;
+        pageRowCount++;
       });
+
+      // Footer on last page
+      doc.fontSize(7).fillColor('#888888').font('Helvetica')
+        .text('Varistor EOPMS — Confidential', 0, doc.page.height - 30, { align: 'center', lineBreak: false });
 
       doc.end();
     } catch (err) {
