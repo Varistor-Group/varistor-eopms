@@ -1124,35 +1124,47 @@ const MOCK_EMPLOYEE_NAMES = {
         ? ['Employee', 'Dept', 'Present', 'Leaves', 'W.O', 'Holidays', 'Total Hrs', 'Payable Days']
         : ['Employee', 'Dept', 'Date', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status'];
       const colWidths = type === 'monthly'
-        ? [110, 90, 50, 50, 45, 60, 60, 60]
-        : [110, 90, 65, 80, 80, 55, 55];
+        ? [110, 80, 45, 45, 40, 50, 55, 65]
+        : [110, 85, 65, 75, 75, 55, 50];
 
-      let x = doc.page.margins.left;
       const rowH = 20;
 
-      // Header row
-      doc.rect(x, doc.y, doc.page.width - 80, rowH).fill('#84CC16');
+      // Draw header row
+      const headerY = doc.y;
+      doc.rect(doc.page.margins.left, headerY, doc.page.width - 80, rowH).fill('#84CC16');
       doc.fillColor('#111111').fontSize(9);
+      
+      let currentX = doc.page.margins.left;
       cols.forEach((col, i) => {
-        doc.text(col, x + 4, doc.y - rowH + 5, { width: colWidths[i], lineBreak: false });
-        x += colWidths[i];
+        doc.text(col, currentX + 4, headerY + 5, { width: colWidths[i], lineBreak: false });
+        currentX += colWidths[i];
       });
+      doc.y = headerY + rowH; // reset doc.y to the bottom of the header row
       doc.moveDown(0.2);
 
       // Data rows — 25 per page
       rows.forEach((row, idx) => {
-        if (idx > 0 && idx % 25 === 0) doc.addPage();
-        x = doc.page.margins.left;
-        const y = doc.y;
-        if (idx % 2 === 0) doc.rect(x, y, doc.page.width - 80, rowH).fill('#f7fee7');
+        if (idx > 0 && idx % 25 === 0) {
+          doc.addPage();
+        }
+        const rowY = doc.y;
+        if (idx % 2 === 0) {
+          doc.rect(doc.page.margins.left, rowY, doc.page.width - 80, rowH).fill('#f7fee7');
+        }
+        
         doc.fillColor('#111111').fontSize(8);
+        
         const values = type === 'monthly'
           ? [row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.totalHrs, row.payableDays]
           : [row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+          
+        let cellX = doc.page.margins.left;
         values.forEach((val, i) => {
-          doc.text(String(val ?? ''), x + 4, y + 5, { width: colWidths[i], lineBreak: false });
-          x += colWidths[i];
+          doc.text(String(val ?? ''), cellX + 4, rowY + 5, { width: colWidths[i], lineBreak: false });
+          cellX += colWidths[i];
         });
+        
+        doc.y = rowY + rowH; // reset doc.y to exactly below this row
         doc.moveDown(0.2);
       });
 

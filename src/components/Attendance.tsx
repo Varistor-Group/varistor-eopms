@@ -1030,8 +1030,8 @@ export const Attendance: React.FC = () => {
                     {DAYS.map(d => <div key={d} className="text-center text-[10px] font-bold text-varistor-muted">{d[0]}</div>)}
                   </div>
                   <div className="grid grid-cols-7 gap-1">
-                    {/* Offset: July 2026 starts on Wednesday */}
-                    {[0, 1, 2].map(i => <div key={`off-${i}`} />)}
+                    {/* Offset: July 2026 starts on Wednesday (so Mon & Tue are empty) */}
+                    {[0, 1].map(i => <div key={`off-${i}`} />)}
                     {Array.from({ length: 31 }, (_, i) => {
                       const d = new Date(2026, 6, i + 1);
                       const dow = d.getDay();
