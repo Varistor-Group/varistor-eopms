@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -930,6 +930,12 @@ export type Database = {
       }
       current_employee_id: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
+      delete_employee_with_auth: {
+        Args: {
+          p_employee_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

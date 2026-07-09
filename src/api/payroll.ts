@@ -149,6 +149,7 @@ export function numberToWords(num: number): string {
 /** Single source of truth for all payroll calculations. */
 export function computeNet(params: {
   monthlySalary: number;
+  monthlyCtc?: number;
   totalDays?: number;
   payDays?: number;
   medical?: number;
