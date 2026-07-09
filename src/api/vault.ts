@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VAULT SERVICE - Supabase Storage + Database
  * Replaces Express server + local file system.
  * Documents are encrypted client-side before upload, decrypted on download.
@@ -387,6 +387,23 @@ export async function linkDocumentToSlot(
     .from('employee_document_slots')
     .update({ document_id: documentId, status: 'Pending' })
     .eq('id', slotId);
+  if (error) return { success: false, error: error.message };
+  return { success: true, error: null };
+}
+
+/**
+ * When HR changes is_required on a template, propagate to ALL slots derived
+ * from that template (non-custom only, so per-employee overrides are kept).
+ */
+export async function syncTemplateSlotsRequirement(
+  templateId: string,
+  isRequired: boolean
+): Promise<{ success: boolean; error: string | null }> {
+  const { error } = await supabase
+    .from('employee_document_slots')
+    .update({ is_required: isRequired })
+    .eq('template_id', templateId)
+    .eq('is_custom', false);
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
 }

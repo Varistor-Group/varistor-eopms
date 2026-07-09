@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye,
   Settings2, Plus, Trash2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
@@ -20,6 +20,7 @@ import {
   uploadDocument,
   linkDocumentToSlot,
   seedEmployeeSlots,
+  syncTemplateSlotsRequirement,
 } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
@@ -51,11 +52,13 @@ interface TemplateManagerProps {
   onTemplateUpdate: (t: DocumentTemplate) => void;
   onTemplateCreate: (t: DocumentTemplate) => void;
   onTemplateDelete: (id: string) => void;
+  /** Called after Required/Visible toggle so parent can propagate to slot state */
+  onSlotsChanged: (templateId: string, change: { isRequired?: boolean; isActive?: boolean }) => void;
   addToast: (msg: string, pts: number, type: 'credit' | 'debit') => void;
 }
 
 const TemplateManager: React.FC<TemplateManagerProps> = ({
-  templates, onTemplateUpdate, onTemplateCreate, onTemplateDelete, addToast
+  templates, onTemplateUpdate, onTemplateCreate, onTemplateDelete, onSlotsChanged, addToast
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -65,19 +68,39 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   const [actionId, setActionId] = useState<string | null>(null);
 
   const handleToggleRequired = async (tmpl: DocumentTemplate) => {
+    const newRequired = !tmpl.isRequired;
     setActionId(tmpl.id);
-    const res = await updateDocumentTemplate(tmpl.id, { isRequired: !tmpl.isRequired });
+    // 1) Update template record
+    const [tmplRes, syncRes] = await Promise.all([
+      updateDocumentTemplate(tmpl.id, { isRequired: newRequired }),
+      // 2) Propagate to all derived (non-custom) employee slots
+      syncTemplateSlotsRequirement(tmpl.id, newRequired),
+    ]);
     setActionId(null);
-    if (res.success && res.template) { onTemplateUpdate(res.template); addToast(`"${tmpl.name}" marked as ${!tmpl.isRequired ? 'Required' : 'Optional'}`, 0, 'credit'); }
-    else { addToast(res.error ?? 'Update failed', 0, 'debit'); }
+    if (tmplRes.success && tmplRes.template) {
+      onTemplateUpdate(tmplRes.template);
+      // 3) Instantly move slot cards in parent UI
+      onSlotsChanged(tmpl.id, { isRequired: newRequired });
+      addToast(`"${tmpl.name}" marked as ${newRequired ? 'Required' : 'Optional'}`, 0, 'credit');
+    } else {
+      addToast(tmplRes.error ?? 'Update failed', 0, 'debit');
+    }
+    if (!syncRes.success) console.warn('[syncTemplateSlotsRequirement]', syncRes.error);
   };
 
   const handleToggleActive = async (tmpl: DocumentTemplate) => {
+    const newActive = !tmpl.isActive;
     setActionId(tmpl.id);
-    const res = await updateDocumentTemplate(tmpl.id, { isActive: !tmpl.isActive });
+    const res = await updateDocumentTemplate(tmpl.id, { isActive: newActive });
     setActionId(null);
-    if (res.success && res.template) { onTemplateUpdate(res.template); addToast(`"${tmpl.name}" ${!tmpl.isActive ? 'activated' : 'hidden'}`, 0, 'credit'); }
-    else { addToast(res.error ?? 'Update failed', 0, 'debit'); }
+    if (res.success && res.template) {
+      onTemplateUpdate(res.template);
+      // Instantly hide/show the affected slot cards in the employee view
+      onSlotsChanged(tmpl.id, { isActive: newActive });
+      addToast(`"${tmpl.name}" ${newActive ? 'activated' : 'hidden from employees'}`, 0, 'credit');
+    } else {
+      addToast(res.error ?? 'Update failed', 0, 'debit');
+    }
   };
 
   const handleDelete = async (tmpl: DocumentTemplate) => {
@@ -85,8 +108,14 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     setActionId(tmpl.id);
     const res = await deleteDocumentTemplate(tmpl.id);
     setActionId(null);
-    if (res.success) { onTemplateDelete(tmpl.id); addToast(`"${tmpl.name}" removed`, 0, 'debit'); }
-    else { addToast(res.error ?? 'Delete failed', 0, 'debit'); }
+    if (res.success) {
+      onTemplateDelete(tmpl.id);
+      // Hide any slots that were linked to this template
+      onSlotsChanged(tmpl.id, { isActive: false });
+      addToast(`"${tmpl.name}" removed`, 0, 'debit');
+    } else {
+      addToast(res.error ?? 'Delete failed', 0, 'debit');
+    }
   };
 
   const handleAdd = async () => {
@@ -483,6 +512,21 @@ export const DocumentVault: React.FC = () => {
           onTemplateUpdate={updated => setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t))}
           onTemplateCreate={created => setTemplates(prev => [...prev, created])}
           onTemplateDelete={id => setTemplates(prev => prev.filter(t => t.id !== id))}
+          onSlotsChanged={(templateId, change) => {
+            setSlots(prev => prev.map(slot => {
+              if (slot.templateId !== templateId || slot.isCustom) return slot;
+              // Required toggle: flip isRequired on the slot card immediately
+              if (change.isRequired !== undefined) return { ...slot, isRequired: change.isRequired };
+              // Visible/active toggle: mark slot hidden so it drops out of view
+              // We use a sentinel: filter it out entirely when hidden
+              return slot;
+            }).filter(slot => {
+              if (slot.templateId !== templateId || slot.isCustom) return true;
+              // If isActive just turned false, remove from local view
+              if (change.isActive === false) return false;
+              return true;
+            }));
+          }}
           addToast={addToast}
         />
       )}
