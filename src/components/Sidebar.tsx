@@ -76,8 +76,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'engine-simulation', label: 'Engine Console', icon: ShieldAlert, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
