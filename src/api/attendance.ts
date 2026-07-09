@@ -751,3 +751,209 @@ export async function getFieldAttendanceHistory(): Promise<FieldPhotoEntry[]> {
   );
 }
 
+// ─── Yearly Attendance Report ──────────────────────────────────────────────
+
+export type DayCode = 'P' | 'L' | 'A' | 'H' | 'WO' | 'HD' | '-';
+
+export interface DayRecord {
+  date: string;      // YYYY-MM-DD
+  code: DayCode;     // Simplified code for display
+  status: AttendanceStatus;
+  isLeavePaidOut: boolean;  // true = L because leave balance was available; false = should be A
+}
+
+export interface EmployeeYearlyReport {
+  employee_id: string;
+  employeeName: string;
+  department: string;
+  year: string;
+  months: {
+    month: string;       // YYYY-MM
+    monthLabel: string;  // "Jan", "Feb" etc.
+    days: DayRecord[];
+  }[];
+  totals: {
+    present: number;
+    paidLeave: number;
+    unpaidLeave: number;  // Leave days converted to A (balance exhausted)
+    absent: number;
+    holidays: number;
+    weekOff: number;
+    halfDay: number;
+    totalLeaveBalance: number;
+    usedLeaveBalance: number;
+  };
+}
+
+export interface EmployeeYearlySummary {
+  employee_id: string;
+  employeeName: string;
+  department: string;
+  present: number;
+  paidLeave: number;
+  unpaidLeave: number;
+  absent: number;
+  holidays: number;
+  weekOff: number;
+  halfDay: number;
+}
+
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/**
+ * Returns a full-year per-day attendance report for one employee.
+ * Maps Present/Late → P, Holidays → H, W.O → WO, Half-day → HD,
+ * Leave → L if leave balance has capacity, else A (balance exhausted).
+ * Absent → A always.
+ *
+ * leaveBalance structure: { casual: { total, used }, sick: { total, used }, earned: { total, used } }
+ * totalBalance = casual.total + sick.total + earned.total - (casual.used + sick.used + earned.used)
+ */
+export async function getYearlyAttendanceReport(
+  year: string,
+  employeeId: string,
+  leaveBalance?: { casual: { total: number; used: number }; sick: { total: number; used: number }; earned: { total: number; used: number } }
+): Promise<EmployeeYearlyReport> {
+  await delay(300);
+
+  const roster = await fetchAttendanceRoster();
+  const emp = roster.find(e => e.id === employeeId) || roster[0];
+  const empIndex = roster.findIndex(e => e.id === employeeId);
+  const holidayDates = _holidayDates();
+  const today = new Date();
+
+  // Calculate remaining leave balance
+  const totalBalance = leaveBalance
+    ? (leaveBalance.casual.total - leaveBalance.casual.used)
+    + (leaveBalance.sick.total - leaveBalance.sick.used)
+    + (leaveBalance.earned.total - leaveBalance.earned.used)
+    : 12; // default 12 days if no balance provided
+
+  let remainingBalance = totalBalance;
+
+  const months: EmployeeYearlyReport['months'] = [];
+  let totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
+
+  for (let m = 0; m < 12; m++) {
+    const monthStr = `${year}-${String(m + 1).padStart(2, '0')}`;
+    const daysInMonth = new Date(Number(year), m + 1, 0).getDate();
+    const days: DayRecord[] = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dateObj = new Date(date + 'T00:00:00');
+
+      // Future dates
+      if (dateObj > today) {
+        days.push({ date, code: '-', status: 'Present', isLeavePaidOut: false });
+        continue;
+      }
+
+      const entryIdx = empIndex * 100 + d + m * 31;
+      const entry = generateEntryForEmployee(emp, date, entryIdx, holidayDates);
+      const override = _overrides.get(entry.id);
+      const final = override ? { ...entry, ...override } : entry;
+
+      let code: DayCode;
+      let isLeavePaidOut = false;
+
+      switch (final.status) {
+        case 'Present':
+        case 'Late':
+          code = 'P';
+          totals.present++;
+          break;
+        case 'Half-day':
+          code = 'HD';
+          totals.halfDay++;
+          break;
+        case 'Holiday':
+          code = 'H';
+          totals.holidays++;
+          break;
+        case 'W.O':
+          code = 'WO';
+          totals.weekOff++;
+          break;
+        case 'Leave':
+          // Check if leave balance still available
+          if (remainingBalance > 0) {
+            code = 'L';
+            isLeavePaidOut = true;
+            remainingBalance--;
+            totals.paidLeave++;
+          } else {
+            // Balance exhausted — treat as Absent
+            code = 'A';
+            isLeavePaidOut = false;
+            totals.unpaidLeave++;
+          }
+          break;
+        case 'Absent':
+          code = 'A';
+          totals.absent++;
+          break;
+        default:
+          code = '-';
+      }
+
+      days.push({ date, code, status: final.status, isLeavePaidOut });
+    }
+
+    months.push({ month: monthStr, monthLabel: MONTH_LABELS[m], days });
+  }
+
+  totals.usedLeaveBalance = totalBalance - remainingBalance;
+
+  return {
+    employee_id: emp.id,
+    employeeName: emp.name,
+    department: emp.dept,
+    year,
+    months,
+    totals,
+  };
+}
+
+/**
+ * Returns a summary of yearly attendance for all employees (HR overview).
+ */
+export async function getEmployeeYearlySummaries(year: string): Promise<EmployeeYearlySummary[]> {
+  await delay(350);
+  const roster = await fetchAttendanceRoster();
+  const holidayDates = _holidayDates();
+  const today = new Date();
+
+  return roster.map((emp, empIndex) => {
+    let present = 0, paidLeave = 0, unpaidLeave = 0, absent = 0,
+        holidays = 0, weekOff = 0, halfDay = 0, remaining = 12;
+
+    for (let m = 0; m < 12; m++) {
+      const daysInMonth = new Date(Number(year), m + 1, 0).getDate();
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        if (new Date(date + 'T00:00:00') > today) continue;
+        const entryIdx = empIndex * 100 + d + m * 31;
+        const entry = generateEntryForEmployee(emp, date, entryIdx, holidayDates);
+        const override = _overrides.get(entry.id);
+        const final = override ? { ...entry, ...override } : entry;
+
+        switch (final.status) {
+          case 'Present': case 'Late': present++; break;
+          case 'Half-day': halfDay++; break;
+          case 'Holiday': holidays++; break;
+          case 'W.O': weekOff++; break;
+          case 'Leave':
+            if (remaining > 0) { paidLeave++; remaining--; }
+            else { unpaidLeave++; }
+            break;
+          case 'Absent': absent++; break;
+        }
+      }
+    }
+
+    return { employee_id: emp.id, employeeName: emp.name, department: emp.dept, present, paidLeave, unpaidLeave, absent, holidays, weekOff, halfDay };
+  });
+}
+
+

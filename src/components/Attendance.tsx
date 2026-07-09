@@ -42,6 +42,7 @@ import {
   getConfidenceBadgeClass,
   getConfidenceLabel,
 } from '../lib/faceVerification';
+import { YearlyAttendanceReport } from './YearlyAttendanceReport';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -840,6 +841,13 @@ export const Attendance: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Section 4.5: Yearly Attendance Report (HR/Admin) ─────────────── */}
+          {isHR && (
+            <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5">
+              <YearlyAttendanceReport />
             </div>
           )}
 
