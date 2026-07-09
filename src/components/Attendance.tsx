@@ -1035,13 +1035,14 @@ export const Attendance: React.FC = () => {
                     {Array.from({ length: 31 }, (_, i) => {
                       const d = new Date(2026, 6, i + 1);
                       const dow = d.getDay();
-                      const isSun = dow === 0;
+                      const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                      const dowName = dowNames[dow];
                       const isSat = dow === 6;
                       const isHolidayDate = holidays.some(h => h.date === `2026-07-${String(i + 1).padStart(2, '0')}`);
 
                       let bg = 'bg-varistor-limeLight text-varistor-limeText'; // working
                       if (isHolidayDate) bg = 'bg-[#1a0a2e] text-white';
-                      else if (isSun && weekOffDay === 'Sun') bg = 'bg-gray-200 text-gray-400';
+                      else if (dowName === weekOffDay) bg = 'bg-gray-200 text-gray-400';
                       else if (isSat && satHalfDay) bg = 'bg-varistor-lime/30 text-varistor-limeText';
 
                       return (
