@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Link as LinkIcon, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { supabase } from '../lib/supabase';
 
 interface ProfilePictureEditorProps {
   onClose: () => void;
@@ -30,29 +31,65 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
     return () => stopCamera();
   }, [activeTab]);
 
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
   const startCamera = async () => {
     setCameraError('');
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (activeTabRef.current !== 'camera') {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
     } catch (err) {
-      setCameraError('Camera access denied or unavailable.');
+      if (activeTabRef.current === 'camera') {
+        setCameraError('Camera access denied or unavailable.');
+      }
     }
   };
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+    if (videoRef.current && videoRef.current.srcObject) {
+      const mediaStream = videoRef.current.srcObject as MediaStream;
+      mediaStream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
+    setStream(prevStream => {
+      if (prevStream) {
+        prevStream.getTracks().forEach(track => track.stop());
+      }
+      return null;
+    });
   };
 
-  const saveAvatar = (dataUrl: string) => {
+  useEffect(() => {
+    return () => {
+      activeTabRef.current = 'none' as any; // Force stop if unmounted
+      stopCamera();
+    };
+  }, []);
+
+  const saveAvatar = async (dataUrl: string) => {
     if (currentUser && dataUrl.trim()) {
-      setCurrentUser({ ...currentUser, avatarUrl: dataUrl.trim() });
+      const newAvatar = dataUrl.trim();
+      setCurrentUser({ ...currentUser, avatarUrl: newAvatar });
+      
+      // Persist to Supabase
+      try {
+        await supabase
+          .from('employees')
+          .update({ avatar_url: newAvatar })
+          .eq('id', currentUser.id);
+      } catch (err) {
+        console.error('Failed to persist avatar to Supabase:', err);
+      }
     }
     onClose();
   };
