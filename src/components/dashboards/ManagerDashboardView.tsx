@@ -16,8 +16,13 @@ export const ManagerDashboardView: React.FC = () => {
       department: emp.department,
       rating: Math.floor(Math.random() * 40) + 60, // 60-99
       points: Math.floor(Math.random() * 1000) + 200,
-      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0
-    })).sort((a, b) => b.points - a.points);
+      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
+      status: emp.status
+    })).sort((a, b) => {
+      if (a.status === 'Active' && b.status === 'Inactive') return -1;
+      if (a.status === 'Inactive' && b.status === 'Active') return 1;
+      return b.points - a.points;
+    });
   };
 
   const [mockData] = useState(generateMockPerformance());
@@ -92,7 +97,7 @@ export const ManagerDashboardView: React.FC = () => {
                     <p className="font-semibold text-sm text-varistor-dark">{d.name}</p>
                     <p className="text-xs text-varistor-muted">{d.pendingLeaves} days requested</p>
                   </div>
-                  <button className="bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-bold hover:bg-orange-200 transition-colors cursor-pointer">Review</button>
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'leaves' }))} className="bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-bold hover:bg-orange-200 transition-colors cursor-pointer">Review</button>
                 </div>
               ))}
               {mockData.filter(d => d.pendingLeaves > 0).length === 0 && (

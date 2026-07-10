@@ -115,7 +115,10 @@ export const EmployeeDashboardView: React.FC = () => {
           <PointsBalance />
 
           {/* Announcements Card */}
-          <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md">
+          <div 
+            onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'announcements' }))}
+            className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md cursor-pointer"
+          >
             <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark flex items-center gap-1.5">
                 <Megaphone size={16} className="text-varistor-lime" />
@@ -221,7 +224,10 @@ export const EmployeeDashboardView: React.FC = () => {
         {/* Column 3: Leave Balance (Mocked for complete shell structure) */}
         <div className="space-y-6">
           {/* Leaves Tracker */}
-          <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[210px] justify-between transition-varistor hover:shadow-md">
+          <div 
+            onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'leaves' }))}
+            className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[210px] justify-between transition-varistor hover:shadow-md cursor-pointer"
+          >
             <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark">Casual leaves</h3>
               <span className="text-xs font-extrabold text-varistor-dark">7 / 12</span>
@@ -256,7 +262,10 @@ export const EmployeeDashboardView: React.FC = () => {
           </div>
 
           {/* HR Document Vault Info Box */}
-          <div className="bg-gradient-to-tr from-varistor-surface to-varistor-surfaceMuted rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md">
+          <div 
+            onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'vault' }))}
+            className="bg-gradient-to-tr from-varistor-surface to-varistor-surfaceMuted rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md cursor-pointer"
+          >
             <div>
               <span className="text-[10px] text-varistor-muted font-bold uppercase tracking-wider block">Security Center</span>
               <h3 className="text-sm font-bold text-varistor-dark mt-2">Document Vault Verified</h3>

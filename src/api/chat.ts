@@ -17,10 +17,13 @@ const SELF_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69dae
 
 const DEFAULT_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
   { id: 'all-hands', name: 'all-hands', pinned: 'POSH policy.pdf' },
-  { id: 'sales-team', name: 'sales-team' },
-  { id: 'operations', name: 'operations' },
-  { id: 'tech-dev', name: 'tech-dev' },
   { id: 'hr-announcements', name: 'hr-announcements' },
+  { id: 'finance', name: 'finance', department: 'Finance' },
+  { id: 'sales-team', name: 'sales-team', department: 'Sales' },
+  { id: 'operations', name: 'operations', department: 'Operations' },
+  { id: 'tech-dev', name: 'tech-dev', department: 'Tech' },
+  { id: 'digital-marketing', name: 'digital-marketing', department: 'Digital Marketing' },
+  { id: 'ops-heads', name: 'ops-heads', department: 'Ops Heads' },
 ];
 
 const CHANNELS_KEY = 'eopms_chat_channels_v1';
@@ -44,9 +47,24 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function buildChannels(): ChatChannel[] {
-  // Member count reflects the actual employee directory, not an invented headcount.
-  return loadChannelList().map(c => ({ ...c, memberCount: mockEmployeeStore.length }));
+function buildChannels(user?: { id: string; department?: string; role?: string }): ChatChannel[] {
+  const allChannels = loadChannelList().map(c => {
+    let count = mockEmployeeStore.length;
+    if (c.allowedEmployeeIds) {
+      count = c.allowedEmployeeIds.length;
+    } else if (c.department) {
+      count = mockEmployeeStore.filter(e => e.department === c.department).length;
+    }
+    return { ...c, memberCount: count };
+  });
+
+  if (!user || user.role === 'Admin') return allChannels;
+
+  return allChannels.filter(c => {
+    if (c.allowedEmployeeIds && !c.allowedEmployeeIds.includes(user.id)) return false;
+    if (c.department && c.department !== user.department) return false;
+    return true;
+  });
 }
 
 function seedMessages(): ChatMessage[] {
@@ -90,8 +108,29 @@ export const chatApi = {
   CHAT_EVENT,
   SELF_NAME,
 
-  getChannels(): ChatChannel[] {
-    return buildChannels();
+  getChannels(user?: { id: string; department?: string; role?: string }): ChatChannel[] {
+    return buildChannels(user);
+  },
+
+  createChannel(name: string, allowedEmployeeIds?: string[], department?: string): ChatChannel {
+    const channels = loadChannelList();
+    const newChannel: Omit<ChatChannel, 'memberCount'> = {
+      id: slugify(name) + '-' + Math.random().toString(36).slice(2, 6),
+      name,
+      allowedEmployeeIds: allowedEmployeeIds && allowedEmployeeIds.length > 0 ? allowedEmployeeIds : undefined,
+      department
+    };
+    channels.push(newChannel);
+    saveChannelList(channels);
+    notifyUpdated();
+    
+    let count = mockEmployeeStore.length;
+    if (newChannel.allowedEmployeeIds) {
+      count = newChannel.allowedEmployeeIds.length;
+    } else if (newChannel.department) {
+      count = mockEmployeeStore.filter(e => e.department === newChannel.department).length;
+    }
+    return { ...newChannel, memberCount: count };
   },
 
   async fetchMessages(channelId: ChannelId, selfName?: string): Promise<ChatMessage[]> {

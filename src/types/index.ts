@@ -164,6 +164,8 @@ export interface ChatChannel {
   name: string;
   memberCount: number;
   pinned?: string;
+  allowedEmployeeIds?: string[]; // If defined, only these employees can access the channel
+  department?: string;           // If defined, only employees in this department can access the channel
 }
 
 export interface ChatAttachment {

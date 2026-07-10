@@ -18,7 +18,10 @@ export const PointsBalance: React.FC = () => {
   const thisWeekTotal = weeklyData.reduce((acc, curr) => acc + curr.points, 0);
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[210px] transition-varistor hover:shadow-md">
+    <div 
+      onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'ledger' }))}
+      className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[210px] transition-varistor hover:shadow-md cursor-pointer"
+    >
       <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec]">
         <h3 className="text-sm font-semibold text-varistor-dark">Vari Points</h3>
         <span className="text-[10px] text-varistor-limeText font-semibold bg-varistor-limeLight px-1.5 py-0.5 rounded-full flex items-center gap-0.5">

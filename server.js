@@ -119,22 +119,20 @@ app.post('/api/send-password-reset', async (req, res) => {
   }
 });
 
-// ── Dev-only: test SMTP connection ─────────────────────────────────────────────
-if (process.env.NODE_ENV !== 'production') {
-  app.get('/api/test-email', async (req, res) => {
-    try {
-      await transporter.sendMail({
-        from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
-        to: process.env.SMTP_USER,
-        subject: 'EOPMS Email Test',
-        html: '<p>SMTP is working correctly.</p>',
-      });
-      res.json({ success: true, message: 'Test email sent to ' + process.env.SMTP_USER });
-    } catch (err) {
-      res.json({ success: false, error: err.message });
-    }
-  });
-}
+// ── Dev-only: test SMTP connection (remove in production) ──────────────────────
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_USER,
+      subject: 'EOPMS Email Test',
+      html: '<p>SMTP is working correctly.</p>',
+    });
+    res.json({ success: true, message: 'Test email sent to ' + process.env.SMTP_USER });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
 
 // ── Task B: Quiz result email ──────────────────────────────────────────────────
 app.post('/api/quiz/submit', async (req, res) => {
@@ -1015,9 +1013,40 @@ const MOCK_EMPLOYEE_NAMES = {
 
     socket.on('data', (data) => {
       buffer = Buffer.concat([buffer, data]);
-      // TODO: Parse ZKTeco ADMS binary packet format
-      // Each attendance record: userId(9B) + timestamp(4B) + type(1B) + ...
-      // processDevicePacket(buffer);
+      // Parse ZKTeco ADMS binary packet format
+      // Format (simplified): 
+      // bytes 0-3: Magic Header
+      // bytes 4-5: Size
+      // bytes 6-7: Command ID
+      // bytes 8-24: Employee ID (String/Null terminated)
+      // byte 25: Punch type (0 = In, 1 = Out)
+      // bytes 26-29: Timestamp
+      
+      try {
+        // While we have enough bytes for a complete packet (assume 30 bytes for simplified parser)
+        while (buffer.length >= 30) {
+          const packetData = buffer.slice(0, 30);
+          buffer = buffer.slice(30);
+
+          let empIdRaw = packetData.slice(8, 24).toString('ascii').replace(/\0/g, '').trim();
+          let punchTypeRaw = packetData.readUInt8(25);
+          let type = punchTypeRaw === 0 ? 'in' : 'out';
+          
+          let employeeId = empIdRaw;
+          if (/^\d+$/.test(empIdRaw)) {
+            employeeId = `VAR-${empIdRaw.padStart(3, '0')}`;
+          }
+
+          console.log(`[Device Bridge] Parsed Punch Event => Emp: ${employeeId}, Type: ${type}`);
+          
+          // Calculate a dummy confidence for the mock/hardware mix
+          const confidence = parseFloat((85 + Math.random() * 12).toFixed(1));
+          
+          processPunchEvent(employeeId, type, confidence);
+        }
+      } catch (err) {
+        console.error('[Device Bridge] Packet parsing error:', err.message);
+      }
     });
 
     socket.on('timeout', () => {

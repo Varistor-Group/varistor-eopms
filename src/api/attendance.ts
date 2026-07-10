@@ -158,12 +158,14 @@ let _cachedRoster: RosterEmployee[] | null = null;
 export async function fetchAttendanceRoster(): Promise<RosterEmployee[]> {
   if (!_cachedRoster) {
     const emps = await getEmployees();
-    _cachedRoster = emps.map((e: Employee) => ({
-      id: e.employeeId,
-      name: e.fullName,
-      dept: e.department,
-      isField: e.is_field_employee || false
-    }));
+    _cachedRoster = emps
+      .filter((e: Employee) => e.status !== 'Inactive')
+      .map((e: Employee) => ({
+        id: e.employeeId,
+        name: e.fullName,
+        dept: e.department,
+        isField: e.is_field_employee || false
+      }));
   }
   return _cachedRoster;
 }
@@ -605,6 +607,17 @@ export async function uploadFieldPhoto(
   //   await supabase.from('attendance_ledger').upsert({ ...ledgerRow }, { onConflict: 'employee_id,date' });
 
   return { success: true, photoUrl, error: null };
+}
+
+/**
+ * Checks if a field employee is currently punched in for today without a punch out.
+ */
+export async function isFieldEmployeePunchedIn(employeeId: string): Promise<boolean> {
+  await delay(100);
+  const date = todayISO();
+  const ledgerId = `atl-${employeeId}-${date}`;
+  const override = _overrides.get(ledgerId);
+  return !!(override && override.punch_in && !override.punch_out);
 }
 
 /**

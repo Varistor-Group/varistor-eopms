@@ -426,6 +426,7 @@ export const DocumentVault: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddSlot, setShowAddSlot] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   const loggedInEmployeeId = 'VAR-024';
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
@@ -452,6 +453,11 @@ export const DocumentVault: React.FC = () => {
 
   useEffect(() => { loadSlots(); }, [loadSlots]);
 
+  const filteredEmployees = employees.filter(e => 
+    e.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || 
+    e.employeeId.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
   const isOwnEmployee = selectedEmployeeId === loggedInEmployeeId || !canSelectEmployee;
 
@@ -467,11 +473,21 @@ export const DocumentVault: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex-1">
             {canSelectEmployee ? (
-              <div className="flex items-center gap-3 mb-3">
-                <Users size={18} className="text-varistor-lime shrink-0" />
-                <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="bg-varistor-pageBg border border-varistor-border text-brand-ink text-sm rounded-xl focus:ring-varistor-lime focus:border-varistor-lime block w-full max-w-xs p-2.5 font-semibold">
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.fullName} ({emp.employeeId})</option>)}
-                </select>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <Users size={18} className="text-varistor-lime shrink-0" />
+                  <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="bg-varistor-pageBg border border-varistor-border text-brand-ink text-sm rounded-xl focus:ring-varistor-lime focus:border-varistor-lime block w-full sm:w-64 p-2.5 font-semibold">
+                    {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.fullName} ({emp.employeeId})</option>)}
+                    {filteredEmployees.length === 0 && <option disabled>No matches</option>}
+                  </select>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Search name or ID..." 
+                  value={employeeSearch}
+                  onChange={e => setEmployeeSearch(e.target.value)}
+                  className="text-sm border border-varistor-border rounded-xl px-3 py-2 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-varistor-lime/30"
+                />
               </div>
             ) : (
               <h1 className="text-xl font-bold text-brand-ink mb-1">{selectedEmployee?.fullName} &middot; {selectedEmployee?.employeeId}</h1>

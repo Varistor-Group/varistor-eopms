@@ -353,9 +353,12 @@ export const Attendance: React.FC = () => {
     XLSX.writeFile(wb, `attendance_monthly_${reportMonth}.xlsx`);
   }
 
-  async function exportPDF(type: 'daily' | 'monthly') {
+  async function exportPDF(type: 'daily' | 'monthly', singleEmployeeId?: string) {
     try {
-      const rows = type === 'daily' ? dailyData : monthlyReport;
+      let rows = type === 'daily' ? dailyData : monthlyReport;
+      if (singleEmployeeId) {
+        rows = rows.filter(r => r.employee_id === singleEmployeeId);
+      }
       const res = await fetch('http://localhost:3001/api/attendance/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,7 +368,8 @@ export const Attendance: React.FC = () => {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `attendance_${type}_${type === 'daily' ? selectedDate : reportMonth}.pdf`;
+      const filenameBase = singleEmployeeId ? `attendance_${singleEmployeeId}_${reportMonth}` : `attendance_${type}_${type === 'daily' ? selectedDate : reportMonth}`;
+      a.href = url; a.download = `${filenameBase}.pdf`;
       a.click(); URL.revokeObjectURL(url);
     } catch {
       addToast('PDF export failed. Is the server running?', 0, 'debit');
@@ -672,7 +676,7 @@ export const Attendance: React.FC = () => {
                 {dailyLoading ? (
                   <div className="p-8 text-center text-varistor-muted text-sm">Loading…</div>
                 ) : (
-                  <table className="w-full min-w-[700px]">
+                  <table className="w-full text-sm">
                     <thead className="bg-varistor-pageBg border-b border-varistor-border">
                       <tr>
                         {['Emp ID', 'Name', 'Dept', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status', ...(canEdit ? ['Edit'] : [])].map(h => (
@@ -808,9 +812,9 @@ export const Attendance: React.FC = () => {
               </div>
               <div className="overflow-x-auto">
                 {reportLoading ? <div className="p-8 text-center text-varistor-muted text-sm">Loading…</div> : (
-                  <table className="w-full min-w-[900px]">
+                  <table className="w-full text-sm">
                     <thead className="bg-varistor-pageBg border-b border-varistor-border">
-                      <tr>{['Emp ID', 'Name', 'Dept', 'Present', 'Late', 'Leaves', 'W.O', 'Holidays', 'Half-day', 'Absent', 'Total Hrs', 'Payable Days'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
+                      <tr>{['Emp ID', 'Name', 'Dept', 'Present (P)', 'Late', 'Leave (L)', 'Week-off (WO)', 'Holiday (H)', 'Half-day (HD)', 'Absent (A)', 'Total Hrs', 'Payable Days', 'Actions'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {(reportDeptFilter === 'All' ? monthlyReport : monthlyReport.filter(r => r.department === reportDeptFilter)).map((row, i) => (
@@ -827,6 +831,11 @@ export const Attendance: React.FC = () => {
                           <td className={tdCls}><span className={row.absent > 0 ? 'text-red-600 font-semibold' : ''}>{row.absent}</span></td>
                           <td className={tdCls}>{row.totalHrs}h</td>
                           <td className={tdCls}><span className="font-bold text-varistor-dark">{row.payableDays}</span></td>
+                          <td className={tdCls}>
+                            <button onClick={() => exportPDF('monthly', row.employee_id)} className="p-1 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-border rounded transition-colors" title="Download Employee PDF">
+                              <Printer size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

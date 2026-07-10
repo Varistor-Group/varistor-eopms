@@ -232,10 +232,68 @@ let _records: PayrollRecord[] = loadPayrollRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
-  // TODO: Payroll Integration Point — replace manual payable days with attendance-driven data:
-  //   import { getPayrollAttendanceSnapshot } from './attendance';
-  //   const snapshot = await getPayrollAttendanceSnapshot('YYYY-MM');
-  //   Use snapshot[n].payableDays in place of the hardcoded working-days assumption below.
+  _records = loadPayrollRecords();
+  
+  // Auto-seed missing payroll records from active employees
+  const { getEmployees } = await import('./employees');
+  const emps = await getEmployees();
+  let updated = false;
+
+  for (const emp of emps) {
+    if (emp.status === 'Active' && !_records.find(r => r.employeeId === emp.id)) {
+      const rec: PayrollRecord = {
+        id: 'PAY-' + Math.random().toString(36).substring(2, 9),
+        employeeId: emp.id,
+        employeeName: emp.fullName,
+        department: emp.department,
+        designation: emp.role,
+        month: 'Jun 2026',
+        ctc: 30000,
+        monthlySalary: 30000,
+        totalDays: 30,
+        payDays: 30,
+        clBalance: 0,
+        pfUan: '',
+        autoFormula: true,
+        status: 'draft',
+        revision: 1,
+        components: { basic: 15000, hra: 7500, pfEmployee: 1800, pfEmployer: 1800, esi: 0, pt: 0, tds: 0, specialAllowance: 0, medical: 1250, ta: 2500, lta: 3500, reimbursement: 0, incentives: 0, overtime: 0, otherDeductions: 0 },
+        netPay: 30000
+      };
+      
+      const comp = computeNet({
+         monthlySalary: rec.monthlySalary,
+         totalDays: 30,
+         payDays: 30,
+      });
+      rec.components = {
+         basic: comp.basic,
+         hra: comp.hra,
+         pfEmployee: comp.pfEmployee,
+         pfEmployer: comp.pfEmployer,
+         esi: comp.esi,
+         pt: comp.pt,
+         tds: comp.tds,
+         specialAllowance: comp.specialAllowance,
+         medical: comp.medical,
+         ta: comp.ta,
+         lta: comp.lta,
+         reimbursement: comp.reimbursement,
+         incentives: comp.incentives,
+         overtime: comp.overtime,
+         otherDeductions: comp.otherDeductions
+      };
+      rec.netPay = comp.netPay;
+      
+      _records.push(rec);
+      updated = true;
+    }
+  }
+
+  if (updated) {
+    savePayrollRecords(_records);
+  }
+
   if (employeeId) {
     return _records.filter(r => r.employeeId === employeeId);
   }

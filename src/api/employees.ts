@@ -75,6 +75,7 @@ export async function getEmployees(): Promise<Employee[]> {
   const { data, error } = await supabase
     .from('employees')
     .select('*')
+    .order('status', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) {
     console.error('[getEmployees]', error.message);

@@ -20,8 +20,13 @@ export const AdminDashboardView: React.FC = () => {
       department: emp.department,
       rating: Math.floor(Math.random() * 40) + 60, // 60-99
       points: Math.floor(Math.random() * 1000) + 200,
-      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0
-    })).sort((a, b) => b.points - a.points);
+      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
+      status: emp.status
+    })).sort((a, b) => {
+      if (a.status === 'Active' && b.status === 'Inactive') return -1;
+      if (a.status === 'Inactive' && b.status === 'Active') return 1;
+      return b.points - a.points;
+    });
   };
 
   const [mockData] = useState(generateMockPerformance());

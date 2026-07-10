@@ -25,6 +25,17 @@ import Payroll from './components/Payroll';
 import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
+import { useFieldTracking } from './hooks/useFieldTracking';
+import { mockEmployeeStore } from './api/employees';
+
+const FieldTrackerBackground: React.FC = () => {
+  const { currentRole, currentUser } = useVariPoints();
+  const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
+  const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
+  
+  useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
+  return null;
+};
 
 const AppContent: React.FC = () => {
   const { currentRole, currentUser, setCurrentUser, setCurrentRole } = useVariPoints();
@@ -120,7 +131,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className={`min-h-[100dvh] bg-varistor-pageBg text-varistor-dark flex font-sans w-full max-w-[100vw] overflow-x-hidden ${isLandscape && window.innerWidth < 768 ? 'landscape-mobile' : ''}`}>
-
+      <FieldTrackerBackground />
       {/* Sidebar navigation */}
       <Sidebar
         activeTab={activeTab}

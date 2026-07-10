@@ -6,6 +6,7 @@ import { Modal } from './shared/Modal';
 import { Input } from './shared/Input';
 import { Button } from './shared/Button';
 import type { ChannelId, ChatChannel, ChatMessage, ChatAttachment } from '../types';
+import { getEmployees, type Employee } from '../api/employees';
 
 type PendingAttachment = Required<Pick<ChatAttachment, 'name' | 'size' | 'type' | 'dataUrl'>>;
 
@@ -51,10 +52,11 @@ export const Chat: React.FC = () => {
   const selfRole = currentRole;
   const selfAvatar = currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selfName)}&background=84CC16&color=fff&size=80&bold=true`;
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
-  const canManageChannels = currentRole === 'Admin';
-  const [channels, setChannels] = useState<ChatChannel[]>(() => chatApi.getChannels());
+  const canManageChannels = currentRole === 'Admin' || currentRole === 'HR';
+  const [channels, setChannels] = useState<ChatChannel[]>(() => chatApi.getChannels(currentUser ?? undefined));
   const [activeChannelId, setActiveChannelId] = useState<ChannelId>('all-hands');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [draft, setDraft] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [unread, setUnread] = useState<{ total: number; byChannel: Record<string, number> }>({ total: 0, byChannel: {} });
@@ -63,6 +65,9 @@ export const Chat: React.FC = () => {
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelType, setNewChannelType] = useState<'All' | 'Department' | 'Custom'>('All');
+  const [newChannelDept, setNewChannelDept] = useState('');
+  const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +76,7 @@ export const Chat: React.FC = () => {
   const activeChannel = channels.find(c => c.id === activeChannelId) ?? channels[0];
 
   const refreshUnread = () => setUnread(chatApi.getUnreadSummary());
-  const refreshChannels = () => setChannels(chatApi.getChannels());
+  const refreshChannels = () => setChannels(chatApi.getChannels(currentUser ?? undefined));
 
   const loadChannelMessages = async (channelId: ChannelId) => {
     setIsLoading(true);
@@ -96,8 +101,9 @@ export const Chat: React.FC = () => {
       refreshChannels();
     };
     window.addEventListener(chatApi.CHAT_EVENT, handler);
+    getEmployees().then(setEmployees);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
-  }, []);
+  }, [currentUser]);
 
   // If the active channel was deleted (by this tab or another), fall back to whatever remains.
   useEffect(() => {
@@ -184,7 +190,9 @@ export const Chat: React.FC = () => {
   const handleCreateChannel = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const channel = chatApi.createChannel(newChannelName);
+      const allowedIds = newChannelType === 'Custom' ? newChannelMembers : undefined;
+      const dept = newChannelType === 'Department' ? newChannelDept : undefined;
+      const channel = chatApi.createChannel(newChannelName, allowedIds, dept);
       refreshChannels();
       setActiveChannelId(channel.id);
       setShowCreateChannel(false);
@@ -527,7 +535,7 @@ export const Chat: React.FC = () => {
         </form>
       </div>
 
-      {/* Create Channel Modal - Admin only */}
+      {/* Create Channel Modal - Admin/HR only */}
       <Modal isOpen={showCreateChannel} onClose={() => setShowCreateChannel(false)} title="Create a channel">
         <form onSubmit={handleCreateChannel} className="flex flex-col gap-4">
           <Input
@@ -538,11 +546,59 @@ export const Chat: React.FC = () => {
             error={channelError ?? undefined}
             autoFocus
           />
-          <div className="flex justify-end gap-2">
+          <div>
+            <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Who can access?</label>
+            <select
+              value={newChannelType}
+              onChange={e => setNewChannelType(e.target.value as any)}
+              className="w-full text-sm bg-varistor-surface text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+            >
+              <option value="All">All Employees</option>
+              <option value="Department">Specific Department</option>
+              <option value="Custom">Selected Employees</option>
+            </select>
+          </div>
+          {newChannelType === 'Department' && (
+            <div>
+              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Department</label>
+              <select
+                value={newChannelDept}
+                onChange={e => setNewChannelDept(e.target.value)}
+                className="w-full text-sm bg-varistor-surface text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+              >
+                <option value="">-- Choose --</option>
+                {Array.from(new Set(employees.map(e => e.department))).filter(Boolean).map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {newChannelType === 'Custom' && (
+            <div>
+              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Members</label>
+              <div className="max-h-48 overflow-y-auto border border-varistor-border rounded-lg p-2 space-y-1">
+                {employees.map(emp => (
+                  <label key={emp.id} className="flex items-center gap-2 text-sm hover:bg-varistor-surfaceMuted p-1.5 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newChannelMembers.includes(emp.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewChannelMembers(prev => [...prev, emp.id]);
+                        else setNewChannelMembers(prev => prev.filter(id => id !== emp.id));
+                      }}
+                      className="rounded text-varistor-lime focus:ring-varistor-lime"
+                    />
+                    {emp.fullName} ({emp.department})
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 mt-2">
             <Button type="button" variant="secondary" onClick={() => setShowCreateChannel(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={!newChannelName.trim()}>
+            <Button type="submit" variant="primary" disabled={!newChannelName.trim() || (newChannelType === 'Department' && !newChannelDept) || (newChannelType === 'Custom' && newChannelMembers.length === 0)}>
               Create channel
             </Button>
           </div>

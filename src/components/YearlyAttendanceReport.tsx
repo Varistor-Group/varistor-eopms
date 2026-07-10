@@ -315,13 +315,13 @@ export const YearlyAttendanceReport: React.FC<YearlyAttendanceReportProps> = ({ 
     { key: 'employee_id', label: 'ID' },
     { key: 'employeeName', label: 'Name' },
     { key: 'department', label: 'Dept' },
-    { key: 'present', label: 'P (Present)', color: 'text-varistor-limeText' },
-    { key: 'paidLeave', label: 'L (Paid Leave)', color: 'text-teal-600' },
+    { key: 'present', label: 'Present (P)', color: 'text-varistor-limeText' },
+    { key: 'paidLeave', label: 'Leave (L)', color: 'text-teal-600' },
     { key: 'unpaidLeave', label: 'L→A (Unpaid)', color: 'text-orange-500' },
-    { key: 'absent', label: 'A (Absent)', color: 'text-red-600' },
-    { key: 'halfDay', label: 'HD', color: 'text-blue-600' },
-    { key: 'holidays', label: 'H (Holiday)', color: 'text-purple-600' },
-    { key: 'weekOff', label: 'WO', color: 'text-gray-500' },
+    { key: 'absent', label: 'Absent (A)', color: 'text-red-600' },
+    { key: 'halfDay', label: 'Half-day (HD)', color: 'text-blue-600' },
+    { key: 'holidays', label: 'Holiday (H)', color: 'text-purple-600' },
+    { key: 'weekOff', label: 'Week-off (WO)', color: 'text-gray-500' },
   ];
 
   return (
@@ -390,7 +390,7 @@ export const YearlyAttendanceReport: React.FC<YearlyAttendanceReportProps> = ({ 
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-varistor-border">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full text-sm">
           <thead className="bg-varistor-surfaceMuted border-b border-varistor-border">
             <tr>
               {columns.map(col => (

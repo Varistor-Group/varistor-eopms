@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { getEmployees, deleteEmployee, sendRecoveryEmail } from '../api/employees';
+import { getEmployees, deleteEmployee, sendRecoveryEmail, updateEmployee } from '../api/employees';
 import { mockEmployeeStore } from '../api/employees';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
-import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown, Mail } from 'lucide-react';
+import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown, Mail, PowerOff, Power } from 'lucide-react';
 import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
@@ -134,8 +134,12 @@ export const EmployeeManagementPortal: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-varistor-border">
-              {employees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-varistor-pageBg/50 transition-colors">
+              {[...employees].sort((a, b) => {
+                if (a.status === 'Active' && b.status === 'Inactive') return -1;
+                if (a.status === 'Inactive' && b.status === 'Active') return 1;
+                return 0;
+              }).map((emp) => (
+                <tr key={emp.id} className={`hover:bg-varistor-pageBg/50 transition-colors ${emp.status === 'Inactive' ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-varistor-limeTint flex items-center justify-center font-bold text-varistor-limeText shrink-0">
@@ -180,9 +184,32 @@ export const EmployeeManagementPortal: React.FC = () => {
                         Inactive
                       </span>
                     )}
-                  </td>
+                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={async () => {
+                          const newStatus = emp.status === 'Active' ? 'Inactive' : 'Active';
+                          const label = newStatus === 'Inactive' ? 'deactivate' : 'reactivate';
+                          if (window.confirm(`Are you sure you want to ${label} ${emp.fullName}?`)) {
+                            const result = await updateEmployee(emp.id, { status: newStatus });
+                            if (result.success) {
+                              setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: newStatus } : e));
+                              addToast(`${emp.fullName} has been ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 0, newStatus === 'Active' ? 'credit' : 'debit');
+                            } else {
+                              addToast(result.error || 'Failed to update status', 0, 'debit');
+                            }
+                          }
+                        }}
+                        className={`p-1.5 rounded-md transition-colors ${
+                          emp.status === 'Active'
+                            ? 'text-varistor-muted hover:text-red-600 hover:bg-red-50'
+                            : 'text-varistor-muted hover:text-green-600 hover:bg-green-50'
+                        }`}
+                        title={emp.status === 'Active' ? 'Deactivate Employee' : 'Activate Employee'}
+                      >
+                        {emp.status === 'Active' ? <PowerOff size={16} /> : <Power size={16} />}
+                      </button>
                       <button
                         onClick={async () => {
                           if (window.confirm(`Send recovery credentials email to ${emp.fullName}?`)) {
@@ -225,6 +252,7 @@ export const EmployeeManagementPortal: React.FC = () => {
                       </button>
                     </div>
                   </td>
+
                 </tr>
               ))}
             </tbody>
