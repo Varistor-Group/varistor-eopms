@@ -113,7 +113,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     p_role: input.role,
     p_temp_password: tempPassword,
     p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: input.avatarUrl ?? '',
+    p_avatar_url: input.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=84CC16&color=fff&size=200&bold=true`,
   });
 
   if (rpcError) {
