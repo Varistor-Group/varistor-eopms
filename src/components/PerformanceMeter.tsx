@@ -57,7 +57,7 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
       
       <div className="flex justify-between items-center text-[10px] text-varistor-muted mt-2 pt-2 border-t border-[#edf0ec]">
         <span>This quarter</span>
-        <span className="text-[#3f6212] font-semibold bg-[#eefed4] px-1.5 py-0.5 rounded-full">Good Standing</span>
+        <span className="text-[#3f6212] font-semibold bg-varistor-limeTint px-1.5 py-0.5 rounded-full">Good Standing</span>
       </div>
     </div>
   );

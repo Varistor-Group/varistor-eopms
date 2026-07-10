@@ -118,7 +118,7 @@ export const EngineSimulationConsole: React.FC = () => {
             <div className="flex gap-3 justify-end pt-2">
               <button
                 type="submit"
-                className="bg-red-700 hover:bg-red-800 text-[#ffffff] px-5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
+                className="bg-red-700 hover:bg-red-800 text-white px-5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
               >
                 <AlertTriangle size={14} />
                 Submit Debit

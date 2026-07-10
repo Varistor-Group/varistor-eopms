@@ -154,7 +154,7 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
       </div>
 
       {activeTab === 'upload' && (
-        <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-lg bg-[#fafbfa] hover:bg-gray-50 transition-colors cursor-pointer relative">
+        <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-lg bg-varistor-pageBg hover:bg-gray-50 transition-colors cursor-pointer relative">
           <Upload size={24} className="text-varistor-muted mb-2" />
           <span className="text-xs text-varistor-dark font-semibold">Click to upload image</span>
           <span className="text-[10px] text-varistor-muted">PNG, JPG up to 5MB</span>
@@ -209,7 +209,7 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
               if (e.key === 'Escape') onClose();
             }}
             placeholder="Paste image URL..."
-            className="text-xs border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-varistor-lime/30 bg-[#fafbfa] w-full"
+            className="text-xs border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-varistor-lime/30 bg-varistor-pageBg w-full"
           />
           <button
             onClick={() => saveAvatar(urlInput)}

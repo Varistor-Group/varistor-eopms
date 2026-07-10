@@ -259,7 +259,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
 
         {/* Cannot skip badge */}
         {!videoCompleted && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/60 text-[#ffffff] text-[10px] px-2 py-1 rounded-full">
+          <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
             <Lock size={10} strokeWidth={2} />
             Cannot skip
           </div>
@@ -304,13 +304,13 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
             {/* Play/Pause */}
             <button
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              className="text-[#ffffff] hover:text-varistor-lime transition-colors"
+              className="text-white hover:text-varistor-lime transition-colors"
             >
               {isPlaying ? <Pause size={20} strokeWidth={1.5} /> : <Play size={20} strokeWidth={1.5} />}
             </button>
 
             {/* Time */}
-            <span className="text-[#ffffff] text-[11px] font-mono tabular-nums">
+            <span className="text-white text-[11px] font-mono tabular-nums">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
 
@@ -320,7 +320,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
             <button
               onClick={(e) => e.stopPropagation()}
               title="Subtitles (not available for demo)"
-              className="text-[#ffffff]/50 hover:text-[#ffffff] transition-colors cursor-not-allowed"
+              className="text-white/50 hover:text-white transition-colors cursor-not-allowed"
             >
               <Subtitles size={18} strokeWidth={1.5} />
             </button>
@@ -328,7 +328,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
             {/* Mute */}
             <button
               onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-              className="text-[#ffffff] hover:text-varistor-lime transition-colors"
+              className="text-white hover:text-varistor-lime transition-colors"
             >
               {isMuted ? <VolumeX size={18} strokeWidth={1.5} /> : <Volume2 size={18} strokeWidth={1.5} />}
             </button>
@@ -336,7 +336,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
             {/* Fullscreen */}
             <button
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-              className="text-[#ffffff] hover:text-varistor-lime transition-colors"
+              className="text-white hover:text-varistor-lime transition-colors"
             >
               <Maximize size={18} strokeWidth={1.5} />
             </button>
@@ -344,7 +344,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
         </div>
 
         {/* Auto-pause on tab switch notice */}
-        <div className="absolute top-3 left-3 text-[10px] text-[#ffffff]/50">
+        <div className="absolute top-3 left-3 text-[10px] text-white/50">
           Auto-pause on tab switch
         </div>
       </div>

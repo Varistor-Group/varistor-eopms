@@ -121,7 +121,7 @@ export const EmployeeDashboardView: React.FC = () => {
                 <Megaphone size={16} className="text-varistor-lime" />
                 Announcements
               </h3>
-              <span className="text-[9px] font-bold text-[#ffffff] bg-black px-1.5 py-0.5 rounded uppercase">Feed</span>
+              <span className="text-[9px] font-bold text-white bg-black px-1.5 py-0.5 rounded uppercase">Feed</span>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 mt-3 pr-1">

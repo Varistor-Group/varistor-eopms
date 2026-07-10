@@ -312,7 +312,7 @@ export const EmployeeManagementPortal: React.FC = () => {
                   {/* Type */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-varistor-dark">Transaction Type <span className="text-red-500">*</span></label>
-                    <div className="flex bg-[#edf0ec] p-0.5 rounded-lg text-[11px] font-semibold w-full">
+                    <div className="flex bg-varistor-pageBg p-0.5 rounded-lg text-[11px] font-semibold w-full">
                       <button
                         type="button"
                         onClick={() => setHrPointsType('credit')}

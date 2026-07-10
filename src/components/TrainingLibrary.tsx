@@ -86,7 +86,7 @@ function TrainingCard({
         {/* Overlay on hover for non-locked */}
         {!isLocked && !isCompleted && (
           <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <PlayCircle size={40} className="text-[#ffffff]" />
+            <PlayCircle size={40} className="text-white" />
           </div>
         )}
         {/* Completed overlay */}

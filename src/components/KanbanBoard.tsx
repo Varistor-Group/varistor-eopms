@@ -31,14 +31,14 @@ const KanbanColumn: React.FC<ColumnProps> = ({ id, title, tasks, onCardClick }) 
   return (
     <div 
       ref={setNodeRef}
-      className={`flex-1 min-w-[280px] bg-[#f8faf7] border border-varistor-border rounded-varistor p-4 flex flex-col h-[calc(100vh-200px)] min-h-[500px] transition-all duration-200 ${
-        isOver ? 'bg-[#f4f7f2] border-varistor-lime border-dashed border-2' : ''
+      className={`flex-1 min-w-[280px] bg-varistor-pageBg border border-varistor-border rounded-varistor p-4 flex flex-col h-[calc(100vh-200px)] min-h-[500px] transition-all duration-200 ${
+        isOver ? 'bg-varistor-pageBg border-varistor-lime border-dashed border-2' : ''
       }`}
     >
       {/* Column Header */}
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h3 className="text-sm font-bold text-varistor-dark uppercase tracking-wider">{title}</h3>
-        <span className="text-xs font-bold bg-[#edf0ec] px-2 py-0.5 rounded-full text-varistor-dark">
+        <span className="text-xs font-bold bg-varistor-pageBg px-2 py-0.5 rounded-full text-varistor-dark">
           {tasks.length}
         </span>
       </div>
@@ -181,7 +181,7 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
 
       {/* Card Footer: Date chip and Avatar */}
       <div className="flex justify-between items-center pt-3 border-t border-[#f1f3f0]">
-        <div className="flex items-center gap-1 text-[10px] text-[#555a52] bg-[#f1f3f0] px-2 py-0.5 rounded-full">
+        <div className="flex items-center gap-1 text-[10px] text-[#555a52] bg-varistor-pageBg px-2 py-0.5 rounded-full">
           <Calendar size={11} className="text-[#888]" />
           <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>

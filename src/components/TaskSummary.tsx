@@ -49,7 +49,7 @@ export const TaskSummary: React.FC = () => {
           activeTasks.map((task) => (
             <div 
               key={task.id} 
-              className="flex items-center justify-between p-3 border border-[#edf0ec] rounded-lg bg-[#fafbfa] hover:bg-white hover:border-[#d2d8ce] transition-varistor group"
+              className="flex items-center justify-between p-3 border border-[#edf0ec] rounded-lg bg-varistor-pageBg hover:bg-white hover:border-[#d2d8ce] transition-varistor group"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <button

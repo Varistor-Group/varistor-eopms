@@ -49,7 +49,7 @@ export const ResetPassword: React.FC = () => {
     <div className="force-light min-h-screen w-full flex bg-white font-sans selection:bg-brand-lime/20 selection:text-brand-ink">
       
       {/* Brand Splash (Left Side) - Hidden on mobile */}
-      <div className="hidden md:flex w-1/2 bg-[#f1f3f0] p-12 lg:p-20 flex-col justify-between relative overflow-hidden">
+      <div className="hidden md:flex w-1/2 bg-varistor-pageBg p-12 lg:p-20 flex-col justify-between relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-[#84CC16]/20 blur-[120px] pointer-events-none" />
         <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] rounded-full bg-[#111111]/5 blur-[100px] pointer-events-none" />
@@ -70,7 +70,7 @@ export const ResetPassword: React.FC = () => {
       </div>
 
       {/* Reset Form (Right Side) */}
-      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-[#fafafa]">
+      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-varistor-pageBg">
         <div className="max-w-md mx-auto w-full bg-white p-8 rounded-[12px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-gray-100 animate-[fadeInPage_250ms_ease-out]">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
             ACCOUNT RECOVERY

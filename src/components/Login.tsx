@@ -176,7 +176,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       </div>
 
       {/* Sign-in Form (Right Side) */}
-      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-[#fafafa]">
+      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-varistor-pageBg">
         <div className="max-w-md mx-auto w-full">
 
           {/* Sign-in Card */}

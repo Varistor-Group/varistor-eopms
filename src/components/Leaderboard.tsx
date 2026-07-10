@@ -104,7 +104,7 @@ export const Leaderboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-6 bg-[#fafafa]">
+      <div className="p-6 bg-varistor-pageBg">
         {/* Controls */}
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <div className="relative flex-1">

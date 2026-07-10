@@ -125,7 +125,7 @@ const Leaves: React.FC = () => {
                     <span>Casual Leave Balance</span>
                     <span className="font-bold text-varistor-dark">{leaveBalance?.casual?.used ?? 0} / {leaveBalance?.casual?.total ?? 12} Taken</span>
                   </div>
-                  <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
                     <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, ((leaveBalance?.casual?.used ?? 0) / (leaveBalance?.casual?.total ?? 12)) * 100)}%` }} />
                   </div>
                 </div>
@@ -134,7 +134,7 @@ const Leaves: React.FC = () => {
                     <span>Sick Leave Balance</span>
                     <span className="font-bold text-varistor-dark">{leaveBalance?.sick?.used ?? 0} / {leaveBalance?.sick?.total ?? 10} Taken</span>
                   </div>
-                  <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
                     <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, ((leaveBalance?.sick?.used ?? 0) / (leaveBalance?.sick?.total ?? 10)) * 100)}%` }} />
                   </div>
                 </div>
