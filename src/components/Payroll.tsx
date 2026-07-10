@@ -40,7 +40,7 @@ const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
 const MONTH = 'Jun 2026';
-const LOGGED_IN_EMP = 'VAR-024';
+
 
 // Column name aliases — tolerant parsing of Excel headers
 const COL_ALIASES: Record<string, string[]> = {

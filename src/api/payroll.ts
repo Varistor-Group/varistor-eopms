@@ -199,6 +199,7 @@ function getPTAmount(gross: number, ranges: any[]): number {
 /** Single source of truth for all payroll calculations. */
 export function computeNet(params: {
   monthlySalary: number;
+  monthlyCtc?: number;
   totalDays?: number;
   payDays?: number;
   medical?: number;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight, User } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees, type Employee } from '../api/employees';
 import { fetchAllClBalances, updateClBalance, type ClBalance } from '../api/payroll';
