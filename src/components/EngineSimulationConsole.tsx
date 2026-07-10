@@ -38,7 +38,7 @@ export const EngineSimulationConsole: React.FC = () => {
   return (
     <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
       <div>
-        <h1 className="text-xl font-bold text-varistor-dark">Engine Simulation Console</h1>
+        <h1 className="text-xl font-bold text-varistor-dark">VP Management Console</h1>
         <p className="text-xs text-varistor-muted mt-0.5">Administrative tools for testing and asserting manual Vari Points penalties.</p>
       </div>
 
