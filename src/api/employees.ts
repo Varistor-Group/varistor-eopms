@@ -145,51 +145,25 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   });
 
   let emailErrorMsg: string | null = null;
-  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
-
-  if (resendApiKey) {
-    try {
-      const emailRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'onboarding@resend.dev',
-          to: input.personalEmail,
-          subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-              <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-                <h1 style="color: white; margin: 0;">Welcome to Varistor EOPMS!</h1>
-              </div>
-              <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-                <p>Hi ${input.fullName},</p>
-                <p>Your account has been successfully created. Here are your login credentials:</p>
-                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                  <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${input.username}</p>
-                  <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${input.employeeId}</p>
-                  <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${tempPassword}</code></p>
-                </div>
-                <p>Please log in using the app URL and change your password as soon as possible.</p>
-              </div>
-            </div>
-          `
-        })
-      });
-
-      if (!emailRes.ok) {
-        const errData = await emailRes.json().catch(() => null);
-        emailErrorMsg = errData?.message || 'Failed to send welcome email via Resend API.';
-        console.error('[Resend Error]', errData);
-      }
-    } catch (e: any) {
-      emailErrorMsg = e.message;
-      console.error('[Resend Exception]', e);
+  try {
+    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: input.fullName,
+        email: input.personalEmail,
+        employeeId: input.employeeId,
+        tempPassword,
+      }),
+    });
+    const result = await emailRes.json().catch(() => null);
+    if (!result?.success) {
+      emailErrorMsg = result?.error || 'Failed to send welcome email.';
+      console.error('[Email]', emailErrorMsg);
     }
-  } else {
-      emailErrorMsg = 'VITE_RESEND_API_KEY is not configured in .env.';
+  } catch (e: any) {
+    emailErrorMsg = e.message;
+    console.error('[Email Exception]', e);
   }
 
   return { success: true, employee: empRow ? rowToEmployee(empRow) : null, error: null, emailError: emailErrorMsg };
@@ -329,50 +303,24 @@ export let mockEmployeeStore: Employee[] = [];
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
 export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {
-  const resendApiKey = import.meta.env.VITE_RESEND_API_KEY;
-  if (!resendApiKey) {
-    return { success: false, error: 'VITE_RESEND_API_KEY is not configured in .env.' };
-  }
-
   try {
-    const emailRes = await fetch('https://api.resend.com/emails', {
+    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'onboarding@resend.dev',
-        to: employee.personalEmail,
-        subject: 'Recovery: Varistor EOPMS Login Credentials',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-            <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="color: white; margin: 0;">Varistor EOPMS Credentials</h1>
-            </div>
-            <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-              <p>Hi ${employee.fullName},</p>
-              <p>An administrator has requested to resend your login credentials. Here they are:</p>
-              <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${employee.username}</p>
-                <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${employee.employeeId}</p>
-                <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${employee.tempPassword}</code></p>
-              </div>
-              <p>Please log in using the app URL and change your password as soon as possible.</p>
-            </div>
-          </div>
-        `
-      })
+        name: employee.fullName,
+        email: employee.personalEmail,
+        employeeId: employee.employeeId,
+        tempPassword: employee.tempPassword || '(contact HR for your temporary password)',
+      }),
     });
-
-    if (!emailRes.ok) {
-      const errData = await emailRes.json().catch(() => null);
-      return { success: false, error: errData?.message || 'Failed to send recovery email via Resend API.' };
+    const result = await emailRes.json().catch(() => null);
+    if (!result?.success) {
+      return { success: false, error: result?.error || 'Failed to send recovery email.' };
     }
-
     return { success: true, error: null };
   } catch (e: any) {
-    console.error('[Resend Exception]', e);
+    console.error('[Email Exception]', e);
     return { success: false, error: e.message };
   }
 }
