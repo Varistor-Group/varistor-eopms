@@ -258,6 +258,11 @@ function generateEntryForEmployee(
 
   const work_hours = calcWorkHours(punchIn, punchOut);
 
+  // Apply Late Entry Penalty Logic if hours < 9
+  if (work_hours !== undefined && work_hours < 9.0 && (status === 'Present' || status === 'Late')) {
+    status = 'Late';
+  }
+
   return {
     id: `atl-${emp.id}-${date}`,
     employee_id: emp.id,
@@ -391,8 +396,16 @@ export async function updateAttendance(
     updates.punch_out ?? existing.punch_out
   );
 
+  let newStatus = updates.status ?? existing.status;
+  
+  // Apply Late Entry Penalty Logic if hours < 9
+  if (newWorkHours !== undefined && newWorkHours < 9.0 && (newStatus === 'Present' || newStatus === 'Late')) {
+    newStatus = 'Late';
+  }
+
   const updatedFields: Partial<AttendanceLedgerEntry> = {
     ...updates,
+    status: newStatus,
     work_hours: newWorkHours,
     source: 'hr_override',
     override_reason: reason,
