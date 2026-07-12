@@ -118,17 +118,35 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
   const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
 
-  let addHeads = ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""];
-  let dedHeads = ["PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""];
-  try {
-    const savedHeads = localStorage.getItem('eopms_salary_heads');
-    if (savedHeads) {
-      const parsed = JSON.parse(savedHeads);
-      if (parsed.additions) addHeads = parsed.additions;
-      if (parsed.deductions) dedHeads = parsed.deductions;
-    }
-  } catch (e) {
-    console.error(e);
+  let addHeads = record.additionHeads;
+  let dedHeads = record.deductionHeads;
+  let addValues = record.additionValues;
+  let dedValues = record.deductionValues;
+
+  if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
+    const comp = computeNet({
+      monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
+      monthlyCtc: record.ctc,
+      totalDays: record.totalDays,
+      payDays: record.payDays,
+      medical: c.medical,
+      ta: c.ta,
+      lta: c.lta,
+      reimbursement: c.reimbursement,
+      incentives: c.incentives,
+      overtime: c.overtime,
+      tds: c.tds,
+      otherDeductions: c.otherDeductions,
+      employeeId: record.employeeId,
+      attendanceBreakdown: record.attendanceBreakdown,
+      hasPf: record.hasPf,
+      hasEsi: record.hasEsi,
+      hasPt: record.hasPt,
+    });
+    addHeads = comp.additionHeads;
+    dedHeads = comp.deductionHeads;
+    addValues = comp.additionValues;
+    dedValues = comp.deductionValues;
   }
 
   const earnings: { label: string; val: number | null }[] = [];
@@ -137,41 +155,14 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   for (let i = 0; i < 10; i++) {
     const addName = addHeads[i]?.trim();
     if (addName) {
-      let val = 0;
-      if (Array.isArray(record.additionValues) && record.additionValues[i] !== undefined) {
-        val = record.additionValues[i];
-      } else {
-        const lower = addName.toLowerCase();
-        if (lower === 'basic') val = basic;
-        else if (lower === 'hra') val = hra;
-        else if (['medical', 'medical allowance'].includes(lower)) val = medical;
-        else if (['ta', 'travel allowance', 'transport allowance'].includes(lower)) val = ta;
-        else if (lower === 'lta') val = lta;
-        else if (['special allowance', 'special'].includes(lower)) val = specialAllowance;
-        else if (lower === 'reimbursement') val = reimbursement;
-        else if (lower === 'incentives') val = incentives;
-        else if (lower === 'ot hours') val = overtime;
-      }
-      earnings.push({ label: addName, val });
+      earnings.push({ label: addName, val: addValues?.[i] ?? null });
     } else {
       earnings.push({ label: '', val: null });
     }
 
     const dedName = dedHeads[i]?.trim();
     if (dedName) {
-      let val = 0;
-      if (Array.isArray(record.deductionValues) && record.deductionValues[i] !== undefined) {
-        val = record.deductionValues[i];
-      } else {
-        const lower = dedName.toLowerCase();
-        if (lower === 'pf') val = pfEmployee;
-        else if (lower === 'pf employer') val = pfEmployer;
-        else if (lower === 'esi') val = esi;
-        else if (lower === 'pt') val = pt;
-        else if (lower === 'tds') val = tds;
-        else if (['other deductions', 'advance salary adjut'].includes(lower)) val = otherDeductions;
-      }
-      deductions.push({ label: dedName, val });
+      deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
     } else {
       deductions.push({ label: '', val: null });
     }
@@ -179,7 +170,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
 
   let maxSlipRows = 0;
   for (let i = 0; i < 10; i++) {
-    if (earnings[i].label || deductions[i].label) {
+    if (earnings[i]?.label || deductions[i]?.label) {
       maxSlipRows = i + 1;
     }
   }
