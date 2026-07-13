@@ -655,9 +655,6 @@ export async function uploadFieldPhoto(
   return { success: true, photoUrl, error: null };
 }
 
-function todayISO(): string {
-  return new Date().toLocaleDateString('en-CA');
-}
 
 /**
  * Checks if a field employee is currently punched in for today without a punch out.
