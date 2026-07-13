@@ -6,8 +6,15 @@ import fs from 'fs/promises';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
+
+// ── Supabase Admin client (service role — server-side only) ───────────────────
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const app = express();
 const port = 3001;
@@ -17,12 +24,16 @@ app.use(express.json());
 // ── Nodemailer SMTP transporter ────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: process.env.SMTP_SECURE === 'true',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false, // true for 465, false for other ports
+  requireTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 transporter.verify((error) => {
@@ -92,6 +103,25 @@ app.post('/api/send-password-reset', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
+    // Generate a real Supabase password reset link via Admin API
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${process.env.APP_URL || 'http://localhost:5173'}/reset-password`,
+      },
+    });
+
+    if (linkError) {
+      console.error('[send-password-reset] generateLink error:', linkError);
+      return res.status(400).json({ success: false, error: linkError.message || 'Could not generate reset link. Check that this email exists in the system.' });
+    }
+
+    const resetLink = linkData.properties?.action_link;
+    if (!resetLink) {
+      return res.status(500).json({ success: false, error: 'Reset link generation failed — no link returned.' });
+    }
+
     await transporter.sendMail({
       from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: email,
@@ -104,7 +134,7 @@ app.post('/api/send-password-reset', async (req, res) => {
           <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
             <h2 style="font-size: 18px; font-weight: 600; color: #111;">Password Reset Requested</h2>
             <p style="color: #444; line-height: 1.6;">We received a request to reset the password for your Varistor EOPMS account.</p>
-            <a href="${process.env.APP_URL || 'http://localhost:5173'}/reset?token=PENDING_REAL_TOKEN" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
+            <a href="${resetLink}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
             <p style="color: #444; line-height: 1.6; margin-top: 24px;">If you did not request this, please ignore this email. Your password will not be changed.</p>
             <p style="color: #888; font-size: 12px; margin-top: 32px;">This link expires in 1 hour.</p>
           </div>
