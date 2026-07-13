@@ -432,34 +432,59 @@ const generateSalarySlipPDF = (slip) => {
       doc.text('Amount (Rs.)', 470, 191, { align: 'right', width: 80 });
 
       // Table Row Content
-      const earnings = [
-        { label: 'Salary', val: slip.monthlySalary },
-        { label: 'Basic', val: slip.basic },
-        { label: 'HRA', val: slip.hra },
-        { label: 'Medical', val: slip.medical },
-        { label: 'TA', val: slip.ta },
-        { label: 'LTA', val: slip.lta },
-        { label: 'Special Allowance', val: slip.specialAllowance },
-        { label: 'Reimbursement', val: slip.reimbursement },
-        { label: 'Incentives', val: slip.incentives },
-        { label: 'OT Hours', val: slip.overtime },
-      ];
+      let earnings = [];
+      let deductions = [];
 
-      const deductions = [
-        { label: 'PF Employee', val: slip.pfEmployee },
-        { label: 'PF Employer', val: slip.pfEmployer },
-        { label: 'ESI', val: slip.esi },
-        { label: 'PT', val: slip.pt },
-        { label: 'TDS', val: slip.tds },
-        { label: 'Other Deductions', val: slip.otherDeductions },
-        { label: '', val: null },
-        { label: '', val: null },
-        { label: '', val: null },
-        { label: '', val: null },
-      ];
+      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
+          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+        for (let i = 0; i < 10; i++) {
+          earnings.push({
+            label: slip.additionHeads[i] || '',
+            val: (slip.additionHeads[i] && slip.additionValues[i] !== undefined) ? slip.additionValues[i] : null
+          });
+          deductions.push({
+            label: slip.deductionHeads[i] || '',
+            val: (slip.deductionHeads[i] && slip.deductionValues[i] !== undefined) ? slip.deductionValues[i] : null
+          });
+        }
+      } else {
+        earnings = [
+          { label: 'Salary', val: slip.monthlySalary },
+          { label: 'Basic', val: slip.basic },
+          { label: 'HRA', val: slip.hra },
+          { label: 'Medical', val: slip.medical },
+          { label: 'TA', val: slip.ta },
+          { label: 'LTA', val: slip.lta },
+          { label: 'Special Allowance', val: slip.specialAllowance },
+          { label: 'Reimbursement', val: slip.reimbursement },
+          { label: 'Incentives', val: slip.incentives },
+          { label: 'OT Hours', val: slip.overtime },
+        ];
+
+        deductions = [
+          { label: 'PF Employee', val: slip.pfEmployee },
+          { label: 'PF Employer', val: slip.pfEmployer },
+          { label: 'ESI', val: slip.esi },
+          { label: 'PT', val: slip.pt },
+          { label: 'TDS', val: slip.tds },
+          { label: 'Other Deductions', val: slip.otherDeductions },
+          { label: '', val: null },
+          { label: '', val: null },
+          { label: '', val: null },
+          { label: '', val: null },
+        ];
+      }
+
+      let maxPdfRows = 0;
+      for (let i = 0; i < 10; i++) {
+        if (earnings[i].label || deductions[i].label) {
+          maxPdfRows = i + 1;
+        }
+      }
+      if (maxPdfRows === 0) maxPdfRows = 10;
 
       let currentY = 204;
-      for (let idx = 0; idx < 10; idx++) {
+      for (let idx = 0; idx < maxPdfRows; idx++) {
         const earn = earnings[idx];
         doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
         if (earn.label) {
@@ -470,7 +495,7 @@ const generateSalarySlipPDF = (slip) => {
         }
 
         const deduct = deductions[idx];
-        if (deduct.label) {
+        if (deduct && deduct.label) {
           doc.text(deduct.label, 302, currentY + 3);
           if (deduct.val !== null && deduct.val !== undefined) {
             doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
@@ -512,20 +537,31 @@ const generateSalarySlipPDF = (slip) => {
       
       currentY += 20;
 
+      const finalPay = slip.netPay - (slip.deduction || 0);
+
       // Net Pay Row
       doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
       doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
       
       doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
-      doc.text('NetPay [In-Hand]', 45, currentY + 13);
       
-      doc.fontSize(14).font('Helvetica-Bold');
-      doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
+      if (slip.deduction && slip.deduction > 0) {
+        doc.text('Final Pay [In-Hand]', 45, currentY + 13);
+        doc.fontSize(14).font('Helvetica-Bold');
+        doc.text(fmt(finalPay), 150, currentY + 11, { align: 'right', width: 140 });
 
-      // Number to Words
-      const words = numberToWords(slip.netPay);
-      doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
-      doc.text(words, 305, currentY + 8, { width: 242, align: 'center' });
+        const words = numberToWords(finalPay);
+        doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
+        doc.text(`Net Pay: ${fmt(slip.netPay)} | Deduction: ${fmt(slip.deduction)}\n${words}`, 305, currentY + 7, { width: 242, align: 'center' });
+      } else {
+        doc.text('NetPay [In-Hand]', 45, currentY + 13);
+        doc.fontSize(14).font('Helvetica-Bold');
+        doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
+
+        const words = numberToWords(slip.netPay);
+        doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
+        doc.text(words, 305, currentY + 14, { width: 242, align: 'center' });
+      }
 
       // Borders for Net Pay row
       doc.moveTo(40, currentY + 36).lineTo(555, currentY + 36).stroke();
@@ -563,66 +599,35 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
     const buildSlipHtml = (slip) => {
       const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const words = numberToWords(slip.netPay);
-      return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Salary Slip – ${month}</title></head>
-<body style="margin:0;padding:0;background:#f4f6f3;font-family:Arial,Helvetica,sans-serif;color:#111;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
-        <tr>
-          <td style="padding:24px 32px;text-align:center;border-bottom:1px solid #d8ded2;">
-            <p style="margin:0;color:#111;font-size:22px;font-weight:700;">Varistor Technologies Pvt. Ltd.</p>
-            <p style="margin:6px 0 0;color:#555;font-size:11px;">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
-            <p style="margin:2px 0 0;color:#555;font-size:11px;">Email - hr@varistor.in, Telephone - 080 4117 8911</p>
-          </td>
-        </tr>
-        <tr bgcolor="#fef08a">
-          <td style="padding:10px;text-align:center;font-weight:bold;font-size:13px;color:#111;">
-            Pay Slip for the Month of ${month}
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 32px 0;">
-            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
-              <tr>
-                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Emp ID.</td>
-                <td width="30%" style="border:1px solid #cccccc;">${slip.employeeId || '—'}</td>
-                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Designation</td>
-                <td width="30%" style="border:1px solid #cccccc;">${slip.designation || '—'}</td>
-              </tr>
-              <tr>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Employee Name</td>
-                <td style="border:1px solid #cccccc;">${slip.name}</td>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Department</td>
-                <td style="border:1px solid #cccccc;">${slip.department || '—'}</td>
-              </tr>
-              <tr>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.totalDays || 30}</td>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Paid No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.payDays || 30}</td>
-              </tr>
-              <tr>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">PF UAN No.</td>
-                <td style="border:1px solid #cccccc;">${slip.pfUan || '—'}</td>
-                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">CL Balance</td>
-                <td style="border:1px solid #cccccc;">${slip.clBalance || 0}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 32px;">
-            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
-              <tr bgcolor="#bfdbfe" style="font-weight:bold;">
-                <td width="35%" style="border:1px solid #cccccc;">Earnings</td>
-                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
-                <td width="35%" style="border:1px solid #cccccc;">Deductions</td>
-                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
-              </tr>
+      const finalPay = slip.netPay - (slip.deduction || 0);
+      const words = numberToWords(finalPay);
+
+      let rowsHtml = '';
+      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
+          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+        let maxRows = 0;
+        for (let i = 0; i < 10; i++) {
+          if (slip.additionHeads[i] || slip.deductionHeads[i]) {
+            maxRows = i + 1;
+          }
+        }
+        for (let i = 0; i < maxRows; i++) {
+          const addHead = slip.additionHeads[i] || '';
+          const addVal = addHead ? fmt(slip.additionValues[i]) : '';
+          const dedHead = slip.deductionHeads[i] || '';
+          const dedVal = dedHead ? fmt(slip.deductionValues[i]) : '';
+
+          rowsHtml += `
+            <tr>
+              <td style="border:1px solid #cccccc;">${addHead || '&nbsp;'}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${addVal || '&nbsp;'}</td>
+              <td style="border:1px solid #cccccc;">${dedHead || '&nbsp;'}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${dedVal || '&nbsp;'}</td>
+            </tr>
+          `;
+        }
+      } else {
+        rowsHtml = `
               <tr>
                 <td style="border:1px solid #cccccc;">Salary</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.monthlySalary)}</td>
@@ -683,6 +688,69 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="border:1px solid #cccccc;">&nbsp;</td>
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
               </tr>
+        `;
+      }
+
+      return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salary Slip – ${month}</title></head>
+<body style="margin:0;padding:0;background:#f4f6f3;font-family:Arial,Helvetica,sans-serif;color:#111;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f3;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #d8ded2;">
+        <tr>
+          <td style="padding:24px 32px;text-align:center;border-bottom:1px solid #d8ded2;">
+            <p style="margin:0;color:#111;font-size:22px;font-weight:700;">Varistor Technologies Pvt. Ltd.</p>
+            <p style="margin:6px 0 0;color:#555;font-size:11px;">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
+            <p style="margin:2px 0 0;color:#555;font-size:11px;">Email - hr@varistor.in, Telephone - 080 4117 8911</p>
+          </td>
+        </tr>
+        <tr bgcolor="#fef08a">
+          <td style="padding:10px;text-align:center;font-weight:bold;font-size:13px;color:#111;">
+            Pay Slip for the Month of ${month}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px 0;">
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
+              <tr>
+                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Emp ID.</td>
+                <td width="30%" style="border:1px solid #cccccc;">${slip.employeeId || '—'}</td>
+                <td width="20%" style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Designation</td>
+                <td width="30%" style="border:1px solid #cccccc;">${slip.designation || '—'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Employee Name</td>
+                <td style="border:1px solid #cccccc;">${slip.name}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Department</td>
+                <td style="border:1px solid #cccccc;">${slip.department || '—'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">No. of Days</td>
+                <td style="border:1px solid #cccccc;">${slip.totalDays || 30}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Paid No. of Days</td>
+                <td style="border:1px solid #cccccc;">${slip.payDays || 30}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">PF UAN No.</td>
+                <td style="border:1px solid #cccccc;">${slip.pfUan || '—'}</td>
+                <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">CL Balance</td>
+                <td style="border:1px solid #cccccc;">${slip.clBalance || 0}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;">
+            <table width="100%" cellpadding="6" cellspacing="0" style="font-size:12px;border-collapse:collapse;border:1px solid #cccccc;">
+              <tr bgcolor="#bfdbfe" style="font-weight:bold;">
+                <td width="35%" style="border:1px solid #cccccc;">Earnings</td>
+                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
+                <td width="35%" style="border:1px solid #cccccc;">Deductions</td>
+                <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
+              </tr>
+              ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
                 <td style="border:1px solid #cccccc;">Total CTC</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ctc)}</td>
@@ -690,9 +758,15 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.deductions)}</td>
               </tr>
               <tr>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">NetPay [In-Hand]</td>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">${fmt(slip.netPay)}</td>
-                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">${words}</td>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
+                  ${slip.deduction && slip.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}
+                </td>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">
+                  ${fmt(finalPay)}
+                </td>
+                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">
+                  ${slip.deduction && slip.deduction > 0 ? `Net Pay: ${fmt(slip.netPay)} | Deduction: ${fmt(slip.deduction)}<br/>` : ''}${words}
+                </td>
               </tr>
             </table>
           </td>

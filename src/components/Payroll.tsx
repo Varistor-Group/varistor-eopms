@@ -93,7 +93,8 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
 // ─── Salary Slip Preview Modal ─────────────────────────────────────────────────
 
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
-  const netPayWords = numberToWords(record.netPay);
+  const finalPay = record.netPay - (record.deduction ?? 0);
+  const netPayWords = numberToWords(finalPay);
 
   const c: any = record.components || {};
   const monthlySalary = record.monthlySalary ?? record.ctc ?? 0;
@@ -116,6 +117,69 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
 
   const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
   const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
+
+  let addHeads = record.additionHeads;
+  let dedHeads = record.deductionHeads;
+  let addValues = record.additionValues;
+  let dedValues = record.deductionValues;
+
+  if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
+    const comp = computeNet({
+      monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
+      monthlyCtc: record.ctc,
+      totalDays: record.totalDays,
+      payDays: record.payDays,
+      medical: c.medical,
+      ta: c.ta,
+      lta: c.lta,
+      reimbursement: c.reimbursement,
+      incentives: c.incentives,
+      overtime: c.overtime,
+      tds: c.tds,
+      otherDeductions: c.otherDeductions,
+      employeeId: record.employeeId,
+      attendanceBreakdown: record.attendanceBreakdown,
+      hasPf: record.hasPf,
+      hasEsi: record.hasEsi,
+      hasPt: record.hasPt,
+    });
+    addHeads = comp.additionHeads;
+    dedHeads = comp.deductionHeads;
+    addValues = comp.additionValues;
+    dedValues = comp.deductionValues;
+  }
+
+  const earnings: { label: string; val: number | null }[] = [];
+  const deductions: { label: string; val: number | null }[] = [];
+
+  for (let i = 0; i < 10; i++) {
+    const addName = addHeads[i]?.trim();
+    if (addName) {
+      earnings.push({ label: addName, val: addValues?.[i] ?? null });
+    } else {
+      earnings.push({ label: '', val: null });
+    }
+
+    const dedName = dedHeads[i]?.trim();
+    if (dedName) {
+      deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
+    } else {
+      deductions.push({ label: '', val: null });
+    }
+  }
+
+  let maxSlipRows = 0;
+  for (let i = 0; i < 10; i++) {
+    if (earnings[i]?.label || deductions[i]?.label) {
+      maxSlipRows = i + 1;
+    }
+  }
+  if (maxSlipRows === 0) maxSlipRows = 10;
+
+  const finalTotalDeductions = Array.isArray(record.deductionValues)
+    ? record.deductionValues.reduce((a, b) => a + b, 0)
+    : totalDeductions;
+  const finalTotalCtc = record.gross ?? totalCtc;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">
@@ -185,71 +249,27 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Salary</td>
-                <td className="p-2 text-right font-mono">{fmt(monthlySalary)}</td>
-                <td className="p-2">PF Employee</td>
-                <td className="p-2 text-right font-mono">{fmt(pfEmployee)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Basic</td>
-                <td className="p-2 text-right font-mono">{fmt(basic)}</td>
-                <td className="p-2">PF Employer</td>
-                <td className="p-2 text-right font-mono">{fmt(pfEmployer)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">HRA</td>
-                <td className="p-2 text-right font-mono">{fmt(hra)}</td>
-                <td className="p-2">ESI</td>
-                <td className="p-2 text-right font-mono">{fmt(esi)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Medical</td>
-                <td className="p-2 text-right font-mono">{fmt(medical)}</td>
-                <td className="p-2">PT</td>
-                <td className="p-2 text-right font-mono">{fmt(pt)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">TA</td>
-                <td className="p-2 text-right font-mono">{fmt(ta)}</td>
-                <td className="p-2">TDS</td>
-                <td className="p-2 text-right font-mono">{fmt(tds)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">LTA</td>
-                <td className="p-2 text-right font-mono">{fmt(lta)}</td>
-                <td className="p-2">Other Deductions</td>
-                <td className="p-2 text-right font-mono">{fmt(otherDeductions)}</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Special Allowance</td>
-                <td className="p-2 text-right font-mono">{fmt(specialAllowance)}</td>
-                <td className="p-2">&nbsp;</td>
-                <td className="p-2 text-right font-mono">&nbsp;</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Reimbursement</td>
-                <td className="p-2 text-right font-mono">{fmt(reimbursement)}</td>
-                <td className="p-2">&nbsp;</td>
-                <td className="p-2 text-right font-mono">&nbsp;</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">Incentives</td>
-                <td className="p-2 text-right font-mono">{fmt(incentives)}</td>
-                <td className="p-2">&nbsp;</td>
-                <td className="p-2 text-right font-mono">&nbsp;</td>
-              </tr>
-              <tr className="divide-x divide-gray-300">
-                <td className="p-2">OT Hours</td>
-                <td className="p-2 text-right font-mono">{fmt(overtime)}</td>
-                <td className="p-2">&nbsp;</td>
-                <td className="p-2 text-right font-mono">&nbsp;</td>
-              </tr>
+              {Array.from({ length: maxSlipRows }).map((_, idx) => {
+                const earn = earnings[idx] || { label: '', val: null };
+                const deduct = deductions[idx] || { label: '', val: null };
+                return (
+                  <tr key={idx} className="divide-x divide-gray-300">
+                    <td className="p-2">{earn.label || <span className="opacity-0">—</span>}</td>
+                    <td className="p-2 text-right font-mono">
+                      {earn.label && earn.val !== null && earn.val !== undefined ? fmt(earn.val) : ''}
+                    </td>
+                    <td className="p-2">{deduct.label || <span className="opacity-0">—</span>}</td>
+                    <td className="p-2 text-right font-mono">
+                      {deduct.label && deduct.val !== null && deduct.val !== undefined ? fmt(deduct.val) : ''}
+                    </td>
+                  </tr>
+                );
+              })}
               <tr className="bg-gray-100 font-bold divide-x divide-gray-300 border-t border-gray-300">
                 <td className="p-2">Total CTC</td>
-                <td className="p-2 text-right font-mono">{fmt(totalCtc)}</td>
+                <td className="p-2 text-right font-mono">{fmt(finalTotalCtc)}</td>
                 <td className="p-2">Total Deduction</td>
-                <td className="p-2 text-right font-mono">{fmt(totalDeductions)}</td>
+                <td className="p-2 text-right font-mono">{fmt(finalTotalDeductions)}</td>
               </tr>
             </tbody>
           </table>
@@ -257,11 +277,14 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           {/* Net Pay Block */}
           <div className="grid grid-cols-2 border border-gray-300 rounded overflow-hidden text-sm font-bold divide-x divide-gray-300 mb-4">
             <div className="bg-green-50 p-3 flex justify-between items-center">
-              <span className="text-gray-700">NetPay [In-Hand]</span>
-              <span className="text-xl text-varistor-limeText font-black">{fmt(record.netPay)}</span>
+              <span className="text-gray-700">{record.deduction && record.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}</span>
+              <span className="text-xl text-varistor-limeText font-black">{fmt(finalPay)}</span>
             </div>
-            <div className="bg-gray-50 p-3 flex items-center justify-center text-center text-xs text-gray-700 leading-tight">
-              {netPayWords}
+            <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
+              {record.deduction && record.deduction > 0 && (
+                <span className="text-[10px] text-gray-400 mb-1">Net Pay: {fmt(record.netPay)} | Deduction: {fmt(record.deduction)}</span>
+              )}
+              <span>{netPayWords}</span>
             </div>
           </div>
 
@@ -337,6 +360,14 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const tds = payRec?.components?.tds ?? 0;
         const otherDeductions = payRec?.components?.otherDeductions ?? 0;
 
+        const attendanceBreakdown = {
+          present: att.present || 0,
+          weekOff: att.weekOff || 0,
+          leaves: att.leaves || 0,
+          holidays: att.holidays || 0,
+          absent: att.absent || 0
+        };
+
         const comp = computeNet({
           monthlySalary,
           totalDays,
@@ -349,6 +380,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           overtime,
           tds,
           otherDeductions,
+          employeeId: att.employee_id,
+          attendanceBreakdown,
         });
 
         parsed.push({
@@ -381,6 +414,11 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           ctc,
           deductions: comp.totalDeductions,
           netPay: comp.netPay,
+          additionHeads: comp.additionHeads,
+          deductionHeads: comp.deductionHeads,
+          additionValues: comp.additionValues,
+          deductionValues: comp.deductionValues,
+          deduction: payRec?.deduction ?? 0,
         });
       });
 
@@ -443,6 +481,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         return;
       }
 
+      const payrollRecords = await getPayrollRecords();
       const parsed: SlipRow[] = [];
       for (let i = 1; i < raw.length; i++) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -476,21 +515,22 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const tds = parseNumber(obj.tds ?? 0);
         const otherDeductions = parseNumber(obj.otherDeductions ?? 0);
 
-        // Run calculations
-        const prorata = Math.round((monthlySalary / totalDays) * payDays);
-        const basic = Math.round(prorata * 0.5);
-        const hra = Math.round(basic * 0.5);
-        const specialAllowance = prorata - (basic + hra + medical + ta + lta);
-        
-        const pfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
-        const pfEmployer = pfEmployee;
-        
-        const gross = prorata;
-        const esi = ctc > 21000 ? 0 : Math.ceil(gross * 0.0325);
-        const pt = gross >= 15001 ? 200 : 0;
-        
-        const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
-        const netPay = gross - totalDeductions + reimbursement + incentives + overtime;
+        const comp = computeNet({
+          monthlySalary,
+          totalDays,
+          payDays,
+          medical,
+          ta,
+          lta,
+          reimbursement,
+          incentives,
+          overtime,
+          tds,
+          otherDeductions,
+          employeeId,
+        });
+
+        const payRec = payrollRecords.find(r => r.employeeId === employeeId);
 
         parsed.push({
           name,
@@ -504,24 +544,29 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           payDays,
           clBalance,
           pfUan,
-          medical,
-          ta,
-          lta,
-          reimbursement,
-          incentives,
-          overtime,
-          tds,
-          otherDeductions,
-          basic,
-          hra,
-          specialAllowance,
-          pfEmployee,
-          pfEmployer,
-          esi,
-          pt,
+          medical: comp.medical,
+          ta: comp.ta,
+          lta: comp.lta,
+          reimbursement: comp.reimbursement,
+          incentives: comp.incentives,
+          overtime: comp.overtime,
+          tds: comp.tds,
+          otherDeductions: comp.otherDeductions,
+          basic: comp.basic,
+          hra: comp.hra,
+          specialAllowance: comp.specialAllowance,
+          pfEmployee: comp.pfEmployee,
+          pfEmployer: comp.pfEmployer,
+          esi: comp.esi,
+          pt: comp.pt,
           ctc,
-          deductions: totalDeductions,
-          netPay
+          deductions: comp.totalDeductions,
+          netPay: comp.netPay,
+          additionHeads: comp.additionHeads,
+          deductionHeads: comp.deductionHeads,
+          additionValues: comp.additionValues,
+          deductionValues: comp.deductionValues,
+          deduction: payRec?.deduction ?? 0,
         });
       }
 
@@ -851,6 +896,737 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
   );
 };
 
+// ─── Customizable Payroll Configurations ────────────────────────────────────────
+
+const SalaryHeadMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [additions, setAdditions] = useState<string[]>(Array(10).fill(''));
+  const [deductions, setDeductions] = useState<string[]>(Array(10).fill(''));
+  const [pfPercentage, setPfPercentage] = useState<number>(12);
+  const [esiPercentage, setEsiPercentage] = useState<number>(0);
+  const [ptRanges, setPtRanges] = useState<{ min: number; max: number; amount: number }[]>([]);
+
+  const loadData = () => {
+    try {
+      const saved = localStorage.getItem('eopms_salary_heads');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.additions) setAdditions(parsed.additions);
+        if (parsed.deductions) {
+          let updatedDeductions = [...parsed.deductions];
+          if (!updatedDeductions.includes('ESI')) {
+            const emptyIdx = updatedDeductions.findIndex(d => d === '');
+            if (emptyIdx !== -1) updatedDeductions[emptyIdx] = 'ESI';
+          }
+          if (!updatedDeductions.includes('PT')) {
+            const emptyIdx = updatedDeductions.findIndex(d => d === '');
+            if (emptyIdx !== -1) updatedDeductions[emptyIdx] = 'PT';
+          }
+          setDeductions(updatedDeductions);
+        } else {
+          setDeductions(["PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""]);
+        }
+        if (parsed.pfPercentage !== undefined) setPfPercentage(parsed.pfPercentage);
+        if (parsed.esiPercentage !== undefined) setEsiPercentage(parsed.esiPercentage);
+        if (parsed.ptRanges) setPtRanges(parsed.ptRanges);
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    // Defaults
+    setAdditions(["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""]);
+    setDeductions(["PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""]);
+    setPfPercentage(12);
+    setEsiPercentage(0);
+    setPtRanges([
+      { min: 0, max: 2999, amount: 0 },
+      { min: 3000, max: 5999, amount: 20 },
+      { min: 6000, max: 8999, amount: 80 },
+      { min: 9000, max: 11999, amount: 150 },
+      { min: 12000, max: 500000, amount: 200 }
+    ]);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSave = () => {
+    const data = {
+      additions,
+      deductions,
+      pfPercentage,
+      esiPercentage,
+      ptRanges
+    };
+    localStorage.setItem('eopms_salary_heads', JSON.stringify(data));
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    loadData();
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border p-6 shadow-varistor mb-6 animate-[fadeInPage_200ms_ease-out]">
+      <div className="border-b border-varistor-border pb-4 mb-6">
+        <h2 className="text-lg font-bold text-varistor-dark">Advanced Salary Head Master</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Addition Heads */}
+        <div>
+          <h3 className="text-xs font-bold text-center text-varistor-dark mb-4 uppercase tracking-wider">Addition Head</h3>
+          <div className="space-y-2">
+            {additions.map((head, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-[11px] text-varistor-muted w-20">Add. Head {idx + 1}</span>
+                <input
+                  type="text"
+                  value={head}
+                  disabled={!isEditing}
+                  onChange={e => {
+                    const next = [...additions];
+                    next[idx] = e.target.value;
+                    setAdditions(next);
+                  }}
+                  className="flex-1 text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime disabled:bg-varistor-pageBg disabled:text-varistor-muted"
+                  placeholder={`Add. Head ${idx + 1}`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Deduction Heads */}
+        <div>
+          <h3 className="text-xs font-bold text-center text-varistor-dark mb-4 uppercase tracking-wider">Deduction Head</h3>
+          <div className="space-y-2">
+            {deductions.map((head, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-[11px] text-varistor-muted w-20">Ded. Head {idx + 1}</span>
+                <input
+                  type="text"
+                  value={head}
+                  disabled={!isEditing}
+                  onChange={e => {
+                    const next = [...deductions];
+                    next[idx] = e.target.value;
+                    setDeductions(next);
+                  }}
+                  className="flex-1 text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime disabled:bg-varistor-pageBg disabled:text-varistor-muted"
+                  placeholder={`Ded. Head ${idx + 1}`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Other Deduction */}
+        <div>
+          <h3 className="text-xs font-bold text-center text-varistor-dark mb-4 uppercase tracking-wider">Other Deduction</h3>
+          <div className="space-y-4 bg-varistor-pageBg p-4 rounded-xl border border-varistor-border">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-varistor-dark w-16">PF (%)</span>
+              <input
+                type="number"
+                value={pfPercentage}
+                disabled={!isEditing}
+                onChange={e => setPfPercentage(Number(e.target.value))}
+                className="w-20 text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime bg-white disabled:bg-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-varistor-dark w-16">ESI (%)</span>
+              <input
+                type="number"
+                value={esiPercentage}
+                disabled={!isEditing}
+                onChange={e => setEsiPercentage(Number(e.target.value))}
+                className="w-20 text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime bg-white disabled:bg-transparent"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Professional Tax Slabs */}
+      <div className="border-t border-varistor-border pt-6 mb-8">
+        <h3 className="text-xs font-bold text-center text-varistor-dark mb-4 uppercase tracking-wider">Professional Tax Range</h3>
+        <div className="max-w-xl mx-auto space-y-2">
+          {ptRanges.map((range, idx) => (
+            <div key={idx} className="flex items-center justify-center gap-3">
+              <input
+                type="number"
+                value={range.min}
+                disabled={!isEditing}
+                onChange={e => {
+                  const next = [...ptRanges];
+                  next[idx].min = Number(e.target.value);
+                  setPtRanges(next);
+                }}
+                className="w-24 text-center text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime disabled:bg-varistor-pageBg"
+              />
+              <span className="text-xs font-bold text-varistor-muted">TO</span>
+              <input
+                type="number"
+                value={range.max}
+                disabled={!isEditing}
+                onChange={e => {
+                  const next = [...ptRanges];
+                  next[idx].max = Number(e.target.value);
+                  setPtRanges(next);
+                }}
+                className="w-28 text-center text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime disabled:bg-varistor-pageBg"
+              />
+              <span className="text-xs font-bold text-varistor-muted">=</span>
+              <input
+                type="number"
+                value={range.amount}
+                disabled={!isEditing}
+                onChange={e => {
+                  const next = [...ptRanges];
+                  next[idx].amount = Number(e.target.value);
+                  setPtRanges(next);
+                }}
+                className="w-24 text-center text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime disabled:bg-varistor-pageBg"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex items-center justify-center gap-3 border-t border-varistor-border pt-6">
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Edit
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-1.5 px-6 py-2 bg-varistor-lime hover:bg-[#65a30d] text-white text-xs font-bold rounded-lg transition-all shadow-sm"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1.5 px-6 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-all shadow-sm"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Cancel
+            </button>
+          </>
+        )}
+        <button
+          onClick={onExit}
+          className="flex items-center gap-1.5 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-all shadow-sm"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Exit
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+  const [formulas, setFormulas] = useState<{ code: string; name: string; equation: string }[]>([]);
+  const [availableHeads, setAvailableHeads] = useState<string[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [formData, setFormData] = useState({ code: '', name: '', equation: '' });
+  const [search, setSearch] = useState('');
+
+  const loadData = () => {
+    try {
+      const saved = localStorage.getItem('eopms_salary_formulas');
+      const defaults = [
+        { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
+        { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
+        { code: "F3", name: "MEDICAL ALLOWANCE", equation: "1250" },
+        { code: "F4", name: "TA", equation: "2500" },
+        { code: "F5", name: "LTA", equation: "3500" },
+        { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, (($BS / $DIM) * ($SP + $SW + $SL + $SH)) - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
+        { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
+        { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
+        { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
+      ];
+      let loaded = saved ? JSON.parse(saved) : [];
+      if (loaded.length < 9) {
+        loaded = defaults;
+        localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaults));
+      }
+      setFormulas(loaded);
+
+      const headsRaw = localStorage.getItem('eopms_salary_heads');
+      let headsList: string[] = [];
+      if (headsRaw) {
+        const parsed = JSON.parse(headsRaw);
+        if (parsed.additions) headsList = [...headsList, ...parsed.additions];
+        if (parsed.deductions) headsList = [...headsList, ...parsed.deductions];
+      } else {
+        headsList = ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "PF", "ESI", "PT", "Advance salary adjut"];
+      }
+      setAvailableHeads(headsList.filter(h => h.trim() !== ''));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const saveFormulas = (newFormulas: typeof formulas) => {
+    setFormulas(newFormulas);
+    localStorage.setItem('eopms_salary_formulas', JSON.stringify(newFormulas));
+  };
+
+  const handleOpenAdd = () => {
+    const nextCode = `F${formulas.length + 1}`;
+    setFormData({ code: nextCode, name: availableHeads[0] || '', equation: '' });
+    setEditIndex(null);
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (idx: number) => {
+    setFormData(formulas[idx]);
+    setEditIndex(idx);
+    setShowForm(true);
+  };
+
+  const handleDelete = (idx: number) => {
+    if (window.confirm('Are you sure you want to delete this formula?')) {
+      const next = formulas.filter((_, i) => i !== idx);
+      saveFormulas(next);
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.equation) {
+      alert('Please fill in all fields');
+      return;
+    }
+    if (editIndex !== null) {
+      const next = [...formulas];
+      next[editIndex] = formData;
+      saveFormulas(next);
+    } else {
+      saveFormulas([...formulas, formData]);
+    }
+    setShowForm(false);
+  };
+
+  const filtered = formulas.filter(f =>
+    f.name.toLowerCase().includes(search.toLowerCase()) ||
+    f.code.toLowerCase().includes(search.toLowerCase()) ||
+    f.equation.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border p-6 shadow-varistor mb-6 animate-[fadeInPage_200ms_ease-out]">
+      <div className="border-b border-varistor-border pb-4 mb-6">
+        <h2 className="text-lg font-bold text-varistor-dark">Salary Formula Master</h2>
+      </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleFormSubmit} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 className="font-bold text-varistor-dark text-base">{editIndex !== null ? 'Edit Formula' : 'Add New Formula'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-varistor-muted mb-1">Formula Code</label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={e => setFormData({ ...formData, code: e.target.value })}
+                  className="w-full text-xs border border-varistor-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-varistor-muted mb-1">Formula Name (Associated Head)</label>
+                <select
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full text-xs border border-varistor-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime bg-white"
+                >
+                  {availableHeads.map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-varistor-muted mb-1">Equation</label>
+                <input
+                  type="text"
+                  value={formData.equation}
+                  onChange={e => setFormData({ ...formData, equation: e.target.value })}
+                  placeholder="e.g. (($BS*0.50)/$DIM)*($SP+$SW+$SL+$SH)"
+                  className="w-full text-xs border border-varistor-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime font-mono"
+                  required
+                />
+                <div className="mt-2 text-[10px] text-varistor-muted bg-varistor-pageBg p-2.5 rounded border border-varistor-border leading-relaxed">
+                  <span className="font-bold">Available variables:</span>
+                  <div className="grid grid-cols-2 gap-x-2 mt-1 font-mono text-[9px]">
+                    <div>$BS: Base Amt</div>
+                    <div>$DIM: Days/Month</div>
+                    <div>$SP: Present Days</div>
+                    <div>$SW: Weekly Offs</div>
+                    <div>$SL: Leaves</div>
+                    <div>$SH: Holidays</div>
+                  </div>
+                  <div className="mt-2 text-[9px]">
+                    Reference other formulas: e.g. <code className="bg-gray-100 px-1 rounded">$Basic * 0.50</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 border border-varistor-border rounded-lg text-xs hover:bg-gray-50 text-varistor-dark font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-varistor-lime hover:bg-[#65a30d] text-white rounded-lg text-xs font-bold"
+              >
+                {editIndex !== null ? 'Update' : 'Add'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Top Filter and Search */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xs text-varistor-muted">
+          Show <span className="font-bold text-varistor-dark">all</span> entries
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="text-xs border border-varistor-border rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-lg border border-varistor-border mb-6">
+        <table className="w-full text-xs border-collapse">
+          <thead className="bg-varistor-pageBg text-varistor-muted border-b border-varistor-border font-bold text-left">
+            <tr>
+              <th className="p-3">Formula Code</th>
+              <th className="p-3">Formula Name</th>
+              <th className="p-3">Equation</th>
+              <th className="p-3 text-center w-24">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-varistor-border">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-varistor-muted">No formulas found.</td>
+              </tr>
+            ) : (
+              filtered.map((item, idx) => (
+                <tr key={idx} className="hover:bg-varistor-pageBg transition-colors">
+                  <td className="p-3 font-mono font-semibold text-varistor-dark">{item.code}</td>
+                  <td className="p-3 font-semibold text-varistor-dark">{item.name}</td>
+                  <td className="p-3 font-mono text-varistor-dark bg-gray-50/50">{item.equation}</td>
+                  <td className="p-3">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(idx)}
+                        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                        title="Edit formula"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(idx)}
+                        className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                        title="Delete formula"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-2.5">
+        <button
+          onClick={handleOpenAdd}
+          className="flex items-center gap-1.5 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add
+        </button>
+        <button
+          onClick={onExit}
+          className="flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Exit
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [companyFilter, setCompanyFilter] = useState('ALL');
+  const [deptFilter, setDeptFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
+  const [editValue, setEditValue] = useState<number>(0);
+  const [salaryDetails, setSalaryDetails] = useState<Record<string, number>>({});
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const emps = await getEmployees();
+      setEmployees(emps);
+      const saved = localStorage.getItem('eopms_employee_salary_details');
+      if (saved) {
+        setSalaryDetails(JSON.parse(saved));
+      } else {
+        const initialDetails: Record<string, number> = {
+          "VAR-001": 150000,
+          "VAR-002": 50000,
+          "VAR-003": 35000,
+          "VAR-004": 45000
+        };
+        setSalaryDetails(initialDetails);
+        localStorage.setItem('eopms_employee_salary_details', JSON.stringify(initialDetails));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleEditSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingEmployee) {
+      const next = { ...salaryDetails, [editingEmployee.employeeId]: editValue };
+      setSalaryDetails(next);
+      localStorage.setItem('eopms_employee_salary_details', JSON.stringify(next));
+      setEditingEmployee(null);
+    }
+  };
+
+  const departments = ['ALL', ...Array.from(new Set(employees.map(e => e.department).filter(Boolean)))];
+  const companies = ['ALL', 'Varistor Technologies'];
+
+  const filtered = employees.filter(emp => {
+    if (deptFilter !== 'ALL' && emp.department !== deptFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        emp.fullName.toLowerCase().includes(q) ||
+        emp.employeeId.toLowerCase().includes(q) ||
+        (emp.department || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border p-6 shadow-varistor mb-6 animate-[fadeInPage_200ms_ease-out]">
+      <div className="border-b border-varistor-border pb-4 mb-6">
+        <h2 className="text-lg font-bold text-varistor-dark">Employee Salary Details Configuration (By Formula)</h2>
+      </div>
+
+      {editingEmployee && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleEditSave} className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <h3 className="font-bold text-varistor-dark text-base">Edit Reference Amount</h3>
+            <p className="text-xs text-varistor-muted">Updating reference salary ($BS) for <span className="font-semibold text-varistor-dark">{editingEmployee.fullName} ({editingEmployee.employeeId})</span></p>
+            <div>
+              <label className="block text-xs font-semibold text-varistor-muted mb-1">BS/Reference Amount (₹)</label>
+              <input
+                type="number"
+                value={editValue}
+                onChange={e => setEditValue(Number(e.target.value))}
+                className="w-full text-xs border border-varistor-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingEmployee(null)}
+                className="px-4 py-2 border border-varistor-border rounded-lg text-xs hover:bg-gray-50 text-varistor-dark font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-varistor-lime hover:bg-[#65a30d] text-white rounded-lg text-xs font-bold"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Filters block */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 items-end">
+        <div>
+          <label className="block text-xs font-semibold text-varistor-muted mb-1">Select Company</label>
+          <select
+            value={companyFilter}
+            onChange={e => setCompanyFilter(e.target.value)}
+            className="w-full text-xs border border-varistor-border rounded px-3 py-2 bg-white focus:outline-none"
+          >
+            {companies.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-varistor-muted mb-1">Select Department</label>
+          <select
+            value={deptFilter}
+            onChange={e => setDeptFilter(e.target.value)}
+            className="w-full text-xs border border-varistor-border rounded px-3 py-2 bg-white focus:outline-none"
+          >
+            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={loadData}
+            className="flex-1 text-xs py-2 px-4 border border-green-500 hover:bg-green-50 text-green-600 hover:text-green-700 font-bold rounded-lg transition-colors"
+          >
+            Apply Filter
+          </button>
+          <button
+            onClick={() => { setCompanyFilter('ALL'); setDeptFilter('ALL'); setSearch(''); }}
+            className="flex-1 text-xs py-2 px-4 border border-blue-500 hover:bg-blue-50 text-blue-600 hover:text-blue-700 font-bold rounded-lg transition-colors"
+          >
+            Clear Filter
+          </button>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-varistor-muted mb-1">Search Employee</label>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full text-xs border border-varistor-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+          />
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <div className="bg-white rounded-lg border border-varistor-border shadow-varistor overflow-hidden mb-6">
+        {loading ? (
+          <div className="p-8 text-center text-varistor-muted text-xs">Loading employees...</div>
+        ) : (
+          <table className="w-full text-xs border-collapse">
+            <thead className="bg-varistor-pageBg text-varistor-muted border-b border-varistor-border font-bold text-left">
+              <tr>
+                <th className="p-3">EmpCode</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Dept. Name</th>
+                <th className="p-3 text-right">BS/Reference Amt</th>
+                <th className="p-3 text-center w-24">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-varistor-border">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-varistor-muted">No employees found.</td>
+                </tr>
+              ) : (
+                filtered.map((emp, idx) => {
+                  const amt = salaryDetails[emp.employeeId] ?? 30000;
+                  return (
+                    <tr key={idx} className="hover:bg-varistor-pageBg transition-colors">
+                      <td className="p-3 text-varistor-dark font-semibold">{emp.employeeId}</td>
+                      <td className="p-3 text-varistor-dark font-semibold">{emp.fullName}</td>
+                      <td className="p-3 text-varistor-muted">{emp.department || '—'}</td>
+                      <td className="p-3 text-right text-varistor-dark font-mono font-bold">{fmt(amt)}</td>
+                      <td className="p-3">
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => { setEditingEmployee(emp); setEditValue(amt); }}
+                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                            title="Edit salary reference"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <button
+        onClick={onExit}
+        className="flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-all shadow-sm"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        Exit
+      </button>
+    </div>
+  );
+};
+
 // ─── Admin Salary Engine ──────────────────────────────────────────────────────
 
 const FORMULAS = [
@@ -880,6 +1656,8 @@ const SalaryEngine: React.FC = () => {
   const [filterDept, setFilterDept] = useState('All');
   /** CL balances map: employeeId -> { total, used } */
   const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
+  const [activeTab, setActiveTab] = useState<'engine' | 'heads' | 'formulas' | 'employees'>('engine');
+  const [showFormulaRef, setShowFormulaRef] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -931,6 +1709,27 @@ const SalaryEngine: React.FC = () => {
     const ctc = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(ctc) || ctc <= 0) return;
     const updated = await updatePayrollRecord(id, { ctc });
+    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+  };
+
+  const handleDeductionChange = async (id: string, value: string) => {
+    const deduction = parseInt(value.replace(/,/g, ''), 10);
+    if (isNaN(deduction) || deduction < 0) return;
+    const updated = await updatePayrollRecord(id, { deduction });
+    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+  };
+
+  const handleComponentChange = async (id: string, field: 'basic' | 'hra', value: string) => {
+    const val = parseInt(value.replace(/,/g, ''), 10);
+    if (isNaN(val) || val < 0) return;
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    const updated = await updatePayrollRecord(id, {
+      components: {
+        ...rec.components,
+        [field]: val
+      }
+    });
     if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
   };
 
@@ -1020,299 +1819,374 @@ const SalaryEngine: React.FC = () => {
           <p className="text-sm text-varistor-muted mt-0.5">Excel-driven formula engine · {MONTH} · {records.length} employees</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowUploadPanel(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${
-              showUploadPanel
-                ? 'bg-varistor-lime text-white border-varistor-lime'
-                : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
-            }`}
-          >
-            <Mail size={14} /> {showUploadPanel ? 'Hide Upload Panel' : 'Upload Excel & Send Slips'}
-          </button>
-          <button
-            onClick={handleApplyAll}
-            disabled={applyingAll}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark disabled:opacity-50"
-          >
-            {applyingAll ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Apply formulas to all
-          </button>
-          <button
-            onClick={() => setShowAudit(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark"
-          >
-            <ShieldCheck size={14} /> Audit Log
-          </button>
-          {selectedIds.size > 0 && (
-            <button
-              onClick={handleApprove}
-              disabled={approving}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-60"
-            >
-              {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              Approve {selectedIds.size} Selected
-            </button>
+          {activeTab === 'engine' && (
+            <>
+              <button
+                onClick={() => setShowUploadPanel(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${
+                  showUploadPanel
+                    ? 'bg-varistor-lime text-white border-varistor-lime'
+                    : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
+                }`}
+              >
+                <Mail size={14} /> {showUploadPanel ? 'Hide Upload Panel' : 'Upload Excel & Send Slips'}
+              </button>
+              <button
+                onClick={handleApplyAll}
+                disabled={applyingAll}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark disabled:opacity-50"
+              >
+                {applyingAll ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Apply formulas to all
+              </button>
+              <button
+                onClick={() => setShowAudit(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-varistor-border rounded-lg hover:bg-varistor-limeLight transition-colors text-varistor-dark"
+              >
+                <ShieldCheck size={14} /> Audit Log
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleApprove}
+                  disabled={approving}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-60"
+                >
+                  {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Approve {selectedIds.size} Selected
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Excel Upload Panel */}
-      {showUploadPanel && (
-        <ExcelUploadPanel onClose={() => setShowUploadPanel(false)} />
-      )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* Sub-navigation Tabs */}
+      <div className="flex border-b border-varistor-border gap-4 mb-6">
         {[
-          { label: 'Total Employees', val: records.length, icon: Users, color: 'text-blue-500' },
-          { label: 'Draft Slips', val: draftCount, icon: FileText, color: 'text-yellow-500' },
-          { label: 'Approved Slips', val: approvedCount, icon: ShieldCheck, color: 'text-varistor-lime' },
-          { label: 'Total Net Payroll', val: fmt(totalNetPay), icon: TrendingUp, color: 'text-varistor-lime' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-white rounded-varistor border border-varistor-border p-4 flex items-center gap-3 shadow-varistor">
-            <div className={`w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center ${stat.color}`}>
-              <stat.icon size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-varistor-muted">{stat.label}</p>
-              <p className="font-bold text-varistor-dark text-sm">{stat.val}</p>
-            </div>
-          </div>
+          { id: 'engine', label: 'Salary Engine', icon: DollarSign },
+          { id: 'heads', label: 'Salary Head Master', icon: BarChart3 },
+          { id: 'formulas', label: 'Salary Formula Master', icon: FileText },
+          { id: 'employees', label: 'Employee Salary Details', icon: Users }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-1.5 pb-2 text-xs font-bold border-b-2 transition-all ${
+              activeTab === tab.id
+                ? 'border-varistor-lime text-varistor-limeText'
+                : 'border-transparent text-varistor-muted hover:text-varistor-dark'
+            }`}
+          >
+            <tab.icon size={13} />
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Formula Reference */}
-      <div className="bg-white rounded-varistor border border-varistor-border p-5 mb-6 shadow-varistor">
-        <p className="text-xs font-bold text-varistor-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <BarChart3 size={13} /> Payroll Formulas (Excel-driven)
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="pb-2 text-xs text-varistor-muted font-semibold w-32">Component</th>
-                <th className="pb-2 text-xs text-varistor-muted font-semibold">Formula</th>
-                <th className="pb-2 text-xs text-varistor-muted font-semibold w-16 text-center">Auto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-varistor-border">
-              {FORMULAS.map(row => (
-                <tr key={row.component} className="hover:bg-varistor-pageBg">
-                  <td className="py-2 font-semibold text-varistor-dark">{row.component}</td>
-                  <td className="py-2"><FormulaBadge formula={row.formula} /></td>
-                  <td className="py-2 text-center"><CheckCircle2 size={14} className="text-varistor-lime inline" /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {activeTab === 'heads' && <SalaryHeadMaster onExit={() => setActiveTab('engine')} />}
+      {activeTab === 'formulas' && <SalaryFormulaMaster onExit={() => setActiveTab('engine')} />}
+      {activeTab === 'employees' && <EmployeeSalaryDetails onExit={() => setActiveTab('engine')} />}
 
-      {/* Filter */}
-      <div className="flex items-center gap-3 mb-4">
-        <select
-          value={filterDept}
-          onChange={e => setFilterDept(e.target.value)}
-          className="text-sm border border-varistor-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-        >
-          {departments.map(d => <option key={d}>{d}</option>)}
-        </select>
-        <span className="text-xs text-varistor-muted">{visible.length} employees shown</span>
-        {selectedIds.size > 0 && <span className="text-xs font-semibold text-varistor-lime">{selectedIds.size} selected</span>}
-      </div>
+      {activeTab === 'engine' && (
+        <>
+          {/* Excel Upload Panel */}
+          {showUploadPanel && (
+            <ExcelUploadPanel onClose={() => setShowUploadPanel(false)} />
+          )}
 
-      {/* Main Table */}
-      <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <RefreshCw size={20} className="animate-spin text-varistor-lime" />
-            <span className="ml-2 text-sm text-varistor-muted">Loading payroll data…</span>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Total Employees', val: records.length, icon: Users, color: 'text-blue-500' },
+              { label: 'Draft Slips', val: draftCount, icon: FileText, color: 'text-yellow-500' },
+              { label: 'Approved Slips', val: approvedCount, icon: ShieldCheck, color: 'text-varistor-lime' },
+              { label: 'Total Net Payroll', val: fmt(totalNetPay), icon: TrendingUp, color: 'text-varistor-lime' },
+            ].map(stat => (
+              <div key={stat.label} className="bg-white rounded-varistor border border-varistor-border p-4 flex items-center gap-3 shadow-varistor">
+                <div className={`w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center ${stat.color}`}>
+                  <stat.icon size={18} />
+                </div>
+                <div>
+                  <p className="text-xs text-varistor-muted">{stat.label}</p>
+                  <p className="font-bold text-varistor-dark text-sm">{stat.val}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
-              <thead className="bg-varistor-pageBg border-b border-varistor-border text-xs text-varistor-muted">
-                <tr>
-                  <th className="px-4 py-3 w-10">
-                    <button onClick={toggleAll}>
-                      {selectedIds.size > 0 ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} />}
-                    </button>
-                  </th>
-                  {[
-                    { key: 'employeeName', label: 'Employee' },
-                    { key: 'department', label: 'Dept' },
-                    { key: 'ctc', label: 'Monthly CTC' },
-                    { key: null, label: 'CL Balance' },
-                    { key: null, label: 'LOP' },
-                    { key: null, label: 'Basic' },
-                    { key: null, label: 'HRA' },
-                    { key: null, label: 'Net Pay' },
-                    { key: null, label: 'PF' },
-                    { key: null, label: 'ESI' },
-                    { key: null, label: 'PT' },
-                    { key: 'status', label: 'Status' },
-                    { key: null, label: 'Actions' },
-                  ].map((col, i) => (
-                    <th
-                      key={i}
-                      onClick={() => col.key && toggleSort(col.key as keyof PayrollRecord)}
-                      className={`px-4 py-3 text-left font-semibold uppercase tracking-wider ${col.key ? 'cursor-pointer select-none hover:text-varistor-dark' : ''}`}
-                    >
-                      <span className="flex items-center gap-1">
-                        {col.label}
-                        {col.key && <SortIcon field={col.key as keyof PayrollRecord} />}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-varistor-border">
-                {visible.map(rec => {
-                  const isSelected = selectedIds.has(rec.id);
-                  const isApproved = rec.status === 'approved';
-                  const clBal = clBalances[rec.employeeId] ?? { total: 12, used: 0 };
-                  const lopDays = computeLopDays(clBal);
-                  return (
-                    <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
-                      <td className="px-4 py-3">
-                        {!isApproved ? (
-                          <button onClick={() => toggleSelect(rec.id)}>
-                            {isSelected ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} className="text-gray-300" />}
-                          </button>
-                        ) : (
-                          <Lock size={13} className="text-gray-300 mx-auto" />
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-varistor-dark">{rec.employeeName}</div>
-                        <div className="text-[11px] text-varistor-muted">{rec.employeeId}</div>
-                      </td>
-                      <td className="px-4 py-3 text-varistor-muted">{rec.department}</td>
-                      {/* Monthly CTC */}
-                      <td className="px-4 py-3">
-                        {isAdmin && !isApproved ? (
-                          <input
-                            type="number"
-                            defaultValue={rec.ctc}
-                            onBlur={e => handleCTCChange(rec.id, e.target.value)}
-                            className="w-28 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                          />
-                        ) : (
-                          <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
-                        )}
-                      </td>
-                      {/* CL Balance */}
-                      <td className="px-4 py-3">
-                        {isAdmin ? (
-                          <div className="flex flex-col gap-0.5">
-                            <input
-                              type="number"
-                              defaultValue={clBal.total}
-                              onBlur={e => handleCLBalanceChange(rec.employeeId, e.target.value)}
-                              min={0}
-                              className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                              title="Total CL days entitlement"
-                            />
-                            <span className="text-[10px] text-varistor-muted">{clBal.used} used</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-mono">{clBal.total - clBal.used} / {clBal.total}</span>
-                        )}
-                      </td>
-                      {/* LOP Days */}
-                      <td className="px-4 py-3 text-center">
-                        {lopDays > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[11px] font-bold rounded border border-red-200">
-                            -{lopDays}d
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-gray-300">—</span>
-                        )}
-                      </td>
-                      {(['basic', 'hra'] as const).map(f => (
-                        <td key={f} className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.components[f])}</td>
-                      ))}
-                      <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
-                      {/* PF checkbox */}
-                      <td className="px-4 py-3 text-center">
-                        {isAdmin && !isApproved ? (
-                          <input
-                            type="checkbox"
-                            checked={rec.hasPf}
-                            onChange={(e) => handleToggleFlag(rec.id, 'hasPf', e.target.checked)}
-                            title={rec.hasPf ? 'PF applied — uncheck to disable' : 'PF disabled — check to enable'}
-                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                          />
-                        ) : (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                          }`}>{rec.hasPf ? 'On' : 'Off'}</span>
-                        )}
-                      </td>
-                      {/* ESI checkbox */}
-                      <td className="px-4 py-3 text-center">
-                        {isAdmin && !isApproved ? (
-                          <input
-                            type="checkbox"
-                            checked={rec.hasEsi}
-                            onChange={(e) => handleToggleFlag(rec.id, 'hasEsi', e.target.checked)}
-                            title={rec.hasEsi ? 'ESI applied — uncheck to disable' : 'ESI disabled — check to enable'}
-                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                          />
-                        ) : (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                          }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
-                        )}
-                      </td>
-                      {/* PT checkbox */}
-                      <td className="px-4 py-3 text-center">
-                        {isAdmin && !isApproved ? (
-                          <input
-                            type="checkbox"
-                            checked={rec.hasPt}
-                            onChange={(e) => handleToggleFlag(rec.id, 'hasPt', e.target.checked)}
-                            title={rec.hasPt ? 'PT applied — uncheck to disable' : 'PT disabled — check to enable'}
-                            className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                          />
-                        ) : (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                          }`}>{rec.hasPt ? 'On' : 'Off'}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {isApproved ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-varistor-limeTint text-varistor-limeText text-[11px] font-semibold rounded-full">
-                            <Lock size={10} /> Approved
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-50 text-yellow-700 text-[11px] font-semibold rounded-full border border-yellow-200">
-                            <Unlock size={10} /> Draft
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => setPreviewRecord(rec)} className="p-1.5 rounded-lg hover:bg-varistor-limeLight text-varistor-muted hover:text-varistor-lime" title="Preview">
-                            <Eye size={14} />
-                          </button>
-                          {isApproved && isAdmin && (
-                            <button onClick={() => handleRevision(rec.id)} className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-400 hover:text-orange-600" title="New revision">
-                              <RefreshCw size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+
+          {/* Formula Reference */}
+          <div className="bg-white rounded-varistor border border-varistor-border p-4 mb-6 shadow-varistor">
+            <button
+              onClick={() => setShowFormulaRef(v => !v)}
+              className="w-full flex items-center justify-between text-xs font-bold text-varistor-muted uppercase tracking-wider focus:outline-none"
+            >
+              <span className="flex items-center gap-1.5">
+                <BarChart3 size={13} /> Payroll Formulas (Excel-driven)
+              </span>
+              <span className="text-[10px] text-varistor-lime font-bold">
+                {showFormulaRef ? 'Hide Formulas ▲' : 'View Formulas ▼'}
+              </span>
+            </button>
+
+            {showFormulaRef && (
+              <div className="overflow-x-auto mt-4 pt-4 border-t border-varistor-border animate-[fadeInPage_150ms_ease-out]">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="pb-2 text-xs text-varistor-muted font-semibold w-32">Component</th>
+                      <th className="pb-2 text-xs text-varistor-muted font-semibold">Formula</th>
+                      <th className="pb-2 text-xs text-varistor-muted font-semibold w-16 text-center">Auto</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-varistor-border">
+                    {FORMULAS.map(row => (
+                      <tr key={row.component} className="hover:bg-varistor-pageBg">
+                        <td className="py-2 font-semibold text-varistor-dark">{row.component}</td>
+                        <td className="py-2"><FormulaBadge formula={row.formula} /></td>
+                        <td className="py-2 text-center"><CheckCircle2 size={14} className="text-varistor-lime inline" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Filter */}
+          <div className="flex items-center gap-3 mb-4">
+            <select
+              value={filterDept}
+              onChange={e => setFilterDept(e.target.value)}
+              className="text-sm border border-varistor-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+            >
+              {departments.map(d => <option key={d}>{d}</option>)}
+            </select>
+            <span className="text-xs text-varistor-muted">{visible.length} employees shown</span>
+            {selectedIds.size > 0 && <span className="text-xs font-semibold text-varistor-lime">{selectedIds.size} selected</span>}
+          </div>
+
+          {/* Main Table */}
+          <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center h-40">
+                <RefreshCw size={20} className="animate-spin text-varistor-lime" />
+                <span className="ml-2 text-sm text-varistor-muted">Loading payroll data…</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[900px]">
+                  <thead className="bg-varistor-pageBg border-b border-varistor-border text-xs text-varistor-muted">
+                    <tr>
+                      <th className="px-4 py-3 w-10">
+                        <button onClick={toggleAll}>
+                          {selectedIds.size > 0 ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} />}
+                        </button>
+                      </th>
+                      {[
+                        { key: 'employeeName', label: 'Employee' },
+                        { key: 'department', label: 'Dept' },
+                        { key: 'ctc', label: 'Monthly CTC' },
+                        { key: null, label: 'CL Balance' },
+                        { key: null, label: 'LOP' },
+                        { key: null, label: 'Basic' },
+                        { key: null, label: 'HRA' },
+                        { key: null, label: 'Net Pay' },
+                        { key: null, label: 'Deductions' },
+                        { key: null, label: 'Final Pay' },
+                        { key: null, label: 'PF' },
+                        { key: null, label: 'ESI' },
+                        { key: null, label: 'PT' },
+                        { key: 'status', label: 'Status' },
+                        { key: null, label: 'Actions' },
+                      ].map((col, i) => (
+                        <th
+                          key={i}
+                          onClick={() => col.key && toggleSort(col.key as keyof PayrollRecord)}
+                          className={`px-4 py-3 text-left font-semibold uppercase tracking-wider ${col.key ? 'cursor-pointer select-none hover:text-varistor-dark' : ''}`}
+                        >
+                          <span className="flex items-center gap-1">
+                            {col.label}
+                            {col.key && <SortIcon field={col.key as keyof PayrollRecord} />}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-varistor-border">
+                    {visible.map(rec => {
+                      const isSelected = selectedIds.has(rec.id);
+                      const isApproved = rec.status === 'approved';
+                      const clBal = clBalances[rec.employeeId] ?? { total: 12, used: 0 };
+                      const lopDays = computeLopDays(clBal);
+                      return (
+                        <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
+                          <td className="px-4 py-3">
+                            {!isApproved ? (
+                              <button onClick={() => toggleSelect(rec.id)}>
+                                {isSelected ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} className="text-gray-300" />}
+                              </button>
+                            ) : (
+                              <Lock size={13} className="text-gray-300 mx-auto" />
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-varistor-dark">{rec.employeeName}</div>
+                            <div className="text-[11px] text-varistor-muted">{rec.employeeId}</div>
+                          </td>
+                          <td className="px-4 py-3 text-varistor-muted">{rec.department}</td>
+                          {/* Monthly CTC */}
+                          <td className="px-4 py-3">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="number"
+                                defaultValue={rec.ctc}
+                                onBlur={e => handleCTCChange(rec.id, e.target.value)}
+                                className="w-28 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                              />
+                            ) : (
+                              <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
+                            )}
+                          </td>
+                          {/* CL Balance */}
+                          <td className="px-4 py-3">
+                            {isAdmin ? (
+                              <div className="flex flex-col gap-0.5">
+                                <input
+                                  type="number"
+                                  defaultValue={clBal.total}
+                                  onBlur={e => handleCLBalanceChange(rec.employeeId, e.target.value)}
+                                  min={0}
+                                  className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                                  title="Total CL days entitlement"
+                                />
+                                <span className="text-[10px] text-varistor-muted">{clBal.used} used</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs font-mono">{clBal.total - clBal.used} / {clBal.total}</span>
+                            )}
+                          </td>
+                          {/* LOP Days */}
+                          <td className="px-4 py-3 text-center">
+                            {lopDays > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[11px] font-bold rounded border border-red-200">
+                                -{lopDays}d
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-300">—</span>
+                            )}
+                          </td>
+                          {(['basic', 'hra'] as const).map(f => (
+                            <td key={f} className="px-4 py-3">
+                              {isAdmin && !isApproved ? (
+                                <input
+                                  type="number"
+                                  key={`${rec.id}-${f}-${rec.components[f]}`}
+                                  defaultValue={rec.components[f]}
+                                  onBlur={e => handleComponentChange(rec.id, f, e.target.value)}
+                                  className="w-20 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                                />
+                              ) : (
+                                <span className="font-mono text-xs text-varistor-dark">{fmt(rec.components[f])}</span>
+                              )}
+                            </td>
+                          ))}
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
+                          <td className="px-4 py-3">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="number"
+                                defaultValue={rec.deduction ?? 0}
+                                onBlur={e => handleDeductionChange(rec.id, e.target.value)}
+                                className="w-20 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                              />
+                            ) : (
+                              <span className="font-mono text-xs">{fmt(rec.deduction ?? 0)}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-varistor-limeText">
+                            {fmt(rec.netPay - (rec.deduction ?? 0))}
+                          </td>
+                          {/* PF checkbox */}
+                          <td className="px-4 py-3 text-center">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="checkbox"
+                                checked={rec.hasPf}
+                                onChange={(e) => handleToggleFlag(rec.id, 'hasPf', e.target.checked)}
+                                title={rec.hasPf ? 'PF applied — uncheck to disable' : 'PF disabled — check to enable'}
+                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                              />
+                            ) : (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                              }`}>{rec.hasPf ? 'On' : 'Off'}</span>
+                            )}
+                          </td>
+                          {/* ESI checkbox */}
+                          <td className="px-4 py-3 text-center">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="checkbox"
+                                checked={rec.hasEsi}
+                                onChange={(e) => handleToggleFlag(rec.id, 'hasEsi', e.target.checked)}
+                                title={rec.hasEsi ? 'ESI applied — uncheck to disable' : 'ESI disabled — check to enable'}
+                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                              />
+                            ) : (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                              }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
+                            )}
+                          </td>
+                          {/* PT checkbox */}
+                          <td className="px-4 py-3 text-center">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="checkbox"
+                                checked={rec.hasPt}
+                                onChange={(e) => handleToggleFlag(rec.id, 'hasPt', e.target.checked)}
+                                title={rec.hasPt ? 'PT applied — uncheck to disable' : 'PT disabled — check to enable'}
+                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
+                              />
+                            ) : (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                              }`}>{rec.hasPt ? 'On' : 'Off'}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isApproved ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-varistor-limeTint text-varistor-limeText text-[11px] font-semibold rounded-full">
+                                <Lock size={10} /> Approved
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-50 text-yellow-700 text-[11px] font-semibold rounded-full border border-yellow-200">
+                                <Unlock size={10} /> Draft
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setPreviewRecord(rec)} className="p-1.5 rounded-lg hover:bg-varistor-limeLight text-varistor-muted hover:text-varistor-lime" title="Preview">
+                                <Eye size={14} />
+                              </button>
+                              {isApproved && isAdmin && (
+                                <button onClick={() => handleRevision(rec.id)} className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-400 hover:text-orange-600" title="New revision">
+                                  <RefreshCw size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
