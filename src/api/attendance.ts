@@ -10,6 +10,8 @@
  *  Mutates → { success: boolean; error: string | null }
  */
 
+import { API_URL } from '../config/api';
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export type AttendanceStatus =
@@ -691,7 +693,7 @@ export async function getPayrollAttendanceSnapshot(
  */
 export async function getDeviceStatus(): Promise<DeviceStatus> {
   try {
-    const res = await fetch('http://localhost:3001/api/attendance/device-status');
+    const res = await fetch(`${API_URL}/api/attendance/device-status`);
     if (!res.ok) throw new Error('Bridge unreachable');
     return await res.json();
   } catch {
@@ -712,7 +714,7 @@ export async function getDeviceStatus(): Promise<DeviceStatus> {
  */
 export async function getLivePunchFeed(): Promise<LivePunchEvent[]> {
   try {
-    const res = await fetch('http://localhost:3001/api/attendance/live-feed');
+    const res = await fetch(`${API_URL}/api/attendance/live-feed`);
     if (!res.ok) throw new Error('Bridge unreachable');
     return await res.json();
   } catch {
@@ -740,7 +742,7 @@ export async function getLivePunchFeed(): Promise<LivePunchEvent[]> {
  */
 export async function forceDeviceResync(): Promise<{ success: boolean; error: string | null }> {
   try {
-    const res = await fetch('http://localhost:3001/api/attendance/force-resync', { method: 'POST' });
+    const res = await fetch(`${API_URL}/api/attendance/force-resync`, { method: 'POST' });
     if (!res.ok) throw new Error('Resync failed');
     return { success: true, error: null };
   } catch {
