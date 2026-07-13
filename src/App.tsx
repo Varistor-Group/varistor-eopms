@@ -32,7 +32,7 @@ const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
   const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
   const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
-  
+
   useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
   return null;
 };
@@ -44,7 +44,7 @@ const AppContent: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
-  
+
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
@@ -59,6 +59,12 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     // We must dynamically import to avoid breaking the web build if Capacitor is missing
     let listener: any = null;
+    
+    // Hide native status bar if on mobile
+    import('@capacitor/status-bar').then(({ StatusBar }) => {
+      StatusBar.hide().catch(console.warn);
+    }).catch(console.warn);
+
     import('@capacitor/app').then(({ App: CapApp }) => {
       listener = CapApp.addListener('backButton', () => {
         // First check if any inner component (like Chat sidebar) wants to consume this
@@ -99,7 +105,7 @@ const AppContent: React.FC = () => {
       localStorage.removeItem('eopms_current_user');
       localStorage.removeItem('eopms_role');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -240,7 +246,7 @@ const AppContent: React.FC = () => {
                   <span className="text-[10px] text-varistor-muted leading-tight">{currentUser?.department ?? ''}</span>
                 </div>
               </button>
-              
+
               <button
                 onClick={handleLogout}
                 title="Logout"
@@ -315,7 +321,7 @@ const AppContent: React.FC = () => {
 
       {/* Real-time Task Notification Pop-up */}
       {taskNotification && taskNotification.show && (
-        <div className="fixed top-4 left-4 right-4 z-50 max-w-sm mx-auto bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
+        <div className="fixed top-[calc(1rem+env(safe-area-inset-top))] left-4 right-4 z-50 max-w-sm mx-auto bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>

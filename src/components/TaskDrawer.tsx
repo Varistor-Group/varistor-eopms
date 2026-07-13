@@ -12,7 +12,8 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   const { 
     toggleChecklistItem, 
     addChecklistItem, 
-    addAttachment 
+    addAttachment,
+    moveTask
   } = useKanbanTasks();
 
   const [newCheckItem, setNewCheckItem] = useState('');
@@ -67,13 +68,31 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
       />
 
       {/* Drawer Body */}
-      <div className={`fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col ${isClosing ? 'animate-[slideOut_200ms_ease-in]' : 'animate-[slideIn_200ms_ease-out]'}`}>
+      <div 
+        className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col"
+        style={{
+          animation: isClosing ? 'slideOut 200ms ease-in forwards' : 'slideIn 200ms ease-out forwards'
+        }}
+      >
         
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border flex-shrink-0">
-          <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            {currentTask.status.replace('_', ' ')}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              {currentTask.status.replace('_', ' ')}
+            </span>
+            {currentTask.status === 'todo' && (
+              <button
+                onClick={() => {
+                  moveTask(currentTask.id, 'in_progress');
+                  onClose();
+                }}
+                className="text-[10px] font-bold bg-varistor-lime text-white px-2.5 py-1 rounded shadow-sm hover:bg-[#7bc012] transition-colors"
+              >
+                START TASK (MOVE TO IN PROGRESS)
+              </button>
+            )}
+          </div>
           <button 
             onClick={onClose}
             className="p-1 rounded-full text-varistor-muted hover:text-black hover:bg-gray-100 transition-colors"

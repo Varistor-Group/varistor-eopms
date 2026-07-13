@@ -109,7 +109,6 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const ta = c.ta ?? 2500;
   const lta = c.lta ?? 3500;
   const specialAllowance = c.specialAllowance ?? 0;
-  console.debug(monthlySalary, reimbursement, incentives, overtime);
 
   const pfEmployee = c.pfEmployee ?? 0;
   const pfEmployer = c.pfEmployer ?? 0;
@@ -182,7 +181,9 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const finalTotalDeductions = Array.isArray(record.deductionValues)
     ? record.deductionValues.reduce((a, b) => a + b, 0)
     : totalDeductions;
-  const finalTotalCtc = record.gross ?? totalCtc;
+  const finalTotalCtc = Array.isArray(record.additionValues)
+    ? record.additionValues.reduce((a, b) => a + b, 0)
+    : totalCtc;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">

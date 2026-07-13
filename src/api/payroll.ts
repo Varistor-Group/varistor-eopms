@@ -14,6 +14,7 @@
  *  - HR/Admin can SELECT all, INSERT and UPDATE
  *  - Approved rows locked via DB trigger
  */
+import { getEmployees } from './employees';
 
 
 
@@ -668,7 +669,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           employeeId: emp.employeeId,
           employeeName: emp.fullName,
           department: emp.department,
-          designation: emp.role === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
+          designation: emp.role === 'Employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
           month: targetMonth,
           ctc: defaultCtc,
           monthlySalary: defaultCtc,
