@@ -374,7 +374,7 @@ export const Attendance: React.FC = () => {
 
   async function exportPDF(type: 'daily' | 'monthly', singleEmployeeId?: string) {
     try {
-      let rows = type === 'daily' ? dailyData : monthlyReport;
+      let rows: any[] = type === 'daily' ? dailyData : monthlyReport;
       if (singleEmployeeId) {
         rows = rows.filter(r => r.employee_id === singleEmployeeId);
       }

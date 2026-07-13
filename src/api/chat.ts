@@ -113,15 +113,24 @@ export const chatApi = {
   },
 
   createChannel(name: string, allowedEmployeeIds?: string[], department?: string): ChatChannel {
-    const channels = loadChannelList();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Channel name is required.');
+
+    const id = slugify(trimmed) + '-' + Math.random().toString(36).slice(2, 6);
+    if (!slugify(trimmed)) throw new Error('Channel name must contain at least one letter or number.');
+
+    const existing = loadChannelList();
+    if (existing.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      throw new Error(`#${trimmed} already exists.`);
+    }
+
     const newChannel: Omit<ChatChannel, 'memberCount'> = {
-      id: slugify(name) + '-' + Math.random().toString(36).slice(2, 6),
-      name,
+      id,
+      name: trimmed,
       allowedEmployeeIds: allowedEmployeeIds && allowedEmployeeIds.length > 0 ? allowedEmployeeIds : undefined,
       department
     };
-    channels.push(newChannel);
-    saveChannelList(channels);
+    saveChannelList([...existing, newChannel]);
     notifyUpdated();
     
     let count = mockEmployeeStore.length;
@@ -201,24 +210,7 @@ export const chatApi = {
     notifyUpdated();
   },
 
-  createChannel(name: string): ChatChannel {
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error('Channel name is required.');
 
-    const id = slugify(trimmed);
-    if (!id) throw new Error('Channel name must contain at least one letter or number.');
-
-    const existing = loadChannelList();
-    if (existing.some(c => c.id === id || c.name.toLowerCase() === trimmed.toLowerCase())) {
-      throw new Error(`#${trimmed} already exists.`);
-    }
-
-    const channel: Omit<ChatChannel, 'memberCount'> = { id, name: trimmed };
-    saveChannelList([...existing, channel]);
-    notifyUpdated();
-
-    return { ...channel, memberCount: mockEmployeeStore.length };
-  },
 
   deleteChannel(channelId: ChannelId) {
     const existing = loadChannelList();

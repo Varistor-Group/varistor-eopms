@@ -179,6 +179,7 @@ const Leaves: React.FC = () => {
                   <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
                     <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, (((ownClBalance?.used ?? leaveBalance?.casual?.used ?? 0) / (ownClBalance?.total ?? leaveBalance?.casual?.total ?? 12)) * 100))}%` }} />
                   </div>
+                </div>
                 <div>
                   <div className="flex justify-between text-xs text-varistor-muted mb-1">
                     <span>Sick Leave Balance</span>

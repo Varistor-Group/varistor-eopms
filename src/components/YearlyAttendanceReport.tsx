@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  CalendarDays, ChevronLeft, ChevronDown, ChevronUp,
-  FileSpreadsheet, Users, X, Info, Download
+  CalendarDays, ChevronDown, ChevronUp,
+  FileSpreadsheet, X, Info
 } from 'lucide-react';
 import { Button } from './shared/Button';
 import {
