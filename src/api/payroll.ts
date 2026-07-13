@@ -633,70 +633,89 @@ let _records: PayrollRecord[] = loadPayrollRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
-  _records = loadPayrollRecords();
 
-  // Auto-seed missing payroll records from active employees
-  const { getEmployees } = await import('./employees');
-  const emps = await getEmployees();
-  let updated = false;
+  try {
+    const employees = await getEmployees();
+    _records = loadPayrollRecords();
 
-  for (const emp of emps) {
-    if (emp.status === 'Active' && !_records.find(r => r.employeeId === emp.id)) {
-      const rec: PayrollRecord = {
-        id: 'PAY-' + Math.random().toString(36).substring(2, 9),
-        employeeId: emp.id,
-        employeeName: emp.fullName,
-        department: emp.department,
-        designation: emp.role,
-        month: 'Jun 2026',
-        ctc: 30000,
-        monthlySalary: 30000,
-        totalDays: 30,
-        payDays: 30,
-        clBalance: 0,
-        pfUan: '',
-        autoFormula: true,
-        status: 'draft',
-        revision: 1,
-        hasPf: true,
-        hasEsi: true,
-        hasPt: true,
-        slipReleased: false,
-        components: { basic: 15000, hra: 7500, pfEmployee: 1800, pfEmployer: 1800, esi: 0, pt: 0, tds: 0, specialAllowance: 0, medical: 1250, ta: 2500, lta: 3500, reimbursement: 0, incentives: 0, overtime: 0, otherDeductions: 0 },
-        netPay: 30000
-      };
+    const targetMonth = 'Jun 2026';
+    let modified = false;
 
-      const comp = computeNet({
-        monthlySalary: rec.monthlySalary,
-        totalDays: 30,
-        payDays: 30,
-      });
-      rec.components = {
-        basic: comp.basic,
-        hra: comp.hra,
-        pfEmployee: comp.pfEmployee,
-        pfEmployer: comp.pfEmployer,
-        esi: comp.esi,
-        pt: comp.pt,
-        tds: comp.tds,
-        specialAllowance: comp.specialAllowance,
-        medical: comp.medical,
-        ta: comp.ta,
-        lta: comp.lta,
-        reimbursement: comp.reimbursement,
-        incentives: comp.incentives,
-        overtime: comp.overtime,
-        otherDeductions: comp.otherDeductions
-      };
-      rec.netPay = comp.netPay;
+    for (const emp of employees) {
+      const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
+      if (!exists) {
+        const defaultCtc = 30000;
+        const comp = computeNet({
+          monthlySalary: defaultCtc,
+          totalDays: 30,
+          payDays: 30,
+          medical: 1250,
+          ta: 2500,
+          lta: 3500,
+          reimbursement: 0,
+          incentives: 0,
+          overtime: 0,
+          tds: 0,
+          otherDeductions: 0,
+          hasPf: true,
+          hasEsi: true,
+          hasPt: true,
+          employeeId: emp.employeeId,
+        });
 
-      _records.push(rec);
-      updated = true;
+        const newRec: PayrollRecord = {
+          id: `pay-${emp.employeeId}-${targetMonth.replace(/\s+/g, '-')}`,
+          employeeId: emp.employeeId,
+          employeeName: emp.fullName,
+          department: emp.department,
+          designation: emp.role === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
+          month: targetMonth,
+          ctc: defaultCtc,
+          monthlySalary: defaultCtc,
+          components: {
+            basic: comp.basic,
+            hra: comp.hra,
+            pfEmployee: comp.pfEmployee,
+            pfEmployer: comp.pfEmployer,
+            esi: comp.esi,
+            pt: comp.pt,
+            tds: comp.tds,
+            specialAllowance: comp.specialAllowance,
+            medical: comp.medical,
+            ta: comp.ta,
+            lta: comp.lta,
+            reimbursement: comp.reimbursement,
+            incentives: comp.incentives,
+            overtime: comp.overtime,
+            otherDeductions: comp.otherDeductions,
+          },
+          netPay: comp.netPay,
+          status: 'draft',
+          revision: 0,
+          autoFormula: true,
+          totalDays: 30,
+          payDays: 30,
+          clBalance: 12,
+          pfUan: '—',
+          hasPf: true,
+          hasEsi: true,
+          hasPt: true,
+          slipReleased: false,
+          additionHeads: comp.additionHeads,
+          deductionHeads: comp.deductionHeads,
+          additionValues: comp.additionValues,
+          deductionValues: comp.deductionValues,
+        };
+        _records.push(newRec);
+        modified = true;
+      }
     }
-  }
 
-  if (updated) {
-    savePayrollRecords(_records);
+    if (modified) {
+      savePayrollRecords(_records);
+    }
+  } catch (err) {
+    console.error('Error syncing payroll records with employees list:', err);
   }
 
   if (employeeId) {
@@ -1142,6 +1161,7 @@ export interface SlipRow {
 export interface BulkSendResult {
   sent: number;
   failed: { email: string; name: string; error: string }[];
+  skipped?: boolean;
 }
 
 /**
@@ -1159,4 +1179,68 @@ export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
     throw new Error(err.error || `Server returned ${res.status}`);
   }
   return res.json();
+}
+
+// ─── Payslip Schedule API ─────────────────────────────────────────────────────
+
+export interface PayslipSchedule {
+  day: number;
+  hour: number;
+  minute: number;
+  enabled: boolean;
+  lastRun: string | null;
+}
+
+/** Fetch the current payslip auto-send schedule from the server. */
+export async function getPayslipSchedule(): Promise<PayslipSchedule> {
+  try {
+    const res = await fetch('http://localhost:3001/api/payroll/schedule');
+    if (!res.ok) throw new Error('Server error');
+    return res.json();
+  } catch {
+    return { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null };
+  }
+}
+
+/** Update the payslip auto-send schedule on the server. */
+export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'lastRun'>): Promise<PayslipSchedule> {
+  const res = await fetch('http://localhost:3001/api/payroll/schedule', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(schedule),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
+    throw new Error(err.error || `Server returned ${res.status}`);
+  }
+  const data = await res.json();
+  return data.schedule;
+}
+
+/** Manually trigger payslip dispatch immediately (uses server-stored records). */
+export async function triggerManualSend(): Promise<BulkSendResult> {
+  const res = await fetch('http://localhost:3001/api/payroll/trigger-send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
+    throw new Error(err.error || `Server returned ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Sync the latest payroll records from client localStorage to the server db.json.
+ *  Called whenever HR saves/approves payroll so the cron job has up-to-date data.
+ */
+export async function syncPayrollToServer(records: PayrollRecord[]): Promise<void> {
+  try {
+    await fetch('http://localhost:3001/api/payroll/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records }),
+    });
+  } catch (err) {
+    console.warn('[Payroll] Failed to sync records to server:', err);
+  }
 }

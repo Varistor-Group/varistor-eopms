@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
+import cron from 'node-cron';
 
 dotenv.config();
 
@@ -834,6 +835,214 @@ app.post('/api/payroll/send-slips', async (req, res) => {
   } catch (outerErr) {
     console.error('[Payroll] ROUTE CRASHED:', outerErr);
     return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
+  }
+});
+
+// ── Payroll Schedule & Records Routes ────────────────────────────────────────
+
+// In-memory cron task handle (so we can reschedule when config changes)
+let _payslipCronTask = null;
+
+/**
+ * Build slip data for an employee from db records.
+ * Used by the cron auto-send to construct SlipRow objects server-side.
+ */
+async function buildSlipsFromDb() {
+  try {
+    const db = await readDB();
+    const employees = db.employees || [];
+    const payrollRecords = db.payroll_records || [];
+
+    if (payrollRecords.length === 0) {
+      console.log('[Payroll Cron] No payroll records found in db.json — skipping send.');
+      return [];
+    }
+
+    const slips = [];
+    for (const rec of payrollRecords) {
+      if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
+      const emp = employees.find(e => e.employeeId === rec.employeeId);
+      if (!emp || !emp.personalEmail) continue;
+
+      const c = rec.components || {};
+      slips.push({
+        name: rec.employeeName,
+        email: emp.personalEmail,
+        employeeId: rec.employeeId,
+        department: rec.department,
+        designation: rec.designation,
+        month: rec.month,
+        monthlySalary: rec.monthlySalary || rec.ctc || 0,
+        ctc: rec.ctc || rec.monthlySalary || 0,
+        totalDays: rec.totalDays || 30,
+        payDays: rec.payDays || 30,
+        clBalance: rec.clBalance || 0,
+        pfUan: rec.pfUan || '—',
+        basic: c.basic || 0,
+        hra: c.hra || 0,
+        medical: c.medical || 0,
+        ta: c.ta || 0,
+        lta: c.lta || 0,
+        specialAllowance: c.specialAllowance || 0,
+        pfEmployee: c.pfEmployee || 0,
+        pfEmployer: c.pfEmployer || 0,
+        esi: c.esi || 0,
+        pt: c.pt || 0,
+        tds: c.tds || 0,
+        reimbursement: c.reimbursement || 0,
+        incentives: c.incentives || 0,
+        overtime: c.overtime || 0,
+        otherDeductions: c.otherDeductions || 0,
+        deductions: (c.pfEmployee || 0) + (c.pfEmployer || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
+        netPay: rec.netPay || 0,
+        deduction: rec.deduction || 0,
+        additionHeads: rec.additionHeads || [],
+        deductionHeads: rec.deductionHeads || [],
+        additionValues: rec.additionValues || [],
+        deductionValues: rec.deductionValues || [],
+      });
+    }
+    return slips;
+  } catch (err) {
+    console.error('[Payroll Cron] Error building slips:', err);
+    return [];
+  }
+}
+
+/**
+ * Core dispatch function — used by both cron and manual trigger.
+ * Builds slips from db, calls send-slips logic, updates lastRun.
+ */
+async function dispatchPayslips() {
+  console.log('[Payroll Cron] Starting auto-dispatch...');
+  const slips = await buildSlipsFromDb();
+  if (slips.length === 0) {
+    console.log('[Payroll Cron] No slips to send.');
+    return { sent: 0, failed: [], skipped: true };
+  }
+
+  // Reuse internal send logic by making an internal HTTP request
+  try {
+    const result = await fetch('http://localhost:3001/api/payroll/send-slips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slips }),
+    });
+    const data = await result.json();
+
+    // Update lastRun in db
+    const db = await readDB();
+    if (!db.payroll_schedule) db.payroll_schedule = {};
+    db.payroll_schedule.lastRun = new Date().toISOString();
+    await writeDB(db);
+
+    console.log(`[Payroll Cron] Done — ${data.sent} sent, ${(data.failed || []).length} failed.`);
+    return data;
+  } catch (err) {
+    console.error('[Payroll Cron] Dispatch error:', err);
+    return { sent: 0, failed: [{ error: err.message }] };
+  }
+}
+
+/**
+ * Schedule or re-schedule the cron job based on the schedule config.
+ */
+function scheduleCronJob(schedule) {
+  if (_payslipCronTask) {
+    _payslipCronTask.stop();
+    _payslipCronTask = null;
+    console.log('[Payroll Cron] Previous cron task stopped.');
+  }
+
+  if (!schedule || !schedule.enabled) {
+    console.log('[Payroll Cron] Scheduling is disabled.');
+    return;
+  }
+
+  const day = Math.min(28, Math.max(1, parseInt(schedule.day) || 10));
+  const hour = Math.min(23, Math.max(0, parseInt(schedule.hour) || 10));
+  const minute = Math.min(59, Math.max(0, parseInt(schedule.minute) || 0));
+
+  const cronExpr = `${minute} ${hour} ${day} * *`;
+  console.log(`[Payroll Cron] Scheduled: '${cronExpr}' (day=${day}, ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')})`);
+
+  _payslipCronTask = cron.schedule(cronExpr, async () => {
+    console.log('[Payroll Cron] Cron triggered — dispatching payslips...');
+    await dispatchPayslips();
+  }, { timezone: 'Asia/Kolkata' });
+}
+
+// Bootstrap cron on server start
+(async () => {
+  try {
+    const db = await readDB();
+    const schedule = db.payroll_schedule;
+    if (schedule) {
+      scheduleCronJob(schedule);
+    }
+  } catch (err) {
+    console.error('[Payroll Cron] Failed to load schedule on startup:', err);
+  }
+})();
+
+// GET /api/payroll/schedule — return current schedule config
+app.get('/api/payroll/schedule', async (req, res) => {
+  try {
+    const db = await readDB();
+    res.json(db.payroll_schedule || { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/payroll/schedule — update schedule config and reschedule cron
+app.put('/api/payroll/schedule', async (req, res) => {
+  try {
+    const { day, hour, minute, enabled } = req.body;
+    const db = await readDB();
+    const existing = db.payroll_schedule || {};
+    const newSchedule = {
+      ...existing,
+      day: parseInt(day) || 10,
+      hour: parseInt(hour) || 10,
+      minute: parseInt(minute) || 0,
+      enabled: enabled !== false,
+    };
+    db.payroll_schedule = newSchedule;
+    await writeDB(db);
+    scheduleCronJob(newSchedule);
+    console.log('[Payroll Schedule] Updated:', newSchedule);
+    res.json({ success: true, schedule: newSchedule });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/payroll/records — sync latest payroll records from client to server
+app.post('/api/payroll/records', async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!Array.isArray(records)) {
+      return res.status(400).json({ success: false, error: 'records must be an array.' });
+    }
+    const db = await readDB();
+    db.payroll_records = records;
+    await writeDB(db);
+    console.log(`[Payroll Records] Synced ${records.length} records from client.`);
+    res.json({ success: true, count: records.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/payroll/trigger-send — manually trigger payslip dispatch now
+app.post('/api/payroll/trigger-send', async (req, res) => {
+  try {
+    console.log('[Payroll] Manual trigger-send requested');
+    const result = await dispatchPayslips();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
