@@ -78,7 +78,7 @@ export const TaskManagement: React.FC = () => {
                 <button 
                   type="button" 
                   onClick={() => setCheckpoints([...checkpoints, ''])} 
-                  className="text-xs text-[#5da00d] bg-[#f4f7f2] px-2 py-1 rounded border border-[#5da00d] font-bold flex items-center gap-1 hover:brightness-105"
+                  className="text-xs text-[#5da00d] bg-varistor-pageBg px-2 py-1 rounded border border-[#5da00d] font-bold flex items-center gap-1 hover:brightness-105"
                 >
                   <Plus size={12} strokeWidth={3} /> Add Checkpoint
                 </button>
@@ -95,7 +95,7 @@ export const TaskManagement: React.FC = () => {
                         setCheckpoints(newCp);
                       }} 
                       placeholder={`Checkpoint ${idx + 1}`}
-                      className="flex-1 border border-varistor-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-varistor-lime bg-[#fafbfa]"
+                      className="flex-1 border border-varistor-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg"
                     />
                     <button 
                       type="button" 
@@ -123,7 +123,7 @@ export const TaskManagement: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {awaitingApprovalTasks.map(task => (
-              <div key={task.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-4 border border-[#f1f3f0] rounded-lg gap-4 bg-[#fafbfa]">
+              <div key={task.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-4 border border-[#f1f3f0] rounded-lg gap-4 bg-varistor-pageBg">
                 <div>
                   <h3 className="font-bold text-sm text-varistor-dark">{task.title}</h3>
                   <p className="text-xs text-varistor-muted mt-1">{task.description}</p>

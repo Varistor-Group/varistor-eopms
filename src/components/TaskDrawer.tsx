@@ -75,7 +75,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
           </div>
 
           {/* Meta Details */}
-          <div className="grid grid-cols-2 gap-4 p-4 bg-[#fafbfa] rounded-varistor border border-varistor-border">
+          <div className="grid grid-cols-2 gap-4 p-4 bg-varistor-pageBg rounded-varistor border border-varistor-border">
             <div className="space-y-1">
               <span className="text-[10px] text-varistor-muted font-semibold uppercase tracking-wider block">Assignee</span>
               <div className="flex items-center gap-2">
@@ -104,13 +104,13 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
                 <CheckSquare size={16} className="text-[#555]" />
                 Checklist ({completedCount}/{totalCount})
               </h3>
-              <span className="text-[10px] font-bold text-varistor-limeText bg-[#f7fee7] px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-bold text-varistor-limeText bg-varistor-limeLight px-1.5 py-0.5 rounded">
                 {progressPercent}%
               </span>
             </div>
             
             {/* Progress bar */}
-            <div className="w-full bg-[#f1f3f0] h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
               <div 
                 className="bg-varistor-lime h-full transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
@@ -122,7 +122,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
                 <button
                   key={item.id}
                   onClick={() => toggleChecklistItem(task.id, item.id)}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-varistor-border hover:bg-[#fafbfa] text-left transition-varistor group"
+                  className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-varistor-border hover:bg-varistor-pageBg text-left transition-varistor group"
                 >
                   <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-varistor ${
                     item.completed 
@@ -178,10 +178,10 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
                 task.attachments.map((file) => (
                   <div 
                     key={file.id} 
-                    className="flex items-center justify-between p-2 border border-varistor-border rounded-lg bg-white hover:bg-[#fafbfa] transition-varistor"
+                    className="flex items-center justify-between p-2 border border-varistor-border rounded-lg bg-white hover:bg-varistor-pageBg transition-varistor"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded bg-[#f1f3f0] flex items-center justify-center text-[10px] font-bold text-varistor-muted uppercase">
+                      <div className="w-8 h-8 rounded bg-varistor-pageBg flex items-center justify-center text-[10px] font-bold text-varistor-muted uppercase">
                         {file.type.substring(0, 3)}
                       </div>
                       <div className="min-w-0">
@@ -192,7 +192,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
                     <a 
                       href="#" 
                       onClick={(e) => e.preventDefault()}
-                      className="text-xs font-semibold text-varistor-limeText hover:text-black bg-[#f7fee7] px-2.5 py-1 rounded border border-[#d2f3a6] transition-colors"
+                      className="text-xs font-semibold text-varistor-limeText hover:text-black bg-varistor-limeLight px-2.5 py-1 rounded border border-[#d2f3a6] transition-colors"
                     >
                       Download
                     </a>

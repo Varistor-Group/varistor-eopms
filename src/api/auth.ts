@@ -132,16 +132,20 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
     return { success: false, error: 'Please enter a valid email address.' };
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
-  });
-
-  if (error) {
-    console.error('Password reset error:', error);
-    return { success: false, error: `Failed to send reset link: ${error.message}` };
+  try {
+    const res = await fetch('http://localhost:3001/api/send-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Failed to send reset link.' };
+    }
+    return { success: true, message: 'Reset link sent — check your inbox.' };
+  } catch (err) {
+    return { success: false, error: 'Could not reach the server. Make sure the backend is running.' };
   }
-
-  return { success: true, message: 'Reset link sent — check your inbox' };
 }
 
 export async function updatePassword(password: string): Promise<{ success: boolean; error?: string }> {

@@ -71,9 +71,19 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   // Role gate — only Admin / HR can access
   const canAccess = currentRole === 'Admin' || currentRole === 'HR';
 
-  // Fetch employees on mount to lookup department heads
+  // Fetch employees on mount to lookup department heads and compute next ID
   useEffect(() => {
-    getEmployees().then(setEmployees);
+    getEmployees().then(emps => {
+      setEmployees(emps);
+      // Auto-compute next employee ID from existing VAR-XXX pattern
+      const maxNum = emps.reduce((max, e) => {
+        const match = e.employeeId.match(/VAR-(\d+)/i);
+        if (match) return Math.max(max, parseInt(match[1], 10));
+        return max;
+      }, 0);
+      const nextId = `VAR-${String(maxNum + 1).padStart(3, '0')}`;
+      setForm(prev => ({ ...prev, employeeId: nextId }));
+    });
   }, []);
 
   const set = (field: keyof CreateEmployeeInput) =>
@@ -177,7 +187,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
         </div>
 
         {/* Admin-only badge */}
-        <span className="flex-shrink-0 px-3 py-1 bg-[#1a1a1a] text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
+        <span className="flex-shrink-0 px-3 py-1 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
           Admin / HR only
         </span>
       </div>

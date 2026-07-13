@@ -2,14 +2,188 @@
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
+
+.dark {
+  /*
+   * Overrides Tailwind's own `white` token, not just our custom varistor-*
+   * tokens. Most cards across the app (including pages this branch doesn't
+   * own) pair literal `bg-white` with `text-varistor-dark` - since that text
+   * token already flips to a light color in dark mode, leaving bg-white
+   * unflipped would make that text unreadable (light-on-white ->
+   * near invisible). This keeps those cards legible without editing every file.
+   *
+   * PALETTE TARGETS (WCAG AA on dark surfaces):
+   *   Page bg:   #1c2118  — dark olive-green, not pitch black
+   *   Card:      #252b21  — noticeably lifted from page bg
+   *   Border:    #3a4233  — visible hairline separator
+   *   Text:      #edf0e8  — near-white with warm tint
+   *   Muted:     #9aaa8e  — readable secondary text
+   */
+  --color-white: #252b21;
+  --varistor-pageBg: #1c2118;
+  --varistor-dark: #edf0e8;
+  --varistor-border: #3a4233;
+  --varistor-muted: #9aaa8e;
+  --varistor-surface: #252b21;
+  --varistor-surfaceMuted: #2e3529;
+
+  --varistor-limeLight: #243016;
+  --varistor-limeTint: #2e3d14;
+  --varistor-limeText: #c8f279;
+
+  --varistor-successBg: #1e3012;
+  --varistor-successText: #86efac;
+  --varistor-successBorder: #2d4e1e;
+
+  --varistor-pendingBg: #2e3529;
+  --varistor-pendingText: #d4d9cf;
+  --varistor-pendingBorder: #3e4638;
+
+  --varistor-dangerBg: #341a1a;
+  --varistor-dangerText: #fca5a5;
+  --varistor-dangerBorder: #5a2020;
+
+  --brand-ink: #edf0e8;
+}
+
+/*
+ * Dark-mode overrides for hardcoded Tailwind utility classes.
+ * Many components use literal `bg-gray-50`, `text-gray-400`, `border-gray-200`
+ * etc. These don't respect our CSS variables, so we patch them here.
+ * Scope everything under `.dark` to avoid affecting light mode.
+ */
+.dark {
+  /* ── Surfaces ── */
+  --color-gray-50:  #2d332a;
+  --color-gray-100: #333930;
+  --color-gray-200: #3f4739;
+
+  /* ── Borders ── */
+  --color-gray-300: #4e5849;
+
+  /* ── Text ── */
+  --color-gray-400: #8a9b82;
+  --color-gray-500: #a0ae98;
+  --color-gray-600: #bfc7b9;
+  --color-gray-700: #d4dace;
+  --color-gray-800: #e0e6da;
+  --color-gray-900: #edf0e8;
+
+  /* ── Status pill backgrounds (emerald/amber/red/blue/sky/purple used as chip bg) ── */
+  --color-emerald-50: #163020;
+  --color-green-50:   #163020;
+  --color-amber-50:   #2d2210;
+  --color-yellow-50:  #2d2210;
+  --color-red-50:     #2d1515;
+  --color-blue-50:    #152033;
+  --color-sky-50:     #152130;
+  --color-purple-50:  #231530;
+  --color-indigo-50:  #1a1b35;
+  --color-pink-50:    #2d1525;
+  --color-orange-50:  #2d1e10;
+
+  /* ── Status pill text (keep legible on dark chip bg) ── */
+  --color-emerald-400: #4ade80;
+  --color-emerald-700: #86efac;
+  --color-green-700:   #86efac;
+  --color-amber-600:   #fbbf24;
+  --color-amber-700:   #fcd34d;
+  --color-red-500:     #f87171;
+  --color-red-600:     #fca5a5;
+  --color-blue-600:    #60a5fa;
+  --color-blue-700:    #93c5fd;
+  --color-sky-500:     #38bdf8;
+  --color-sky-600:     #7dd3fc;
+  --color-purple-500:  #c084fc;
+  --color-purple-600:  #d8b4fe;
+  --color-indigo-600:  #818cf8;
+
+  /* ── Status pill borders ── */
+  --color-emerald-200: #1f4730;
+  --color-green-200:   #1f4730;
+  --color-amber-200:   #44330a;
+  --color-red-200:     #4a1f1f;
+  --color-blue-200:    #1a3550;
+  --color-sky-200:     #1a3040;
+  --color-purple-200:  #35205a;
+  --color-indigo-200:  #272850;
+
+  /* ── Whites used for text-on-dark-chip ── */
+  --color-emerald-600: #34d399;
+}
+
+/*
+ * Pins pre-auth screens (Login, ResetPassword) to the light brand theme
+ * regardless of the app's dark mode state - these are the branded entry
+ * points, not "app content", and resetting the same tokens the rest of the
+ * app reads means every shared component nested here (Input, Button, Modal)
+ * renders correctly too, not just this page's own classes.
+ */
+.force-light {
+  color-scheme: light;
+  --color-white: #ffffff;
+  --varistor-pageBg: #f4f6f3;
+  --varistor-dark: #111111;
+  --varistor-border: #d8ded2;
+  --varistor-muted: #868e80;
+  --varistor-surface: #ffffff;
+  --varistor-surfaceMuted: #f1f3f0;
+  --varistor-limeLight: #f7fee7;
+  --varistor-limeTint: #eefed4;
+  --varistor-limeText: #2c4e02;
+  --varistor-successBg: #eefed4;
+  --varistor-successText: #2c4e02;
+  --varistor-successBorder: #d2f3a6;
+  --varistor-pendingBg: #f1f3f0;
+  --varistor-pendingText: #555a52;
+  --varistor-pendingBorder: #e1e4e0;
+  --varistor-dangerBg: #fef2f2;
+  --varistor-dangerText: #b91c1c;
+  --varistor-dangerBorder: #fee2e2;
+  --brand-ink: #111111;
+}
 
 @layer base {
+  /*
+   * Tells the browser to render native form controls (select dropdowns,
+   * checkboxes, scrollbars) in their dark variant. Without this, a <select>
+   * inherits our dark text color but its native popup keeps a white
+   * background, making unselected options unreadable.
+   */
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
     font-size: 14px;
     margin: 0;
     /* Safe area insets for mobile (notches, navbars) */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    transition: background-color 200ms ease-out, color 200ms ease-out;
   }
 }
 
@@ -30,6 +204,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b3baa8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3e4638;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #525e4a;
 }
 
 /* Keyframes for the performance meter arc */

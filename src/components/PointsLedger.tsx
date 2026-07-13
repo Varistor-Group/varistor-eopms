@@ -41,12 +41,12 @@ export const PointsLedger: React.FC = () => {
       {/* Ledger Table Container */}
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
         {/* Table Filters */}
-        <div className="px-6 py-4 border-b border-varistor-border flex justify-between items-center bg-[#fafbfa]">
+        <div className="px-6 py-4 border-b border-varistor-border flex justify-between items-center bg-varistor-pageBg">
           <h3 className="text-xs font-bold text-varistor-dark uppercase tracking-wider flex items-center gap-1.5">
             <Filter size={14} className="text-varistor-muted" />
             Transaction Logs
           </h3>
-          <div className="flex bg-[#edf0ec] p-0.5 rounded-lg text-[11px] font-semibold">
+          <div className="flex bg-varistor-pageBg p-0.5 rounded-lg text-[11px] font-semibold">
             <button 
               onClick={() => setFilterType('all')}
               className={`px-3 py-1 rounded-md transition-varistor cursor-pointer ${filterType === 'all' ? 'bg-white text-black shadow-sm' : 'text-[#6b7264] hover:text-black'}`}
@@ -72,7 +72,7 @@ export const PointsLedger: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-varistor-border text-[10px] text-varistor-muted uppercase tracking-wider font-semibold bg-[#fafbfa]">
+              <tr className="border-b border-varistor-border text-[10px] text-varistor-muted uppercase tracking-wider font-semibold bg-varistor-pageBg">
                 <th className="px-6 py-3">Timestamp</th>
                 <th className="px-6 py-3">Reason / Task Title</th>
                 <th className="px-6 py-3">Justification</th>
@@ -91,7 +91,7 @@ export const PointsLedger: React.FC = () => {
                   const isDebit = entry.type === 'debit';
                   
                   return (
-                    <tr key={entry.id} className="hover:bg-[#fafbfa] transition-colors">
+                    <tr key={entry.id} className="hover:bg-varistor-pageBg transition-colors">
                       <td className="px-6 py-4 text-varistor-muted whitespace-nowrap">
                         {new Date(entry.timestamp).toLocaleDateString('en-US', {
                           month: 'short',
