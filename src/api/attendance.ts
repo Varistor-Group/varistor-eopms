@@ -656,6 +656,7 @@ export async function uploadFieldPhoto(
   return { success: true, photoUrl, error: null };
 }
 
+
 /**
  * Checks if a field employee is currently punched in for today without a punch out.
  */

@@ -645,6 +645,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     let modified = false;
 
     for (const emp of employees) {
+      if (emp.status !== 'Active') continue;
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
       if (!exists) {
         const defaultCtc = 30000;
