@@ -15,7 +15,7 @@
  *  - Approved rows locked via DB trigger
  */
 
-import { getEmployees } from './employees';
+
 
 export interface SalaryComponents {
   basic: number;
@@ -658,6 +658,10 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
         autoFormula: true,
         status: 'draft',
         revision: 1,
+        hasPf: true,
+        hasEsi: true,
+        hasPt: true,
+        slipReleased: false,
         components: { basic: 15000, hra: 7500, pfEmployee: 1800, pfEmployer: 1800, esi: 0, pt: 0, tds: 0, specialAllowance: 0, medical: 1250, ta: 2500, lta: 3500, reimbursement: 0, incentives: 0, overtime: 0, otherDeductions: 0 },
         netPay: 30000
       };

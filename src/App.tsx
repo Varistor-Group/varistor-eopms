@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -6,7 +6,7 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
-import { RoleSwitcher } from './components/RoleSwitcher';
+
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -48,6 +48,59 @@ const AppContent: React.FC = () => {
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+
+  // Refs for back button handler to avoid stale closures
+  const activeTabRef = useRef(activeTab);
+  const isOpenMobileRef = useRef(isOpenMobile);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { isOpenMobileRef.current = isOpenMobile; }, [isOpenMobile]);
+
+  // Handle hardware back button globally
+  useEffect(() => {
+    // We must dynamically import to avoid breaking the web build if Capacitor is missing
+    let listener: any = null;
+    import('@capacitor/app').then(({ App: CapApp }) => {
+      listener = CapApp.addListener('backButton', () => {
+        // First check if any inner component (like Chat sidebar) wants to consume this
+        const event = new CustomEvent('app_back_button', { cancelable: true });
+        window.dispatchEvent(event);
+        if (event.defaultPrevented) return;
+
+        if (isOpenMobileRef.current) {
+          setIsOpenMobile(false);
+        } else if (activeTabRef.current === 'dashboard') {
+          CapApp.exitApp();
+        } else {
+          setIsOpenMobile(true);
+        }
+      });
+    }).catch(console.warn);
+
+    return () => {
+      if (listener && typeof listener.remove === 'function') {
+        listener.remove();
+      }
+    };
+  }, []);
+
+  // ── Fix #7: Auto-restore session from localStorage on app mount ──────
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem('eopms_current_user');
+      const savedRole = localStorage.getItem('eopms_role');
+      if (savedUser && savedRole) {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+        setCurrentRole(savedRole as any);
+        setIsLoggedIn(true);
+      }
+    } catch {
+      // Corrupted data – clear and force re-login
+      localStorage.removeItem('eopms_current_user');
+      localStorage.removeItem('eopms_role');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
@@ -158,13 +211,11 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Live Role Switcher */}
-            <RoleSwitcher currentRole={currentRole} setCurrentRole={setCurrentRole} />
 
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-varistor-surfaceMuted transition-colors cursor-pointer text-varistor-dark"
+              className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full border border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface transition-colors cursor-pointer text-varistor-dark"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
@@ -264,7 +315,7 @@ const AppContent: React.FC = () => {
 
       {/* Real-time Task Notification Pop-up */}
       {taskNotification && taskNotification.show && (
-        <div className="fixed top-6 right-6 z-50 bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
+        <div className="fixed top-4 left-4 right-4 z-50 max-w-sm mx-auto bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>

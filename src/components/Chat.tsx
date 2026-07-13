@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus, Menu } from 'lucide-react';
 import { chatApi } from '../api/chat';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Modal } from './shared/Modal';
@@ -70,6 +70,8 @@ export const Chat: React.FC = () => {
   const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const [showMobileChannels, setShowMobileChannels] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState('100dvh');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +79,27 @@ export const Chat: React.FC = () => {
 
   const refreshUnread = () => setUnread(chatApi.getUnreadSummary());
   const refreshChannels = () => setChannels(chatApi.getChannels(currentUser ?? undefined));
+
+  // Fix #8: Adjust layout when mobile keyboard opens/closes
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => setViewportHeight(`${vv.height}px`);
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
+
+  // Handle hardware back button closing the channels sidebar
+  useEffect(() => {
+    const handleGlobalBack = (e: Event) => {
+      if (showMobileChannels) {
+        e.preventDefault(); // Stop App.tsx from processing this
+        setShowMobileChannels(false);
+      }
+    };
+    window.addEventListener('app_back_button', handleGlobalBack);
+    return () => window.removeEventListener('app_back_button', handleGlobalBack);
+  }, [showMobileChannels]);
 
   const loadChannelMessages = async (channelId: ChannelId) => {
     setIsLoading(true);
@@ -215,9 +238,22 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
-      {/* Channel List */}
-      <aside className="w-56 flex-shrink-0 border-r border-varistor-border flex flex-col bg-varistor-surfaceMuted">
+    <div className="relative bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex flex-col md:flex-row overflow-hidden" style={{ height: `calc(${viewportHeight} - 160px)`, minHeight: '400px' }}>
+      
+      {/* Mobile Backdrop */}
+      {showMobileChannels && (
+        <div 
+          className="md:hidden absolute inset-0 bg-black/50 z-20 transition-opacity"
+          onClick={() => setShowMobileChannels(false)}
+        />
+      )}
+
+      {/* Channel List – slide-over on mobile, fixed aside on desktop */}
+      <aside 
+        className={`absolute inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out md:relative md:transform-none flex w-[80%] md:w-56 flex-shrink-0 border-r border-varistor-border flex-col bg-varistor-surfaceMuted ${
+          showMobileChannels ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
         <div className="px-4 py-3 border-b border-varistor-border flex items-center justify-between">
           <span className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider">Channels</span>
           {canManageChannels && (
@@ -238,7 +274,7 @@ export const Chat: React.FC = () => {
             return (
               <div key={channel.id} className="group relative">
                 <button
-                  onClick={() => setActiveChannelId(channel.id)}
+                  onClick={() => { setActiveChannelId(channel.id); setShowMobileChannels(false); }}
                   className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-varistor cursor-pointer border-l-[3px] ${
                     isActive
                       ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
@@ -273,8 +309,15 @@ export const Chat: React.FC = () => {
       {/* Message Thread */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Channel Header */}
-        <div className="h-16 px-5 flex items-center justify-between border-b border-varistor-border flex-shrink-0">
-          <div>
+        <div className="h-14 md:h-16 px-4 md:px-5 flex items-center justify-between border-b border-varistor-border flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMobileChannels(prev => !prev)}
+              className="md:hidden p-1.5 rounded-lg hover:bg-varistor-surfaceMuted text-varistor-muted"
+              title="Toggle channels"
+            >
+              <Menu size={18} />
+            </button>
             <h3 className="text-sm font-bold text-varistor-dark flex items-center gap-1">
               <Hash size={14} className="text-varistor-muted" />
               {activeChannel.name}
@@ -450,7 +493,7 @@ export const Chat: React.FC = () => {
         )}
 
         {/* Composer */}
-        <form onSubmit={handleSend} className="border-t border-varistor-border px-4 py-3 flex flex-col gap-2 relative flex-shrink-0">
+        <form onSubmit={handleSend} className="border-t border-varistor-border px-3 md:px-4 py-2 md:py-3 flex flex-col gap-2 relative flex-shrink-0">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
 
           {/* Staged attachment preview - not sent until the user hits Send */}

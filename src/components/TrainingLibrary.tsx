@@ -201,7 +201,7 @@ const TrainingLibrary: React.FC = () => {
   const loadModules = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole, currentUser?.department);
+      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole);
       setModules(data);
     } finally {
       setLoading(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, Paperclip, Plus, Calendar, Check } from 'lucide-react';
 import type { Task } from '../types';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
@@ -16,13 +16,31 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   } = useKanbanTasks();
 
   const [newCheckItem, setNewCheckItem] = useState('');
+  const [internalTask, setInternalTask] = useState<Task | null>(task);
+  const [isClosing, setIsClosing] = useState(false);
 
-  if (!task) return null;
+  useEffect(() => {
+    if (task) {
+      setInternalTask(task);
+      setIsClosing(false);
+    } else if (internalTask) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setInternalTask(null);
+        setIsClosing(false);
+      }, 200); // Wait for slideOut animation to finish
+      return () => clearTimeout(timer);
+    }
+  }, [task, internalTask]);
+
+  if (!internalTask) return null;
+
+  const currentTask = internalTask;
 
   const handleAddCheckItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCheckItem.trim()) return;
-    addChecklistItem(task.id, newCheckItem.trim());
+    addChecklistItem(currentTask.id, newCheckItem.trim());
     setNewCheckItem('');
   };
 
@@ -32,29 +50,29 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
     const mockSize = `${(Math.random() * 3 + 0.5).toFixed(1)} MB`;
     const mockType = mockName.split('.').pop() || 'file';
     
-    addAttachment(task.id, mockName, mockSize, mockType);
+    addAttachment(currentTask.id, mockName, mockSize, mockType);
   };
 
   // Checklist statistics
-  const completedCount = task.checklist.filter(c => c.completed).length;
-  const totalCount = task.checklist.length;
+  const completedCount = currentTask.checklist.filter(c => c.completed).length;
+  const totalCount = currentTask.checklist.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <>
       {/* Backdrop overlay */}
       <div 
-        className="fixed inset-0 bg-black/30 z-40 transition-opacity animate-fade-in"
+        className={`fixed inset-0 bg-black/30 z-40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'animate-fade-in opacity-100'}`}
         onClick={onClose}
       />
 
       {/* Drawer Body */}
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col transition-transform duration-200 ease-out transform translate-x-0 animate-[slideIn_200ms_ease-out]">
+      <div className={`fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col ${isClosing ? 'animate-[slideOut_200ms_ease-in]' : 'animate-[slideIn_200ms_ease-out]'}`}>
         
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border flex-shrink-0">
           <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            {task.status.replace('_', ' ')}
+            {currentTask.status.replace('_', ' ')}
           </span>
           <button 
             onClick={onClose}
@@ -68,9 +86,9 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Title & Description */}
           <div>
-            <h2 className="text-lg font-bold text-varistor-dark leading-snug">{task.title}</h2>
+            <h2 className="text-lg font-bold text-varistor-dark leading-snug">{currentTask.title}</h2>
             <p className="text-xs text-varistor-muted mt-2 leading-relaxed whitespace-pre-line">
-              {task.description}
+              {currentTask.description}
             </p>
           </div>
 
@@ -80,11 +98,11 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
               <span className="text-[10px] text-varistor-muted font-semibold uppercase tracking-wider block">Assignee</span>
               <div className="flex items-center gap-2">
                 <img 
-                  src={task.assignee.avatarUrl} 
-                  alt={task.assignee.name} 
+                  src={currentTask.assignee.avatarUrl} 
+                  alt={currentTask.assignee.name} 
                   className="w-6 h-6 rounded-full object-cover border border-varistor-border"
                 />
-                <span className="text-xs font-semibold text-varistor-dark">{task.assignee.name}</span>
+                <span className="text-xs font-semibold text-varistor-dark">{currentTask.assignee.name}</span>
               </div>
             </div>
 
@@ -92,7 +110,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
               <span className="text-[10px] text-varistor-muted font-semibold uppercase tracking-wider block">Due Date</span>
               <div className="flex items-center gap-1.5 text-xs text-varistor-dark font-semibold">
                 <Calendar size={14} className="text-varistor-muted" />
-                <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span>{new Date(currentTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
             </div>
           </div>
@@ -118,10 +136,10 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
             </div>
 
             <div className="space-y-1.5">
-              {task.checklist.map((item) => (
+              {currentTask.checklist.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => toggleChecklistItem(task.id, item.id)}
+                  onClick={() => toggleChecklistItem(currentTask.id, item.id)}
                   className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-varistor-border hover:bg-varistor-pageBg text-left transition-varistor group"
                 >
                   <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-varistor ${
@@ -161,7 +179,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold text-varistor-dark flex items-center gap-1.5 uppercase tracking-wider">
                 <Paperclip size={16} className="text-[#555]" />
-                Attachments ({task.attachments.length})
+                Attachments ({currentTask.attachments.length})
               </h3>
               <button 
                 onClick={handleSimulateAttachment}
@@ -172,10 +190,10 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
             </div>
 
             <div className="space-y-1.5">
-              {task.attachments.length === 0 ? (
+              {currentTask.attachments.length === 0 ? (
                 <p className="text-[11px] text-varistor-muted italic">No attachments. Drag and drop file to simulate.</p>
               ) : (
-                task.attachments.map((file) => (
+                currentTask.attachments.map((file) => (
                   <div 
                     key={file.id} 
                     className="flex items-center justify-between p-2 border border-varistor-border rounded-lg bg-white hover:bg-varistor-pageBg transition-varistor"
@@ -209,6 +227,10 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
         @keyframes slideIn {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        @keyframes slideOut {
+          from { transform: translateX(0); }
+          to { transform: translateX(100%); }
         }
       `}</style>
     </>
