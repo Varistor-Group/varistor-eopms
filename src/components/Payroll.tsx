@@ -351,7 +351,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const clBalance = payRec?.clBalance ?? 0;
         const designation = payRec?.designation || 'EMPLOYEE';
 
-        const totalDays = att.present + att.late + att.halfDay + att.absent + att.weekOff + att.holidays + att.leaves || 30;
+        const totalDays = att.daysInMonth || (att.present + att.halfDay + att.absent + att.weekOff + att.holidays + att.leaves) || 30;
         const payDays = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
 
         const medical = payRec?.components?.medical ?? 1250;

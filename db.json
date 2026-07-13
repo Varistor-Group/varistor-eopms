@@ -1035,6 +1035,93 @@
         "overtime": 0,
         "otherDeductions": 0
       }
+    },
+    {
+      "id": "pay-VAR-069-Jun-2026",
+      "employeeId": "VAR-069",
+      "employeeName": "Manas Jagdale",
+      "department": "Finance",
+      "designation": "EMPLOYEE",
+      "month": "Jun 2026",
+      "ctc": 30000,
+      "monthlySalary": 30000,
+      "components": {
+        "basic": 15000,
+        "hra": 7500,
+        "pfEmployee": 1800,
+        "pfEmployer": 1800,
+        "esi": 200,
+        "pt": 0,
+        "tds": 0,
+        "specialAllowance": 250,
+        "medical": 1250,
+        "ta": 2500,
+        "lta": 3500,
+        "reimbursement": 0,
+        "incentives": 0,
+        "overtime": 0,
+        "otherDeductions": 0
+      },
+      "netPay": 28000,
+      "status": "draft",
+      "revision": 0,
+      "autoFormula": true,
+      "totalDays": 30,
+      "payDays": 30,
+      "clBalance": 12,
+      "pfUan": "—",
+      "hasPf": true,
+      "hasEsi": true,
+      "hasPt": true,
+      "slipReleased": false,
+      "additionHeads": [
+        "Basic",
+        "HRA",
+        "MEDICAL ALLOWANCE",
+        "TA",
+        "LTA",
+        "SPECIAL ALLOWANCE",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "deductionHeads": [
+        "PF",
+        "ESI",
+        "PT",
+        "Advance salary adjut",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "additionValues": [
+        15000,
+        7500,
+        1250,
+        2500,
+        3500,
+        250,
+        0,
+        0,
+        0,
+        0
+      ],
+      "deductionValues": [
+        1800,
+        0,
+        200,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
     }
   ],
   "employee_cl_balances": {
@@ -1052,6 +1139,10 @@
     },
     "VAR-004": {
       "total": 12,
+      "used": 0
+    },
+    "VAR-67": {
+      "total": 6,
       "used": 0
     }
   },

@@ -970,7 +970,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
     const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
-    const totalDays = row.present + row.late + row.halfDay + row.absent + row.weekOff + row.holidays + row.leaves || 30;
+    const totalDays = row.daysInMonth || (row.present + row.halfDay + row.absent + row.weekOff + row.holidays + row.leaves) || 30;
     const payDays = row.payableDays;
 
     const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
