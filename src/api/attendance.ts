@@ -10,6 +10,8 @@
  *  Mutates → { success: boolean; error: string | null }
  */
 
+import { getPayrollRecords, createRevision, updatePayrollRecord } from './payroll';
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export type AttendanceStatus =
@@ -435,14 +437,13 @@ export async function updateAttendance(
 
   // Automate payroll sync
   try {
-    const payrollAPI = await import('./payroll');
     const dateMatch = ledgerId.match(/(\d{4}-\d{2})-\d{2}$/);
     if (dateMatch) {
       const d = new Date(dateMatch[1] + '-01');
       const monthStr = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
       const empId = ledgerId.replace('atl-', '').replace(`-${dateMatch[0]}`, '');
 
-      const records = await payrollAPI.getPayrollRecords();
+      const records = await getPayrollRecords();
       const rec = records.find(r => r.employeeId === empId && r.month === monthStr);
       
       if (rec) {
@@ -452,12 +453,12 @@ export async function updateAttendance(
           const workingDays = snapshot[0].workingDays;
           
           if (rec.status === 'approved') {
-             const rev = await payrollAPI.createRevision(rec.id, editorId);
+             const rev = await createRevision(rec.id, editorId);
              if (rev) {
-               await payrollAPI.updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
+               await updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
              }
           } else {
-             await payrollAPI.updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
+             await updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
           }
         }
       }

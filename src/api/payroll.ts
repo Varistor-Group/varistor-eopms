@@ -640,6 +640,8 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     _records = loadPayrollRecords();
 
     const targetMonth = 'Jun 2026';
+    const d = new Date(`1 ${targetMonth}`);
+    const actualTotalDays = isNaN(d.getTime()) ? 30 : new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     let modified = false;
 
     for (const emp of employees) {
@@ -648,8 +650,8 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
-          totalDays: 30,
-          payDays: 30,
+          totalDays: actualTotalDays,
+          payDays: actualTotalDays,
           medical: 1250,
           ta: 2500,
           lta: 3500,
@@ -694,8 +696,8 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           status: 'draft',
           revision: 0,
           autoFormula: true,
-          totalDays: 30,
-          payDays: 30,
+          totalDays: actualTotalDays,
+          payDays: actualTotalDays,
           clBalance: 12,
           pfUan: '—',
           hasPf: true,
@@ -966,11 +968,16 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
     const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
     const lopDays = Math.max(0, clBal.used - clBal.total);
 
+    const [year, month] = monthStr.split('-');
+    const actualTotalDays = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
     const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
-    const totalDays = row.present + row.late + row.halfDay + row.absent + row.weekOff + row.holidays + row.leaves || 30;
-    const payDays = row.payableDays;
+    // Calculate days strictly based on attendance if available; else fallback to actual days in month
+    const attendanceSum = (row.present || 0) + (row.late || 0) + (row.halfDay || 0) + (row.absent || 0) + (row.weekOff || 0) + (row.holidays || 0) + (row.leaves || 0);
+    const totalDays = attendanceSum > 0 ? attendanceSum : actualTotalDays;
+    const payDays = row.payableDays || actualTotalDays;
 
     const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
     const ta = existingIdx !== -1 ? _records[existingIdx].components.ta : 2500;

@@ -615,14 +615,25 @@ app.post('/api/payroll/send-slips', async (req, res) => {
       const words = numberToWords(finalPay);
 
       let rowsHtml = '';
+      let maxRows = 0;
+      let isCustom = false;
+      let totalEarnings = slip.monthlySalary || slip.ctc || 0;
+      let totalDeductions = slip.deductions || 0;
+
       if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
           Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
-        let maxRows = 0;
         for (let i = 0; i < 10; i++) {
           if (slip.additionHeads[i] || slip.deductionHeads[i]) {
             maxRows = i + 1;
           }
         }
+      }
+
+      if (maxRows > 0) {
+        isCustom = true;
+        totalEarnings = slip.additionValues.reduce((sum, val) => sum + Number(val || 0), 0);
+        totalDeductions = slip.deductionValues.reduce((sum, val) => sum + Number(val || 0), 0);
+
         for (let i = 0; i < maxRows; i++) {
           const addHead = slip.additionHeads[i] || '';
           const addVal = addHead ? fmt(slip.additionValues[i]) : '';
@@ -764,10 +775,10 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               </tr>
               ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
-                <td style="border:1px solid #cccccc;">Total CTC</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ctc)}</td>
-                <td style="border:1px solid #cccccc;">Total Deduction</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.deductions)}</td>
+                <td style="border:1px solid #cccccc;">Total Earnings</td>
+                <td style="text-align:right;border:1px solid #cccccc;color:#22c55e;">${fmt(totalEarnings)}</td>
+                <td style="border:1px solid #cccccc;">Total Deductions</td>
+                <td style="text-align:right;border:1px solid #cccccc;color:#ef4444;">${fmt(totalDeductions)}</td>
               </tr>
               <tr>
                 <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
