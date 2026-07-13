@@ -431,6 +431,39 @@ export async function updateAttendance(
     edited_at: new Date().toISOString(),
   });
 
+  // Automate payroll sync
+  try {
+    const payrollAPI = await import('./payroll');
+    const dateMatch = ledgerId.match(/(\d{4}-\d{2})-\d{2}$/);
+    if (dateMatch) {
+      const d = new Date(dateMatch[1] + '-01');
+      const monthStr = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+      const empId = ledgerId.replace('atl-', '').replace(`-${dateMatch[0]}`, '');
+
+      const records = await payrollAPI.getPayrollRecords();
+      const rec = records.find(r => r.employeeId === empId && r.month === monthStr);
+      
+      if (rec) {
+        const snapshot = await getMonthlyReport(dateMatch[1], [empId]);
+        if (snapshot && snapshot.length > 0) {
+          const payDays = snapshot[0].payableDays;
+          const workingDays = snapshot[0].workingDays;
+          
+          if (rec.status === 'approved') {
+             const rev = await payrollAPI.createRevision(rec.id, editorId);
+             if (rev) {
+               await payrollAPI.updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
+             }
+          } else {
+             await payrollAPI.updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Auto payroll sync failed', e);
+  }
+
   return { success: true, error: null };
 }
 
