@@ -85,7 +85,7 @@ function parseNumber(val: any): number {
 // ─── Formula Badge ────────────────────────────────────────────────────────────
 
 const FormulaBadge = ({ formula }: { formula: string }) => (
-  <span className="font-mono text-[10px] bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0] px-1.5 py-0.5 rounded">
+  <span className="font-mono text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
     {formula}
   </span>
 );
@@ -215,7 +215,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           </div>
 
           {/* Yellow Month Bar */}
-          <div className="bg-[#fef08a] text-center py-1.5 font-bold text-sm text-gray-900 border border-yellow-300 rounded mb-4">
+          <div className="bg-yellow-200 text-center py-1.5 font-bold text-sm text-gray-900 border border-yellow-300 rounded mb-4">
             Pay Slip for the Month of {record.month}
           </div>
 

@@ -31,7 +31,10 @@ export const TaskSummary: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] transition-varistor hover:shadow-md">
+    <div 
+      onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'kanban' }))}
+      className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] transition-varistor hover:shadow-md cursor-pointer"
+    >
       <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec] mb-3">
         <h3 className="text-sm font-semibold text-varistor-dark">Today's tasks</h3>
         <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-2 py-0.5 rounded-full">
@@ -49,7 +52,7 @@ export const TaskSummary: React.FC = () => {
           activeTasks.map((task) => (
             <div 
               key={task.id} 
-              className="flex items-center justify-between p-3 border border-[#edf0ec] rounded-lg bg-[#fafbfa] hover:bg-white hover:border-[#d2d8ce] transition-varistor group"
+              className="flex items-center justify-between p-3 border border-[#edf0ec] rounded-lg bg-varistor-pageBg hover:bg-white hover:border-[#d2d8ce] transition-varistor group"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <button

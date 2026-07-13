@@ -194,7 +194,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-2 bg-[#1a1a1a] text-white text-sm font-bold rounded-full hover:bg-black transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2 bg-gray-900 text-white text-sm font-bold rounded-full hover:bg-black transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading && (
                 <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

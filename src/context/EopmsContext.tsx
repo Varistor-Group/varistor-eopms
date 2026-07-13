@@ -304,10 +304,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast('Leave request rejected', 0, 'debit');
   };
 
+  const activeUserId = currentUser?.id ?? MOCK_USER_ID;
+
   useEffect(() => {
     const loadAnnouncements = async () => {
       try {
-        const data = await announcementsApi.fetchAnnouncements(MOCK_USER_ID);
+        const data = await announcementsApi.fetchAnnouncements(activeUserId);
         setAnnouncements(data);
       } catch (err) {
         console.error('Failed to load announcements:', err);
@@ -315,11 +317,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     loadAnnouncements();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeUserId]);
 
   const reactToAnnouncement = async (announcementId: string, emojiType: string) => {
     try {
-      const updated = await announcementsApi.toggleReaction(announcementId, MOCK_USER_ID, emojiType);
+      const updated = await announcementsApi.toggleReaction(announcementId, activeUserId, emojiType);
       setAnnouncements(updated);
     } catch (err) {
       console.error('Failed to toggle reaction:', err);
@@ -328,7 +330,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const readAnnouncement = async (announcementId: string) => {
     try {
-      const updated = await announcementsApi.markAsRead(announcementId, MOCK_USER_ID);
+      const updated = await announcementsApi.markAsRead(announcementId, activeUserId);
       setAnnouncements(updated);
     } catch (err) {
       console.error('Failed to mark announcement as read:', err);
@@ -345,7 +347,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const roleToUse = authorRole || (currentRole === 'HR' ? 'HR' : 'Admin');
       const updated = await announcementsApi.createAnnouncement(
         { title, content, type, author_role: roleToUse },
-        MOCK_USER_ID
+        activeUserId
       );
       setAnnouncements(updated);
       addToast(`New announcement posted: "${title}"`, 0, 'credit');

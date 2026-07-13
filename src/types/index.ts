@@ -6,6 +6,33 @@ export type TaskStatus = 'todo' | 'in_progress' | 'awaiting_approval' | 'done';
 
 export type DocumentStatus = 'Verified' | 'Pending' | 'Rejected' | 'Under Review';
 
+// ─── Document Vault Templates ─────────────────────────────────────────────────
+
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  isRequired: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface EmployeeDocumentSlot {
+  id: string;
+  employeeId: string;
+  templateId?: string;       // null for custom/ad-hoc slots
+  documentName: string;
+  isRequired: boolean;
+  isCustom: boolean;         // true = added by HR only for this employee
+  documentId?: string;       // linked documents row id after upload
+  filename?: string;         // file name from the documents row
+  storagePath?: string;
+  status: DocumentStatus;
+  notes?: string;            // HR notes for this slot
+  createdAt: string;
+}
+
 export interface TaskAssignee {
   name: string;
   avatarUrl: string;
@@ -130,18 +157,27 @@ export interface FieldEmployeeLocation {
 
 // ─── Team Chat (Area E) ──────────────────────────────────────────────────────
 
-export type ChannelId = 'all-hands' | 'sales-team' | 'operations' | 'tech-dev' | 'hr-announcements';
+export type ChannelId = string;
 
 export interface ChatChannel {
   id: ChannelId;
   name: string;
   memberCount: number;
   pinned?: string;
+  allowedEmployeeIds?: string[]; // If defined, only these employees can access the channel
+  department?: string;           // If defined, only employees in this department can access the channel
 }
 
 export interface ChatAttachment {
   name: string;
   size: string;
+  type?: string;
+  dataUrl?: string;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  userName: string;
 }
 
 export interface ChatMessage {
@@ -153,6 +189,7 @@ export interface ChatMessage {
   isSelf: boolean;
   text?: string;
   attachment?: ChatAttachment;
+  reactions?: ChatReaction[];
   timestamp: string;
 }
 

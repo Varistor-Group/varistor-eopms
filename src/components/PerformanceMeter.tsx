@@ -17,7 +17,10 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
   }, [score]);
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[220px] transition-varistor hover:shadow-md">
+    <div 
+      onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'kanban' }))}
+      className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col justify-between h-[220px] transition-varistor hover:shadow-md cursor-pointer"
+    >
       <div className="flex justify-between items-center pb-2 border-b border-[#edf0ec]">
         <h3 className="text-sm font-semibold text-varistor-dark">Performance meter</h3>
       </div>
@@ -57,7 +60,7 @@ export const PerformanceMeter: React.FC<PerformanceMeterProps> = ({ score = 78 }
       
       <div className="flex justify-between items-center text-[10px] text-varistor-muted mt-2 pt-2 border-t border-[#edf0ec]">
         <span>This quarter</span>
-        <span className="text-[#3f6212] font-semibold bg-[#eefed4] px-1.5 py-0.5 rounded-full">Good Standing</span>
+        <span className="text-[#3f6212] font-semibold bg-varistor-limeTint px-1.5 py-0.5 rounded-full">Good Standing</span>
       </div>
     </div>
   );

@@ -85,7 +85,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
     <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setIsOpen(prev => !prev)}
-        className="p-2 rounded-full hover:bg-[#f1f3f0] transition-colors relative cursor-pointer"
+        className="p-2 rounded-full hover:bg-varistor-surfaceMuted transition-colors relative cursor-pointer"
         title="Notifications"
       >
         <Bell size={18} strokeWidth={1.5} className="text-varistor-dark" />
@@ -97,7 +97,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 bg-varistor-surface border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-varistor-border">
             <h4 className="text-xs font-bold text-varistor-dark uppercase tracking-wider">Notifications</h4>
             {totalUnread > 0 && (
@@ -122,7 +122,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
               <button
                 key={channel.id}
                 onClick={() => handleChatItemClick(channel.id)}
-                className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-[#f8faf7] transition-colors text-left cursor-pointer"
+                className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-varistor-surfaceMuted transition-colors text-left cursor-pointer"
               >
                 <div className="w-7 h-7 rounded-full bg-varistor-limeLight flex items-center justify-center flex-shrink-0 mt-0.5">
                   <MessageSquare size={13} className="text-varistor-limeText" />
@@ -150,12 +150,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
                   <button
                     key={entry.id}
                     onClick={() => handleLedgerItemClick(entry.id)}
-                    className={`w-full flex items-start gap-3 px-4 py-2.5 hover:bg-[#f8faf7] transition-colors text-left cursor-pointer ${
+                    className={`w-full flex items-start gap-3 px-4 py-2.5 hover:bg-varistor-surfaceMuted transition-colors text-left cursor-pointer ${
                       isUnread ? 'bg-varistor-limeLight/40' : ''
                     }`}
                   >
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      isCredit ? 'bg-varistor-limeLight text-varistor-limeText' : 'bg-red-50 text-red-600'
+                      isCredit ? 'bg-varistor-limeLight text-varistor-limeText' : 'bg-varistor-dangerBg text-varistor-dangerText'
                     }`}>
                       <Award size={13} />
                     </div>
@@ -187,11 +187,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
                       readAnnouncement(ann.id);
                       if (isBirthday) reactToAnnouncement(ann.id, '🎉');
                     }}
-                    className={`w-full flex items-start gap-3 px-4 py-2.5 hover:bg-[#f8faf7] transition-colors text-left cursor-pointer ${
+                    className={`w-full flex items-start gap-3 px-4 py-2.5 hover:bg-varistor-surfaceMuted transition-colors text-left cursor-pointer ${
                       !ann.isRead ? 'bg-varistor-limeLight/40' : ''
                     }`}
                   >
-                    <div className="w-7 h-7 rounded-full bg-[#f1f3f0] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-full bg-varistor-surfaceMuted flex items-center justify-center flex-shrink-0 mt-0.5">
                       {isBirthday ? (
                         <Cake size={13} className="text-varistor-dark" />
                       ) : (

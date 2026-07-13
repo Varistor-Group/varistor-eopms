@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import PDFDocument from 'pdfkit';
 import fs from 'fs/promises';
 import path, { dirname } from 'path';
@@ -14,8 +14,24 @@ const port = 3001;
 
 app.use(express.json());
 
-// Initialize Resend
-const resend = new Resend(process.env.VITE_RESEND_API_KEY);
+// ── Nodemailer SMTP transporter ────────────────────────────────────────────────
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+transporter.verify((error) => {
+  if (error) {
+    console.error('[SMTP] Connection failed:', error.message);
+  } else {
+    console.log('[SMTP] Server ready — sending from', process.env.SMTP_USER);
+  }
+});
 
 // CORS middleware to allow requests from Vite frontend
 app.use((req, res, next) => {
@@ -36,40 +52,35 @@ app.post('/api/send-credentials', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Welcome to Varistor EOPMS - Your Login Credentials',
+      subject: 'Welcome to Varistor EOPMS — Your Login Credentials',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">Welcome to Varistor EOPMS!</h1>
+        <div style="font-family: Inter, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
+          <div style="background: #84CC16; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #000; margin: 0; font-size: 20px; font-weight: 700;">Varistor EOPMS</h1>
           </div>
-          <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-            <p>Hi ${name},</p>
-            <p>Your account has been successfully created. Here are your login credentials:</p>
-            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
-              <p style="margin: 0 0 10px 0;"><strong>Employee ID:</strong> ${employeeId}</p>
-              <p style="margin: 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 6px; border-radius: 3px;">${tempPassword}</code></p>
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
+            <h2 style="font-size: 18px; font-weight: 600; color: #111;">Welcome, ${name}!</h2>
+            <p style="color: #444; line-height: 1.6;">Your account has been created on Varistor EOPMS. Here are your login credentials:</p>
+            <div style="background: #f9fafb; border: 1px solid #D8DED2; border-radius: 8px; padding: 20px; margin: 24px 0;">
+              <p style="margin: 0 0 8px 0; color: #444;"><strong>Employee ID:</strong> ${employeeId}</p>
+              <p style="margin: 0 0 8px 0; color: #444;"><strong>Email:</strong> ${email}</p>
+              <p style="margin: 0; color: #444;"><strong>Temporary Password:</strong> ${tempPassword}</p>
             </div>
-            <p>Please log in using the app URL and change your password as soon as possible.</p>
-            <div style="text-align: center; margin-top: 30px;">
-              <a href="http://localhost:5173" style="background-color: #84CC16; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">Log in to EOPMS</a>
-            </div>
+            <p style="color: #444; line-height: 1.6;">Please log in and change your password immediately.</p>
+            <a href="${process.env.APP_URL || 'http://localhost:5173'}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Log In to EOPMS →</a>
+            <p style="color: #888; font-size: 12px; margin-top: 32px;">If you did not expect this email, please contact HR immediately.</p>
           </div>
         </div>
       `,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, data });
+    res.json({ success: true });
   } catch (err) {
-    console.error('Server error:', err);
-    res.status(500).json({ success: false, error: 'Failed to send email' });
+    console.error('[send-credentials] Error:', err);
+    res.json({ success: false, error: err.message });
   }
 });
 
@@ -81,40 +92,45 @@ app.post('/api/send-password-reset', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
-    // Mock reset link
-    const resetLink = 'http://localhost:5173/reset?token=MOCK_TOKEN_123';
-
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Password Reset Request',
+      subject: 'Varistor EOPMS — Password Reset Request',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">Password Reset</h1>
+        <div style="font-family: Inter, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
+          <div style="background: #84CC16; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #000; margin: 0; font-size: 20px; font-weight: 700;">Varistor EOPMS</h1>
           </div>
-          <div style="padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-            <p>Hi,</p>
-            <p>We received a request to reset the password for your account.</p>
-            <p>Click the button below to reset your password. This link is a mock placeholder for development.</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetLink}" style="background-color: #84CC16; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">Reset Password</a>
-            </div>
-            <p style="font-size: 12px; color: #777;">If you did not request this, you can safely ignore this email.</p>
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
+            <h2 style="font-size: 18px; font-weight: 600; color: #111;">Password Reset Requested</h2>
+            <p style="color: #444; line-height: 1.6;">We received a request to reset the password for your Varistor EOPMS account.</p>
+            <a href="${process.env.APP_URL || 'http://localhost:5173'}/reset?token=PENDING_REAL_TOKEN" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
+            <p style="color: #444; line-height: 1.6; margin-top: 24px;">If you did not request this, please ignore this email. Your password will not be changed.</p>
+            <p style="color: #888; font-size: 12px; margin-top: 32px;">This link expires in 1 hour.</p>
           </div>
         </div>
       `,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, data });
+    res.json({ success: true });
   } catch (err) {
-    console.error('Server error:', err);
-    res.status(500).json({ success: false, error: 'Failed to send email' });
+    console.error('[send-password-reset] Error:', err);
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// ── Dev-only: test SMTP connection (remove in production) ──────────────────────
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_USER,
+      subject: 'EOPMS Email Test',
+      html: '<p>SMTP is working correctly.</p>',
+    });
+    res.json({ success: true, message: 'Test email sent to ' + process.env.SMTP_USER });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
   }
 });
 
@@ -163,19 +179,14 @@ app.post('/api/quiz/submit', async (req, res) => {
 
     const recipients = [employeeEmail, hrEmail].filter(Boolean);
 
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: recipients,
       subject: `Quiz Result: ${moduleTitle} — ${passed ? 'Passed' : 'Failed'} (${score}%)`,
       html,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, data });
+    res.json({ success: true });
   } catch (err) {
     console.error('Server error:', err);
     res.status(500).json({ success: false, error: 'Failed to send quiz result email' });
@@ -593,7 +604,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
     }
 
     console.log(`[Payroll] Received request to send ${slips.length} slips`);
-    console.log(`[Payroll] Resend API key present: ${!!process.env.VITE_RESEND_API_KEY}`);
+    console.log(`[Payroll] SMTP host: ${process.env.SMTP_HOST || '(not configured)'}`);
 
     const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
@@ -796,28 +807,21 @@ app.post('/api/payroll/send-slips', async (req, res) => {
         const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
         const pdfBuffer = await generateSalarySlipPDF(slip);
 
-        const result = await resend.emails.send({
-          from: 'onboarding@resend.dev',
+        await transporter.sendMail({
+          from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
           to: slip.email,
           subject: `Your Salary Slip – ${month} | Varistor Technologies`,
           html: buildSlipHtml(slip),
           attachments: [
             {
               filename: `Salary_Slip_${month.replace(/\s+/g, '_')}.pdf`,
-              content: pdfBuffer.toString('base64'),
+              content: pdfBuffer,
+              contentType: 'application/pdf',
             }
-          ]
+          ],
         });
-        // Resend SDK can return { data, error } or throw
-        const resendError = result?.error;
-        if (resendError) {
-          const msg = resendError.message || JSON.stringify(resendError);
-          console.error(`[Payroll] Resend error for ${slip.email}:`, msg);
-          failed.push({ email: slip.email, name: slip.name, error: msg });
-        } else {
-          sent.push(slip.email);
-          console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
-        }
+        sent.push(slip.email);
+        console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
       } catch (err) {
         console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
         failed.push({ email: slip.email, name: slip.name, error: err.message });
@@ -972,17 +976,18 @@ app.post('/api/leave/notify-manager', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: managerEmail,
       subject: `Leave Request: ${employeeName} – ${leaveType} (${days} day/s)`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <div style="background-color: #84CC16; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">New Leave Request</h1>
+        <div style="font-family: Inter, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
+          <div style="background: #84CC16; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #000; margin: 0; font-size: 20px; font-weight: 700;">Varistor EOPMS</h1>
           </div>
-          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-            <p>A leave request is awaiting your review on <strong>Varistor EOPMS</strong>.</p>
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
+            <h2 style="font-size: 18px; font-weight: 600; color: #111;">New Leave Request</h2>
+            <p style="color: #444; line-height: 1.6;">A leave request is awaiting your review on <strong>Varistor EOPMS</strong>.</p>
             <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
               <tr style="background:#f9f9f9;">
                 <td style="padding:10px 12px; font-weight:600; border:1px solid #eee;">Employee</td>
@@ -1002,19 +1007,14 @@ app.post('/api/leave/notify-manager', async (req, res) => {
               </tr>
             </table>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="http://localhost:5173" style="background-color: #84CC16; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">Approve / Reject in EOPMS</a>
+              <a href="${process.env.APP_URL || 'http://localhost:5173'}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Review in EOPMS →</a>
             </div>
           </div>
         </div>
       `,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, data });
+    res.json({ success: true });
   } catch (err) {
     console.error('Server error:', err);
     res.status(500).json({ success: false, error: 'Failed to send leave notification email' });
@@ -1034,31 +1034,27 @@ app.post('/api/leave/notify-employee', async (req, res) => {
     const approved = status === 'Approved';
     const statusColor = approved ? '#84CC16' : '#ef4444';
 
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+    await transporter.sendMail({
+      from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: employeeEmail,
       subject: `Your Leave Request ${leaveId} has been ${status}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <div style="background-color: ${statusColor}; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">Leave ${status}</h1>
+        <div style="font-family: Inter, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
+          <div style="background: ${statusColor}; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #000; margin: 0; font-size: 20px; font-weight: 700;">Varistor EOPMS</h1>
           </div>
-          <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px;">
-            <p>Hi ${employeeName || ''},</p>
-            <p>Your leave request <strong>${leaveId}</strong> has been <strong style="color:${statusColor};">${status.toLowerCase()}</strong>.</p>
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
+            <h2 style="font-size: 18px; font-weight: 600; color: #111;">Leave ${status}</h2>
+            <p style="color: #444; line-height: 1.6;">Hi ${employeeName || ''},</p>
+            <p style="color: #444; line-height: 1.6;">Your leave request <strong>${leaveId}</strong> has been <strong style="color:${statusColor};">${status.toLowerCase()}</strong>.</p>
             ${!approved && comment ? `<p style="background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:4px; font-size:13px;"><strong>Reviewer comment:</strong> ${comment}</p>` : ''}
-            <p style="font-size:12px; color:#888; margin-top:24px;">This is an automated message from Varistor EOPMS Leave Management.</p>
+            <p style="color: #888; font-size: 12px; margin-top: 32px;">This is an automated message from Varistor EOPMS Leave Management.</p>
           </div>
         </div>
       `,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, data });
+    res.json({ success: true });
   } catch (err) {
     console.error('Server error:', err);
     res.status(500).json({ success: false, error: 'Failed to send leave status email' });
@@ -1158,9 +1154,40 @@ const MOCK_EMPLOYEE_NAMES = {
 
     socket.on('data', (data) => {
       buffer = Buffer.concat([buffer, data]);
-      // TODO: Parse ZKTeco ADMS binary packet format
-      // Each attendance record: userId(9B) + timestamp(4B) + type(1B) + ...
-      // processDevicePacket(buffer);
+      // Parse ZKTeco ADMS binary packet format
+      // Format (simplified): 
+      // bytes 0-3: Magic Header
+      // bytes 4-5: Size
+      // bytes 6-7: Command ID
+      // bytes 8-24: Employee ID (String/Null terminated)
+      // byte 25: Punch type (0 = In, 1 = Out)
+      // bytes 26-29: Timestamp
+      
+      try {
+        // While we have enough bytes for a complete packet (assume 30 bytes for simplified parser)
+        while (buffer.length >= 30) {
+          const packetData = buffer.slice(0, 30);
+          buffer = buffer.slice(30);
+
+          let empIdRaw = packetData.slice(8, 24).toString('ascii').replace(/\0/g, '').trim();
+          let punchTypeRaw = packetData.readUInt8(25);
+          let type = punchTypeRaw === 0 ? 'in' : 'out';
+          
+          let employeeId = empIdRaw;
+          if (/^\d+$/.test(empIdRaw)) {
+            employeeId = `VAR-${empIdRaw.padStart(3, '0')}`;
+          }
+
+          console.log(`[Device Bridge] Parsed Punch Event => Emp: ${employeeId}, Type: ${type}`);
+          
+          // Calculate a dummy confidence for the mock/hardware mix
+          const confidence = parseFloat((85 + Math.random() * 12).toFixed(1));
+          
+          processPunchEvent(employeeId, type, confidence);
+        }
+      } catch (err) {
+        console.error('[Device Bridge] Packet parsing error:', err.message);
+      }
     });
 
     socket.on('timeout', () => {
@@ -1245,7 +1272,9 @@ const MOCK_EMPLOYEE_NAMES = {
   app.post('/api/attendance/export-pdf', (req, res) => {
     try {
       const { rows = [], month = 'Report', type = 'monthly' } = req.body;
-      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+
+      // ── Page setup: A4 landscape for more column space ──────────────────────
+      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
       const bufs = [];
       doc.on('data', d => bufs.push(d));
       doc.on('end', () => {
@@ -1255,47 +1284,130 @@ const MOCK_EMPLOYEE_NAMES = {
         res.send(pdfBuffer);
       });
 
-      // Header
-      doc.fontSize(18).fillColor('#111111').text(`Varistor EOPMS — Attendance Report`, { align: 'center' });
-      doc.fontSize(11).fillColor('#868e80').text(`Month: ${month} · Generated: ${new Date().toLocaleDateString('en-IN')}`, { align: 'center' });
-      doc.moveDown(1);
+      const pageW = doc.page.width;
+      const marginL = doc.page.margins.left;
+      const usableW = pageW - marginL - doc.page.margins.right;
 
-      // Table header
+      // ── Header ──────────────────────────────────────────────────────────────
+      doc.rect(marginL, 36, usableW, 32).fill('#84CC16');
+      doc.fillColor('#1a2e05').fontSize(15).font('Helvetica-Bold')
+        .text('Varistor EOPMS — Attendance Report', marginL + 10, 45, { lineBreak: false });
+      const subtitle = `${type === 'monthly' ? 'Monthly' : 'Daily'}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`;
+      doc.fillColor('#1a2e05').fontSize(9).font('Helvetica')
+        .text(subtitle, 0, 49, { align: 'right', lineBreak: false });
+
+      doc.y = 36 + 32 + 10; // below header bar
+
+      // ── Column definitions ───────────────────────────────────────────────────
       const cols = type === 'monthly'
-        ? ['Employee', 'Dept', 'Present', 'Leaves', 'W.O', 'Holidays', 'Total Hrs', 'Payable Days']
-        : ['Employee', 'Dept', 'Date', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status'];
-      const colWidths = type === 'monthly'
-        ? [110, 90, 50, 50, 45, 60, 60, 60]
-        : [110, 90, 65, 80, 80, 55, 55];
+        ? [
+            { label: 'Emp ID',      key: 'employee_id',   w: 60 },
+            { label: 'Employee',    key: 'employeeName',  w: 140 },
+            { label: 'Dept',        key: 'department',    w: 90  },
+            { label: 'Present',     key: 'present',       w: 52  },
+            { label: 'Leaves',      key: 'leaves',        w: 48  },
+            { label: 'W.O',         key: 'weekOff',       w: 40  },
+            { label: 'Holidays',    key: 'holidays',      w: 52  },
+            { label: 'Half-day',    key: 'halfDay',       w: 52  },
+            { label: 'Absent',      key: 'absent',        w: 48  },
+            { label: 'Total Hrs',   key: 'totalHrs',      w: 58  },
+            { label: 'Payable Days',key: 'payableDays',   w: 70  },
+          ]
+        : [
+            { label: 'Emp ID',      key: 'employee_id',   w: 60  },
+            { label: 'Employee',    key: 'employeeName',  w: 150 },
+            { label: 'Dept',        key: 'department',    w: 100 },
+            { label: 'Date',        key: 'date',          w: 75  },
+            { label: 'Punch IN',    key: 'punch_in',      w: 80  },
+            { label: 'Punch OUT',   key: 'punch_out',     w: 80  },
+            { label: 'Work Hrs',    key: 'work_hours',    w: 60  },
+            { label: 'Status',      key: 'status',        w: 65  },
+          ];
 
-      let x = doc.page.margins.left;
-      const rowH = 20;
+      // Scale widths to fill exact usable width
+      const totalW = cols.reduce((s, c) => s + c.w, 0);
+      const scale = usableW / totalW;
+      cols.forEach(c => { c.w = Math.floor(c.w * scale); });
 
-      // Header row
-      doc.rect(x, doc.y, doc.page.width - 80, rowH).fill('#84CC16');
-      doc.fillColor('#111111').fontSize(9);
-      cols.forEach((col, i) => {
-        doc.text(col, x + 4, doc.y - rowH + 5, { width: colWidths[i], lineBreak: false });
-        x += colWidths[i];
-      });
-      doc.moveDown(0.2);
+      const rowH = 18;
 
-      // Data rows — 25 per page
-      rows.forEach((row, idx) => {
-        if (idx > 0 && idx % 25 === 0) doc.addPage();
-        x = doc.page.margins.left;
-        const y = doc.y;
-        if (idx % 2 === 0) doc.rect(x, y, doc.page.width - 80, rowH).fill('#f7fee7');
-        doc.fillColor('#111111').fontSize(8);
-        const values = type === 'monthly'
-          ? [row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.totalHrs, row.payableDays]
-          : [row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+      function drawRow(y, values, isBg, isHeader) {
+        // Row background
+        if (isHeader) {
+          doc.rect(marginL, y, usableW, rowH).fill('#2d5a00');
+        } else if (isBg) {
+          doc.rect(marginL, y, usableW, rowH).fill('#f0fce4');
+        } else {
+          doc.rect(marginL, y, usableW, rowH).fill('#ffffff');
+        }
+
+        // Cell text + vertical dividers
+        let x = marginL;
         values.forEach((val, i) => {
-          doc.text(String(val ?? ''), x + 4, y + 5, { width: colWidths[i], lineBreak: false });
-          x += colWidths[i];
+          const w = cols[i].w;
+          const str = String(val ?? '');
+
+          doc
+            .fillColor(isHeader ? '#ffffff' : '#111111')
+            .fontSize(isHeader ? 8 : 7.5)
+            .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
+            .text(str, x + 4, y + (rowH - 8) / 2, {
+              width: w - 8,
+              lineBreak: false,
+              ellipsis: true,
+            });
+
+          // Vertical separator (except after last col)
+          if (i < values.length - 1) {
+            doc.strokeColor(isHeader ? '#4d8a00' : '#d0e8b8')
+              .lineWidth(0.4)
+              .moveTo(x + w, y).lineTo(x + w, y + rowH).stroke();
+          }
+          x += w;
         });
-        doc.moveDown(0.2);
+
+        // Bottom border for each row
+        doc.strokeColor(isHeader ? '#1a4000' : '#c5e0a0')
+          .lineWidth(0.4)
+          .moveTo(marginL, y + rowH).lineTo(marginL + usableW, y + rowH).stroke();
+      }
+
+      // ── Column header ────────────────────────────────────────────────────────
+      const headerY = doc.y;
+      drawRow(headerY, cols.map(c => c.label), false, true);
+      doc.y = headerY + rowH;
+
+      // ── Data rows ────────────────────────────────────────────────────────────
+      let pageRowCount = 0;
+      const rowsPerPage = Math.floor((doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 80) / rowH);
+
+      rows.forEach((row, idx) => {
+        if (pageRowCount > 0 && pageRowCount % rowsPerPage === 0) {
+          // Footer on current page
+          doc.fontSize(7).fillColor('#888888').font('Helvetica')
+            .text(`Page ${Math.ceil(idx / rowsPerPage)}`, 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+          doc.addPage();
+          // Reprint column headers on new page
+          const newHeaderY = doc.page.margins.top;
+          doc.y = newHeaderY;
+          drawRow(newHeaderY, cols.map(c => c.label), false, true);
+          doc.y = newHeaderY + rowH;
+          pageRowCount = 0;
+        }
+
+        const rowY = doc.y;
+        const values = type === 'monthly'
+          ? [row.employee_id || '', row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.halfDay ?? 0, row.absent, row.totalHrs, row.payableDays]
+          : [row.employee_id || '', row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+
+        drawRow(rowY, values, idx % 2 === 1, false);
+        doc.y = rowY + rowH;
+        pageRowCount++;
       });
+
+      // Footer on last page
+      doc.fontSize(7).fillColor('#888888').font('Helvetica')
+        .text('Varistor EOPMS — Confidential', 0, doc.page.height - 30, { align: 'center', lineBreak: false });
 
       doc.end();
     } catch (err) {

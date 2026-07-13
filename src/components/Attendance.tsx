@@ -42,8 +42,7 @@ import {
   getConfidenceBadgeClass,
   getConfidenceLabel,
 } from '../lib/faceVerification';
-import { syncPayrollFromAttendance } from '../api/payroll';
-
+import { YearlyAttendanceReport } from './YearlyAttendanceReport';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -53,13 +52,13 @@ const tdCls = 'px-4 py-3 text-xs text-varistor-dark whitespace-nowrap align-midd
 // ─── Attendance status badge ──────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<AttendanceStatus, string> = {
-  Present:   'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30',
-  Late:      'bg-amber-50 text-amber-700 border-amber-200',
-  'Half-day':'bg-blue-50 text-blue-700 border-blue-200',
-  Holiday:   'bg-purple-50 text-purple-700 border-purple-200',
-  'W.O':     'bg-gray-100 text-gray-500 border-gray-200',
-  Leave:     'bg-teal-50 text-teal-700 border-teal-200',
-  Absent:    'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder',
+  Present: 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30',
+  Late: 'bg-amber-50 text-amber-700 border-amber-200',
+  'Half-day': 'bg-blue-50 text-blue-700 border-blue-200',
+  Holiday: 'bg-purple-50 text-purple-700 border-purple-200',
+  'W.O': 'bg-gray-100 text-gray-500 border-gray-200',
+  Leave: 'bg-teal-50 text-teal-700 border-teal-200',
+  Absent: 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder',
 };
 
 const AttendanceBadge: React.FC<{ status: AttendanceStatus }> = ({ status }) => (
@@ -372,9 +371,12 @@ export const Attendance: React.FC = () => {
     XLSX.writeFile(wb, `attendance_monthly_${reportMonth}.xlsx`);
   }
 
-  async function exportPDF(type: 'daily' | 'monthly') {
+  async function exportPDF(type: 'daily' | 'monthly', singleEmployeeId?: string) {
     try {
-      const rows = type === 'daily' ? dailyData : monthlyReport;
+      let rows = type === 'daily' ? dailyData : monthlyReport;
+      if (singleEmployeeId) {
+        rows = rows.filter(r => r.employee_id === singleEmployeeId);
+      }
       const res = await fetch('http://localhost:3001/api/attendance/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -384,7 +386,8 @@ export const Attendance: React.FC = () => {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `attendance_${type}_${type === 'daily' ? selectedDate : reportMonth}.pdf`;
+      const filenameBase = singleEmployeeId ? `attendance_${singleEmployeeId}_${reportMonth}` : `attendance_${type}_${type === 'daily' ? selectedDate : reportMonth}`;
+      a.href = url; a.download = `${filenameBase}.pdf`;
       a.click(); URL.revokeObjectURL(url);
     } catch {
       addToast('PDF export failed. Is the server running?', 0, 'debit');
@@ -572,11 +575,10 @@ export const Attendance: React.FC = () => {
             <button
               key={tab}
               onClick={() => setMainTab(tab)}
-              className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${
-                mainTab === tab
+              className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${mainTab === tab
                   ? 'bg-white text-varistor-dark shadow-varistor border border-varistor-border'
                   : 'text-varistor-muted hover:text-varistor-dark'
-              }`}
+                }`}
             >
               {tab === 'office' ? '🏢 Office Attendance' : '🏃 Field Attendance'}
             </button>
@@ -691,7 +693,7 @@ export const Attendance: React.FC = () => {
                 {dailyLoading ? (
                   <div className="p-8 text-center text-varistor-muted text-sm">Loading…</div>
                 ) : (
-                  <table className="w-full min-w-[700px]">
+                  <table className="w-full text-sm">
                     <thead className="bg-varistor-pageBg border-b border-varistor-border">
                       <tr>
                         {['Emp ID', 'Name', 'Dept', 'Punch IN', 'Punch OUT', 'Work Hrs', 'Status', ...(canEdit ? ['Edit'] : [])].map(h => (
@@ -837,9 +839,9 @@ export const Attendance: React.FC = () => {
               </div>
               <div className="overflow-x-auto">
                 {reportLoading ? <div className="p-8 text-center text-varistor-muted text-sm">Loading…</div> : (
-                  <table className="w-full min-w-[900px]">
+                  <table className="w-full text-sm">
                     <thead className="bg-varistor-pageBg border-b border-varistor-border">
-                      <tr>{['Emp ID', 'Name', 'Dept', 'Present', 'Late', 'Leaves', 'W.O', 'Holidays', 'Half-day', 'Absent', 'Total Hrs', 'Payable Days'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
+                      <tr>{['Emp ID', 'Name', 'Dept', 'Present (P)', 'Late', 'Leave (L)', 'Week-off (WO)', 'Holiday (H)', 'Half-day (HD)', 'Absent (A)', 'Total Hrs', 'Payable Days', 'Actions'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {(reportDeptFilter === 'All' ? monthlyReport : monthlyReport.filter(r => r.department === reportDeptFilter)).map((row, i) => (
@@ -856,6 +858,11 @@ export const Attendance: React.FC = () => {
                           <td className={tdCls}><span className={row.absent > 0 ? 'text-red-600 font-semibold' : ''}>{row.absent}</span></td>
                           <td className={tdCls}>{row.totalHrs}h</td>
                           <td className={tdCls}><span className="font-bold text-varistor-dark">{row.payableDays}</span></td>
+                          <td className={tdCls}>
+                            <button onClick={() => exportPDF('monthly', row.employee_id)} className="p-1 text-varistor-muted hover:text-varistor-dark hover:bg-varistor-border rounded transition-colors" title="Download Employee PDF">
+                              <Printer size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -870,6 +877,13 @@ export const Attendance: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Section 4.5: Yearly Attendance Report (HR/Admin) ─────────────── */}
+          {isHR && (
+            <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5">
+              <YearlyAttendanceReport />
             </div>
           )}
 
@@ -949,11 +963,10 @@ export const Attendance: React.FC = () => {
                           <td className={tdCls}>{fmtDate(h.date)}</td>
                           <td className={`${tdCls} font-semibold`}>{h.occasion}</td>
                           <td className={tdCls}>
-                            <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                              h.type === 'National' ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : h.type === 'Festival' ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-gray-100 text-gray-500 border-gray-200'
-                            }`}>{h.type}</span>
+                            <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${h.type === 'National' ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : h.type === 'Festival' ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-gray-100 text-gray-500 border-gray-200'
+                              }`}>{h.type}</span>
                           </td>
                         </tr>
                       ))}
@@ -1024,11 +1037,10 @@ export const Attendance: React.FC = () => {
                         <button
                           key={day}
                           onClick={() => setWeekOffDay(day)}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-varistor ${
-                            weekOffDay === day
+                          className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-varistor ${weekOffDay === day
                               ? 'bg-varistor-lime text-varistor-dark border-varistor-lime'
                               : 'border-varistor-border text-varistor-muted hover:border-varistor-lime/50'
-                          }`}
+                            }`}
                         >{day}</button>
                       ))}
                     </div>
@@ -1053,18 +1065,19 @@ export const Attendance: React.FC = () => {
                     {DAYS.map(d => <div key={d} className="text-center text-[10px] font-bold text-varistor-muted">{d[0]}</div>)}
                   </div>
                   <div className="grid grid-cols-7 gap-1">
-                    {/* Offset: July 2026 starts on Wednesday */}
-                    {[0, 1, 2].map(i => <div key={`off-${i}`} />)}
+                    {/* Offset: July 2026 starts on Wednesday (so Mon & Tue are empty) */}
+                    {[0, 1].map(i => <div key={`off-${i}`} />)}
                     {Array.from({ length: 31 }, (_, i) => {
                       const d = new Date(2026, 6, i + 1);
                       const dow = d.getDay();
-                      const isSun = dow === 0;
+                      const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                      const dowName = dowNames[dow];
                       const isSat = dow === 6;
                       const isHolidayDate = holidays.some(h => h.date === `2026-07-${String(i + 1).padStart(2, '0')}`);
 
                       let bg = 'bg-varistor-limeLight text-varistor-limeText'; // working
                       if (isHolidayDate) bg = 'bg-[#1a0a2e] text-white';
-                      else if (isSun && weekOffDay === 'Sun') bg = 'bg-gray-200 text-gray-400';
+                      else if (dowName === weekOffDay) bg = 'bg-gray-200 text-gray-400';
                       else if (isSat && satHalfDay) bg = 'bg-varistor-lime/30 text-varistor-limeText';
 
                       return (
@@ -1113,11 +1126,10 @@ export const Attendance: React.FC = () => {
                   <button
                     key={type}
                     onClick={() => { setPunchType(type); setPhotoFile(null); setPhotoPreview(null); setFaceConfidence(null); }}
-                    className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-varistor flex items-center justify-center gap-2 ${
-                      punchType === type
+                    className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-varistor flex items-center justify-center gap-2 ${punchType === type
                         ? 'bg-varistor-lime text-varistor-dark border-varistor-lime'
                         : 'border-varistor-border text-varistor-muted hover:border-varistor-lime/50'
-                    }`}
+                      }`}
                   >
                     <Camera size={16} strokeWidth={1.5} />
                     Punch {type.toUpperCase()} 📷
@@ -1273,9 +1285,8 @@ export const Attendance: React.FC = () => {
                         <p className="text-xs text-varistor-muted">{photo.employee_id} · {photo.department}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[11px] text-varistor-muted">{fmtDate(photo.date)}</span>
-                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                            photo.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
+                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${photo.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
                             {photo.punch_type.toUpperCase()}
                           </span>
                           {photo.confidence_score !== undefined && (
@@ -1341,9 +1352,8 @@ export const Attendance: React.FC = () => {
                         <td className={tdCls}>{entry.department}</td>
                         <td className={tdCls}>{fmtDate(entry.date)}</td>
                         <td className={tdCls}>
-                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                            entry.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>{entry.punch_type.toUpperCase()}</span>
+                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${entry.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>{entry.punch_type.toUpperCase()}</span>
                         </td>
                         <td className={tdCls}>
                           <button onClick={() => setPhotoModal(entry.photo_url)}>
@@ -1356,11 +1366,10 @@ export const Attendance: React.FC = () => {
                             : '—'}
                         </td>
                         <td className={tdCls}>
-                          <span className={`inline-block px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${
-                            entry.verification_status === 'Verified' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30'
-                            : entry.verification_status === 'Rejected' ? 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>{entry.verification_status}</span>
+                          <span className={`inline-block px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${entry.verification_status === 'Verified' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30'
+                              : entry.verification_status === 'Rejected' ? 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>{entry.verification_status}</span>
                         </td>
                         <td className={tdCls}>{relativeTime(entry.uploaded_at)}</td>
                       </tr>

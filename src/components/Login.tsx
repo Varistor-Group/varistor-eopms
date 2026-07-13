@@ -124,7 +124,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white w-full">
+    <div className="force-light min-h-screen flex flex-col md:flex-row bg-white w-full">
 
       {/* Brand Panel (Left Side) */}
       <div className="w-full md:w-1/2 bg-brand-lime p-8 md:p-12 lg:p-20 flex flex-col justify-between">
@@ -176,7 +176,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       </div>
 
       {/* Sign-in Form (Right Side) */}
-      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-[#fafafa]">
+      <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-varistor-pageBg">
         <div className="max-w-md mx-auto w-full">
 
           {/* Sign-in Card */}

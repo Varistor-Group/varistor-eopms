@@ -633,89 +633,66 @@ let _records: PayrollRecord[] = loadPayrollRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
-  
-  try {
-    const employees = await getEmployees();
-    _records = loadPayrollRecords();
-    
-    const targetMonth = 'Jun 2026';
-    let modified = false;
-    
-    for (const emp of employees) {
-      const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
-      if (!exists) {
-        const defaultCtc = 30000;
-        const comp = computeNet({
-          monthlySalary: defaultCtc,
-          totalDays: 30,
-          payDays: 30,
-          medical: 1250,
-          ta: 2500,
-          lta: 3500,
-          reimbursement: 0,
-          incentives: 0,
-          overtime: 0,
-          tds: 0,
-          otherDeductions: 0,
-          hasPf: true,
-          hasEsi: true,
-          hasPt: true,
-          employeeId: emp.employeeId,
-        });
-        
-        const newRec: PayrollRecord = {
-          id: `pay-${emp.employeeId}-${targetMonth.replace(/\s+/g, '-')}`,
-          employeeId: emp.employeeId,
-          employeeName: emp.fullName,
-          department: emp.department,
-          designation: (emp.role as string) === 'Employee' || (emp.role as string) === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
-          month: targetMonth,
-          ctc: defaultCtc,
-          monthlySalary: defaultCtc,
-          components: {
-            basic: comp.basic,
-            hra: comp.hra,
-            pfEmployee: comp.pfEmployee,
-            pfEmployer: comp.pfEmployer,
-            esi: comp.esi,
-            pt: comp.pt,
-            tds: comp.tds,
-            specialAllowance: comp.specialAllowance,
-            medical: comp.medical,
-            ta: comp.ta,
-            lta: comp.lta,
-            reimbursement: comp.reimbursement,
-            incentives: comp.incentives,
-            overtime: comp.overtime,
-            otherDeductions: comp.otherDeductions,
-          },
-          netPay: comp.netPay,
-          status: 'draft',
-          revision: 0,
-          autoFormula: true,
-          totalDays: 30,
-          payDays: 30,
-          clBalance: 12,
-          pfUan: '—',
-          hasPf: true,
-          hasEsi: true,
-          hasPt: true,
-          slipReleased: false,
-          additionHeads: comp.additionHeads,
-          deductionHeads: comp.deductionHeads,
-          additionValues: comp.additionValues,
-          deductionValues: comp.deductionValues,
-        };
-        _records.push(newRec);
-        modified = true;
-      }
+  _records = loadPayrollRecords();
+
+  // Auto-seed missing payroll records from active employees
+  const { getEmployees } = await import('./employees');
+  const emps = await getEmployees();
+  let updated = false;
+
+  for (const emp of emps) {
+    if (emp.status === 'Active' && !_records.find(r => r.employeeId === emp.id)) {
+      const rec: PayrollRecord = {
+        id: 'PAY-' + Math.random().toString(36).substring(2, 9),
+        employeeId: emp.id,
+        employeeName: emp.fullName,
+        department: emp.department,
+        designation: emp.role,
+        month: 'Jun 2026',
+        ctc: 30000,
+        monthlySalary: 30000,
+        totalDays: 30,
+        payDays: 30,
+        clBalance: 0,
+        pfUan: '',
+        autoFormula: true,
+        status: 'draft',
+        revision: 1,
+        components: { basic: 15000, hra: 7500, pfEmployee: 1800, pfEmployer: 1800, esi: 0, pt: 0, tds: 0, specialAllowance: 0, medical: 1250, ta: 2500, lta: 3500, reimbursement: 0, incentives: 0, overtime: 0, otherDeductions: 0 },
+        netPay: 30000
+      };
+
+      const comp = computeNet({
+        monthlySalary: rec.monthlySalary,
+        totalDays: 30,
+        payDays: 30,
+      });
+      rec.components = {
+        basic: comp.basic,
+        hra: comp.hra,
+        pfEmployee: comp.pfEmployee,
+        pfEmployer: comp.pfEmployer,
+        esi: comp.esi,
+        pt: comp.pt,
+        tds: comp.tds,
+        specialAllowance: comp.specialAllowance,
+        medical: comp.medical,
+        ta: comp.ta,
+        lta: comp.lta,
+        reimbursement: comp.reimbursement,
+        incentives: comp.incentives,
+        overtime: comp.overtime,
+        otherDeductions: comp.otherDeductions
+      };
+      rec.netPay = comp.netPay;
+
+      _records.push(rec);
+      updated = true;
     }
-    
-    if (modified) {
-      savePayrollRecords(_records);
-    }
-  } catch (err) {
-    console.error('Error syncing payroll records with employees list:', err);
+  }
+
+  if (updated) {
+    savePayrollRecords(_records);
   }
 
   if (employeeId) {
@@ -935,7 +912,7 @@ export function formatMonthToMMMYear(monthStr: string): string {
 export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
   await delay(200);
   _records = loadPayrollRecords();
-  
+
   const displayMonth = formatMonthToMMMYear(monthStr);
 
   // Load employees to fetch role/designation

@@ -31,10 +31,10 @@ export const HRDashboardView: React.FC = () => {
   };
 
   const statCards = [
-    { label: 'Total Headcount', value: totalHeadcount, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'Active Employees', value: activeCount, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' },
-    { label: 'Pending Leaves', value: pendingLeaves.length, icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
-    { label: 'Approved This Month', value: approvedThisMonth.length, icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50' },
+    { label: 'Total Headcount', value: totalHeadcount, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', tab: 'admin' },
+    { label: 'Active Employees', value: activeCount, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50', tab: 'admin' },
+    { label: 'Pending Leaves', value: pendingLeaves.length, icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50', tab: 'leaves' },
+    { label: 'Approved This Month', value: approvedThisMonth.length, icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50', tab: 'leaves' },
   ];
 
   return (
@@ -80,7 +80,11 @@ export const HRDashboardView: React.FC = () => {
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(card => (
-          <div key={card.label} className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5 flex items-center gap-4">
+          <div 
+            key={card.label} 
+            onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: card.tab }))}
+            className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5 flex items-center gap-4 cursor-pointer hover:shadow-md transition-varistor"
+          >
             <div className={`w-10 h-10 rounded-lg ${card.bg} flex items-center justify-center flex-shrink-0`}>
               <card.icon size={20} className={card.color} />
             </div>
@@ -109,7 +113,7 @@ export const HRDashboardView: React.FC = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-varistor-muted uppercase bg-[#fafbfa] border-b border-[#f1f3f0]">
+              <thead className="text-xs text-varistor-muted uppercase bg-varistor-surfaceMuted border-b border-varistor-border">
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Department</th>
@@ -125,8 +129,12 @@ export const HRDashboardView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  employees.map(emp => (
-                    <tr key={emp.id} className="border-b border-[#f1f3f0] hover:bg-[#fafbfa]">
+                  [...employees].sort((a, b) => {
+                    if (a.status === 'Active' && b.status === 'Inactive') return -1;
+                    if (a.status === 'Inactive' && b.status === 'Active') return 1;
+                    return 0;
+                  }).map(emp => (
+                    <tr key={emp.id} className={`border-b border-varistor-border hover:bg-varistor-surfaceMuted ${emp.status === 'Inactive' ? 'opacity-60' : ''}`}>
                       <td className="px-4 py-3 font-medium text-varistor-dark flex items-center gap-2">
                         <img
                           src={emp.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.fullName)}&background=84CC16&color=fff&size=32&bold=true`}
@@ -138,7 +146,11 @@ export const HRDashboardView: React.FC = () => {
                       <td className="px-4 py-3 text-varistor-muted">{emp.department}</td>
                       <td className="px-4 py-3 text-varistor-muted">{emp.role}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${emp.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          emp.status === 'Active'
+                            ? 'bg-varistor-successBg text-varistor-successText'
+                            : 'bg-varistor-dangerBg text-varistor-dangerText'
+                        }`}>
                           {emp.status}
                         </span>
                       </td>
@@ -170,7 +182,7 @@ export const HRDashboardView: React.FC = () => {
                 <p className="text-sm text-varistor-muted">No pending leave requests.</p>
               ) : (
                 pendingLeaves.slice(0, 4).map(l => (
-                  <div key={l.id} className="flex justify-between items-center p-3 border border-[#f1f3f0] rounded-lg bg-[#fafbfa]">
+                  <div key={l.id} className="flex justify-between items-center p-3 border border-varistor-border rounded-lg bg-varistor-surfaceMuted">
                     <div>
                       <p className="font-semibold text-sm text-varistor-dark">{l.employeeName}</p>
                       <p className="text-xs text-varistor-muted">{l.type} · {l.days} day{l.days !== 1 ? 's' : ''}</p>
@@ -203,7 +215,7 @@ export const HRDashboardView: React.FC = () => {
                 <button
                   key={action.tab}
                   onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: action.tab }))}
-                  className="w-full text-left text-xs font-semibold text-varistor-dark bg-[#fafbfa] hover:bg-[#eef1ed] border border-[#f1f3f0] rounded-lg px-4 py-2.5 transition-colors flex items-center justify-between"
+                  className="w-full text-left text-xs font-semibold text-varistor-dark bg-varistor-surfaceMuted hover:bg-varistor-border border border-varistor-border rounded-lg px-4 py-2.5 transition-colors flex items-center justify-between"
                 >
                   {action.label}
                   <Megaphone size={12} className="text-varistor-muted" />
