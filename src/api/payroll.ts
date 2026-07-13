@@ -219,7 +219,6 @@ export function computeNet(params: {
   /** Whether PT deduction applies (default true) */
   hasPt?: boolean;
   employeeId?: string;
-  monthlyCtc?: number;
   attendanceBreakdown?: {
     present: number;
     weekOff: number;
@@ -669,7 +668,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           employeeId: emp.employeeId,
           employeeName: emp.fullName,
           department: emp.department,
-          designation: emp.role === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
+          designation: (emp.role as string) === 'Employee' || (emp.role as string) === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
           month: targetMonth,
           ctc: defaultCtc,
           monthlySalary: defaultCtc,
