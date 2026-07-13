@@ -77,6 +77,7 @@ export interface MonthlyReportRow {
   totalHrs: number;
   payableDays: number;
   workingDays: number;
+  daysInMonth: number;  // actual calendar days in the full month
 }
 
 export interface Holiday {
@@ -507,6 +508,9 @@ export async function getMonthlyReport(
 
     const workingDays = dates.length - weekOff - holidays;
     const payableDays = present + late + halfDay * 0.5;
+    // Always use the full calendar days of the month (not capped at today)
+    const [year, mon] = month.split('-').map(Number);
+    const daysInMonth = new Date(year, mon, 0).getDate();
 
     return {
       employee_id: emp.id,
@@ -522,6 +526,7 @@ export async function getMonthlyReport(
       totalHrs: parseFloat(totalHrs.toFixed(1)),
       payableDays: parseFloat(payableDays.toFixed(1)),
       workingDays,
+      daysInMonth,
     };
   });
 }

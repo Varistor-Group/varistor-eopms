@@ -546,12 +546,19 @@ const generateSalarySlipPDF = (slip) => {
       // Totals Row
       doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
       
+      const pdfTotalCtc = (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
+        ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
+        : (slip.ctc || 0);
+      const pdfTotalDeductions = (Array.isArray(slip.deductionValues) && slip.deductionValues.length > 0)
+        ? slip.deductionValues.reduce((a, b) => a + (b || 0), 0)
+        : (slip.deductions || 0);
+
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
       doc.text('Total CTC', 45, currentY + 5);
-      doc.text(fmt(finalTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
+      doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
       
       doc.text('Total Deduction', 302, currentY + 5);
-      doc.text(fmt(finalTotalDeductions), 470, currentY + 5, { align: 'right', width: 80 });
+      doc.text(fmt(pdfTotalDeductions), 470, currentY + 5, { align: 'right', width: 80 });
 
       // Outlines for Totals row
       doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
@@ -791,9 +798,17 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
                 <td style="border:1px solid #cccccc;">Total CTC</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalCtc || slip.ctc)}</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
+                  (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
+                    ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
+                    : (slip.ctc || 0)
+                )}</td>
                 <td style="border:1px solid #cccccc;">Total Deduction</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalDeductions || slip.deductions)}</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
+                  (Array.isArray(slip.deductionValues) && slip.deductionValues.length > 0)
+                    ? slip.deductionValues.reduce((a, b) => a + (b || 0), 0)
+                    : (slip.deductions || 0)
+                )}</td>
               </tr>
               <tr>
                 <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">

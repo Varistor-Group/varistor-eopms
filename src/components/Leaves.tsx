@@ -6,7 +6,7 @@ import { fetchAllClBalances, updateClBalance, type ClBalance } from '../api/payr
 
 const Leaves: React.FC = () => {
   const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser, leaveBalance } = useVariPoints();
-  
+
   const [leaveType, setLeaveType] = useState('Casual Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -161,7 +161,7 @@ const Leaves: React.FC = () => {
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Form and Balances Column */}
         {currentRole === 'Employee' && (
           <div className="lg:col-span-1 space-y-6">
@@ -177,7 +177,7 @@ const Leaves: React.FC = () => {
                     </span>
                   </div>
                   <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, (((ownClBalance?.used ?? leaveBalance?.casual?.used ?? 0) / (ownClBalance?.total ?? leaveBalance?.casual?.total ?? 12)) * 100))}%` }} />
+                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, ((leaveBalance?.casual?.used ?? 0) / (leaveBalance?.casual?.total ?? 12)) * 100)}%` }} />
                   </div>
                 </div>
                 <div>
@@ -195,7 +195,7 @@ const Leaves: React.FC = () => {
             {/* Apply Leave Form */}
             <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
               <h3 className="text-sm font-bold text-varistor-dark border-b pb-2 mb-4">Apply for Leave</h3>
-              
+
               {/* Warnings & Notices */}
               <div className="mb-4 flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                 <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -360,13 +360,12 @@ const Leaves: React.FC = () => {
                         <td className="px-4 py-3 text-center font-bold text-varistor-dark font-mono">{item.days}</td>
                         <td className="px-4 py-3 text-varistor-muted truncate max-w-[150px]" title={item.reason}>{item.reason}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                            item.status === 'Approved'
-                              ? 'bg-green-50 border-green-200 text-green-700'
-                              : item.status === 'Rejected'
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${item.status === 'Approved'
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : item.status === 'Rejected'
                               ? 'bg-red-50 border-red-200 text-red-700'
                               : 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                          }`}>
+                            }`}>
                             {item.status === 'Approved' && <CheckCircle2 size={10} />}
                             {item.status === 'Rejected' && <XCircle size={10} />}
                             {item.status === 'Pending' && <Clock size={10} />}

@@ -2100,16 +2100,6 @@ const SalaryEngine: React.FC = () => {
               >
                 <ShieldCheck size={14} /> Audit Log
               </button>
-              {selectedIds.size > 0 && (
-                <button
-                  onClick={handleApprove}
-                  disabled={approving}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-60"
-                >
-                  {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                  Approve {selectedIds.size} Selected
-                </button>
-              )}
             </>
           )}
         </div>
@@ -2208,8 +2198,8 @@ const SalaryEngine: React.FC = () => {
             )}
           </div>
 
-          {/* Filter */}
-          <div className="flex items-center gap-3 mb-4">
+          {/* Filter + Approve toolbar */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
             <select
               value={filterDept}
               onChange={e => setFilterDept(e.target.value)}
@@ -2219,6 +2209,20 @@ const SalaryEngine: React.FC = () => {
             </select>
             <span className="text-xs text-varistor-muted">{visible.length} employees shown</span>
             {selectedIds.size > 0 && <span className="text-xs font-semibold text-varistor-lime">{selectedIds.size} selected</span>}
+            <div className="ml-auto">
+              <button
+                onClick={handleApprove}
+                disabled={approving || selectedIds.size === 0}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  selectedIds.size > 0
+                    ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
+                    : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
+                } disabled:opacity-60`}
+              >
+                {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {selectedIds.size > 0 ? `Approve ${selectedIds.size} Selected` : 'Approve Selected'}
+              </button>
+            </div>
           </div>
 
           {/* Main Table */}
