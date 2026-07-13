@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
   useDraggable, 
@@ -230,6 +230,18 @@ export const KanbanBoard: React.FC = () => {
       },
     })
   );
+
+  // Fix #1: Pressing back button closes task details instead of exiting/opening sidebar
+  useEffect(() => {
+    const handleGlobalBack = (e: Event) => {
+      if (selectedTask) {
+        e.preventDefault(); // Stop App.tsx from processing this
+        setSelectedTask(null);
+      }
+    };
+    window.addEventListener('app_back_button', handleGlobalBack);
+    return () => window.removeEventListener('app_back_button', handleGlobalBack);
+  }, [selectedTask]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);

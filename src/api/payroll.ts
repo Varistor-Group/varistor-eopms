@@ -14,8 +14,9 @@
  *  - HR/Admin can SELECT all, INSERT and UPDATE
  *  - Approved rows locked via DB trigger
  */
-
 import { getEmployees } from './employees';
+
+
 
 export interface SalaryComponents {
   basic: number;
@@ -633,14 +634,14 @@ let _records: PayrollRecord[] = loadPayrollRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
-  
+
   try {
     const employees = await getEmployees();
     _records = loadPayrollRecords();
-    
+
     const targetMonth = 'Jun 2026';
     let modified = false;
-    
+
     for (const emp of employees) {
       if (emp.status !== 'Active') continue;
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
@@ -663,7 +664,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           hasPt: true,
           employeeId: emp.employeeId,
         });
-        
+
         const newRec: PayrollRecord = {
           id: `pay-${emp.employeeId}-${targetMonth.replace(/\s+/g, '-')}`,
           employeeId: emp.employeeId,
@@ -711,7 +712,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
         modified = true;
       }
     }
-    
+
     if (modified) {
       savePayrollRecords(_records);
     }
@@ -936,7 +937,7 @@ export function formatMonthToMMMYear(monthStr: string): string {
 export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
   await delay(200);
   _records = loadPayrollRecords();
-  
+
   const displayMonth = formatMonthToMMMYear(monthStr);
 
   // Load employees to fetch role/designation

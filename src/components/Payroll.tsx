@@ -50,23 +50,23 @@ const MONTH = 'Jun 2026';
 
 // Column name aliases — tolerant parsing of Excel headers
 const COL_ALIASES: Record<string, string[]> = {
-  name:            ['name', 'full name', 'employee name', 'emp name', 'fullname'],
-  email:           ['email', 'email id', 'mail', 'email address', 'e-mail'],
-  monthlySalary:   ['salary', 'monthly salary', 'monthly_salary', 'monthly salary (rs.)', 'salary amount'],
-  ctc:             ['ctc', 'monthly ctc', 'total ctc', 'ctc amount'],
-  totalDays:       ['total days', 'total_days', 'no. of days', 'no of days', 'days in month'],
-  payDays:         ['pay days', 'pay_days', 'paid days', 'paid no of days', 'paid no. of days', 'paid number of days', 'days present'],
-  designation:     ['designation', 'role', 'job title', 'post'],
-  department:      ['department', 'dept', 'division'],
-  pfUan:           ['pf uan', 'pf uan no.', 'uan', 'uan no', 'pf uan no'],
-  clBalance:       ['cl balance', 'cl_balance', 'casual leave balance', 'cl'],
-  medical:         ['medical', 'medical allowance', 'medical allowance (rs.)'],
-  ta:              ['ta', 'travel allowance', 'travel allowance (rs.)', 'transport allowance'],
-  lta:             ['lta', 'leave travel allowance', 'leave travel allowance (rs.)'],
-  reimbursement:   ['reimbursement', 'reimbursements'],
-  incentives:      ['incentive', 'incentives'],
-  overtime:        ['overtime', 'ot', 'ot hours', 'ot pay'],
-  tds:             ['tds', 'tax deducted at source', 'income tax'],
+  name: ['name', 'full name', 'employee name', 'emp name', 'fullname'],
+  email: ['email', 'email id', 'mail', 'email address', 'e-mail'],
+  monthlySalary: ['salary', 'monthly salary', 'monthly_salary', 'monthly salary (rs.)', 'salary amount'],
+  ctc: ['ctc', 'monthly ctc', 'total ctc', 'ctc amount'],
+  totalDays: ['total days', 'total_days', 'no. of days', 'no of days', 'days in month'],
+  payDays: ['pay days', 'pay_days', 'paid days', 'paid no of days', 'paid no. of days', 'paid number of days', 'days present'],
+  designation: ['designation', 'role', 'job title', 'post'],
+  department: ['department', 'dept', 'division'],
+  pfUan: ['pf uan', 'pf uan no.', 'uan', 'uan no', 'pf uan no'],
+  clBalance: ['cl balance', 'cl_balance', 'casual leave balance', 'cl'],
+  medical: ['medical', 'medical allowance', 'medical allowance (rs.)'],
+  ta: ['ta', 'travel allowance', 'travel allowance (rs.)', 'transport allowance'],
+  lta: ['lta', 'leave travel allowance', 'leave travel allowance (rs.)'],
+  reimbursement: ['reimbursement', 'reimbursements'],
+  incentives: ['incentive', 'incentives'],
+  overtime: ['overtime', 'ot', 'ot hours', 'ot pay'],
+  tds: ['tds', 'tax deducted at source', 'income tax'],
   otherDeductions: ['other deductions', 'other_deductions', 'deductions', 'total deductions']
 };
 
@@ -78,7 +78,7 @@ function resolveHeader(raw: string): string | null {
   return null;
 }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseNumber(val: any): number {
   if (typeof val === 'number') return val;
   if (typeof val === 'string') {
@@ -344,20 +344,20 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const emp = emps.find(e => e.employeeId === att.employee_id);
         const email = emp?.personalEmail || `${att.employee_id.toLowerCase()}@varistor.in`;
         const payRec = payrollRecords.find(r => r.employeeId === att.employee_id);
-        
+
         const monthlySalary = payRec?.monthlySalary ?? 30000;
         const ctc = payRec?.ctc ?? monthlySalary;
         const pfUan = payRec?.pfUan || '—';
         const clBalance = payRec?.clBalance ?? 0;
         const designation = payRec?.designation || 'EMPLOYEE';
-        
+
         const totalDays = att.present + att.late + att.halfDay + att.absent + att.weekOff + att.holidays + att.leaves || 30;
         const payDays = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
 
         const medical = payRec?.components?.medical ?? 1250;
         const ta = payRec?.components?.ta ?? 2500;
         const lta = payRec?.components?.lta ?? 3500;
-        
+
         const reimbursement = payRec?.components?.reimbursement ?? 0;
         const incentives = payRec?.components?.incentives ?? 0;
         const overtime = payRec?.components?.overtime ?? 0;
@@ -443,15 +443,15 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const loadXlsx = (): Promise<any> => {
     return new Promise((resolve, reject) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (typeof (window as any).XLSX !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolve((window as any).XLSX);
         return;
       }
       const script = document.createElement('script');
       script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       script.onload = () => resolve((window as any).XLSX);
       script.onerror = () => reject(new Error('Failed to load xlsx library'));
       document.head.appendChild(script);
@@ -466,7 +466,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       const buf = await file.arrayBuffer();
       const wb = XLSXLib.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw: any[][] = XLSXLib.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
       if (raw.length < 2) {
@@ -475,7 +475,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       }
 
       // Map header row → canonical key
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const headers = (raw[0] as any[]).map(h => resolveHeader(String(h)));
       const hasName = headers.includes('name');
       const hasEmail = headers.includes('email');
@@ -488,31 +488,31 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       const payrollRecords = await getPayrollRecords();
       const parsed: SlipRow[] = [];
       for (let i = 1; i < raw.length; i++) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const row = raw[i] as any[];
         if (row.every(cell => String(cell).trim() === '')) continue; // skip blank rows
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const obj: any = {};
         headers.forEach((key, idx) => { if (key) obj[key] = row[idx]; });
-        
+
         const name = String(obj.name || '').trim();
         const email = String(obj.email || '').trim();
         const employeeId = obj.employeeId ? String(obj.employeeId).trim() : `VAR-${String(i).padStart(3, '0')}`;
         const department = obj.department ? String(obj.department).trim() : 'Operation';
         const designation = obj.designation ? String(obj.designation).trim() : 'WELDER';
         const month = obj.month ? String(obj.month).trim() : MONTH;
-        
+
         const monthlySalary = parseNumber(obj.monthlySalary ?? obj.ctc ?? 0);
         const ctc = parseNumber(obj.ctc ?? obj.monthlySalary ?? 0);
         const totalDays = parseNumber(obj.totalDays ?? 30) || 30;
         const payDays = parseNumber(obj.payDays ?? totalDays ?? 30);
         const clBalance = parseNumber(obj.clBalance ?? 0);
         const pfUan = obj.pfUan ? String(obj.pfUan).trim() : '—';
-        
+
         const medical = parseNumber(obj.medical ?? 1250);
         const ta = parseNumber(obj.ta ?? 2500);
         const lta = parseNumber(obj.lta ?? 3500);
-        
+
         const reimbursement = parseNumber(obj.reimbursement ?? 0);
         const incentives = parseNumber(obj.incentives ?? 0);
         const overtime = parseNumber(obj.overtime ?? 0);
@@ -581,7 +581,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
 
       setRows(parsed);
       setStep('preview');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setParseError(`Failed to parse file: ${err.message}`);
     }
@@ -631,7 +631,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       if (sentEmployeeIds.length > 0) {
         await releaseSlips(sentEmployeeIds);
       }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       clearInterval(interval);
       setParseError(`Send failed: ${err.message}`);
@@ -674,11 +674,10 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => fileRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
-                isDragging
+              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${isDragging
                   ? 'border-varistor-lime bg-varistor-limeLight'
                   : 'border-varistor-border hover:border-varistor-lime hover:bg-varistor-limeLight'
-              }`}
+                }`}
             >
               <input
                 ref={fileRef}
@@ -958,7 +957,7 @@ const PayslipSchedulePanel: React.FC = () => {
 
   const padded = (n: number) => String(n).padStart(2, '0');
   const ordinal = (n: number) => {
-    const s = ['th','st','nd','rd'];
+    const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
@@ -971,11 +970,10 @@ const PayslipSchedulePanel: React.FC = () => {
           <Calendar size={18} className="text-varistor-lime" />
           <span className="font-bold text-varistor-dark text-sm">Payslip Auto-Send Schedule</span>
           {schedule && (
-            <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              schedule.enabled
+            <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${schedule.enabled
                 ? 'bg-varistor-limeTint text-varistor-limeText'
                 : 'bg-gray-100 text-gray-400'
-            }`}>
+              }`}>
               {schedule.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
           )}
@@ -1030,11 +1028,10 @@ const PayslipSchedulePanel: React.FC = () => {
             </div>
 
             {triggerResult && (
-              <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm ${
-                triggerResult.failed.length === 0
+              <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm ${triggerResult.failed.length === 0
                   ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
                   : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
+                }`}>
                 {triggerResult.skipped ? (
                   <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>No approved/released payroll records found on server. Sync records first by approving payroll.</span></>
                 ) : triggerResult.failed.length === 0 ? (
@@ -1916,9 +1913,9 @@ const SalaryEngine: React.FC = () => {
   const visible = monthRecords
     .filter(r => filterDept === 'All' || r.department === filterDept)
     .sort((a, b) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const av = a[sortField] as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bv = b[sortField] as any;
       return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
     });
@@ -1931,7 +1928,7 @@ const SalaryEngine: React.FC = () => {
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
@@ -2050,15 +2047,15 @@ const SalaryEngine: React.FC = () => {
               {payrollAuditLog.length === 0
                 ? <p className="text-sm text-gray-500 text-center py-6">No audit entries yet.</p>
                 : payrollAuditLog.slice().reverse().map((entry, i) => (
-                    <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-lg text-sm">
-                      <ShieldCheck size={16} className="text-varistor-lime mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-gray-800">{entry.action} · {entry.employeeId}</p>
-                        <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.netPay)}</p>
-                        <p className="text-gray-400 text-[11px]">{new Date(entry.timestamp).toLocaleString('en-IN')}</p>
-                      </div>
+                  <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-lg text-sm">
+                    <ShieldCheck size={16} className="text-varistor-lime mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-gray-800">{entry.action} · {entry.employeeId}</p>
+                      <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.netPay)}</p>
+                      <p className="text-gray-400 text-[11px]">{new Date(entry.timestamp).toLocaleString('en-IN')}</p>
                     </div>
-                  ))
+                  </div>
+                ))
               }
             </div>
           </div>
@@ -2079,11 +2076,10 @@ const SalaryEngine: React.FC = () => {
             <>
               <button
                 onClick={() => setShowUploadPanel(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${
-                  showUploadPanel
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${showUploadPanel
                     ? 'bg-varistor-lime text-white border-varistor-lime'
                     : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
-                }`}
+                  }`}
               >
                 <Mail size={14} /> {showUploadPanel ? 'Hide Upload Panel' : 'Upload Excel & Send Slips'}
               </button>
@@ -2127,11 +2123,10 @@ const SalaryEngine: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-1.5 pb-2 text-xs font-bold border-b-2 transition-all ${
-              activeTab === tab.id
+            className={`flex items-center gap-1.5 pb-2 text-xs font-bold border-b-2 transition-all ${activeTab === tab.id
                 ? 'border-varistor-lime text-varistor-limeText'
                 : 'border-transparent text-varistor-muted hover:text-varistor-dark'
-            }`}
+              }`}
           >
             <tab.icon size={13} />
             {tab.label}
@@ -2376,9 +2371,8 @@ const SalaryEngine: React.FC = () => {
                                 className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
                               />
                             ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                              }`}>{rec.hasPf ? 'On' : 'Off'}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                                }`}>{rec.hasPf ? 'On' : 'Off'}</span>
                             )}
                           </td>
                           {/* ESI checkbox */}
@@ -2392,9 +2386,8 @@ const SalaryEngine: React.FC = () => {
                                 className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
                               />
                             ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                              }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                                }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
                             )}
                           </td>
                           {/* PT checkbox */}
@@ -2408,9 +2401,8 @@ const SalaryEngine: React.FC = () => {
                                 className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
                               />
                             ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                              }`}>{rec.hasPt ? 'On' : 'Off'}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
+                                }`}>{rec.hasPt ? 'On' : 'Off'}</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -2667,21 +2659,19 @@ const EmployeePayrollView: React.FC = () => {
           <div className="flex border border-varistor-border rounded-lg overflow-hidden bg-white text-xs">
             <button
               onClick={() => setActiveSlipTab('detailed')}
-              className={`px-3 py-2 font-semibold transition-colors ${
-                activeSlipTab === 'detailed'
+              className={`px-3 py-2 font-semibold transition-colors ${activeSlipTab === 'detailed'
                   ? 'bg-varistor-lime text-white'
                   : 'text-varistor-muted hover:bg-varistor-pageBg'
-              }`}
+                }`}
             >
               Detailed Slip
             </button>
             <button
               onClick={() => setActiveSlipTab('summary')}
-              className={`px-3 py-2 font-semibold transition-colors ${
-                activeSlipTab === 'summary'
+              className={`px-3 py-2 font-semibold transition-colors ${activeSlipTab === 'summary'
                   ? 'bg-varistor-lime text-white'
                   : 'text-varistor-muted hover:bg-varistor-pageBg'
-              }`}
+                }`}
             >
               Summary
             </button>

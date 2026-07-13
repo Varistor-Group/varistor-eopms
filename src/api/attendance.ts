@@ -664,7 +664,7 @@ function todayISO(): string {
  */
 export async function isFieldEmployeePunchedIn(employeeId: string): Promise<boolean> {
   await delay(100);
-  const date = todayISO();
+  const date = new Date().toISOString().split('T')[0];
   const ledgerId = `atl-${employeeId}-${date}`;
   const override = _overrides.get(ledgerId);
   return !!(override && override.punch_in && !override.punch_out);

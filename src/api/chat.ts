@@ -132,7 +132,7 @@ export const chatApi = {
     };
     saveChannelList([...existing, newChannel]);
     notifyUpdated();
-    
+
     let count = mockEmployeeStore.length;
     if (newChannel.allowedEmployeeIds) {
       count = newChannel.allowedEmployeeIds.length;
@@ -209,7 +209,6 @@ export const chatApi = {
     saveMessages(messages);
     notifyUpdated();
   },
-
 
 
   deleteChannel(channelId: ChannelId) {

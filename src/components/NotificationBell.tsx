@@ -69,6 +69,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
     unreadAnnouncements.forEach(a => readAnnouncement(a.id));
     unreadChannels.forEach(c => chatApi.markChannelRead(c.id));
     persistReadLedger(new Set([...readLedgerIds, ...ledger.map(l => l.id)]));
+    refreshChatUnread();
   };
 
   const handleLedgerItemClick = (id: string) => {
@@ -97,7 +98,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-varistor-surface border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
+        <div className="fixed md:absolute left-4 right-4 md:left-auto md:right-0 top-16 md:top-auto md:mt-2 w-auto md:w-80 bg-varistor-surface border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-varistor-border">
             <h4 className="text-xs font-bold text-varistor-dark uppercase tracking-wider">Notifications</h4>
             {totalUnread > 0 && (

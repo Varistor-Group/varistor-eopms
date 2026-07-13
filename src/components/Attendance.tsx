@@ -3,7 +3,7 @@ import {
   ClipboardCheck, Users, Clock, Calendar, TrendingUp,
   Upload, Check, X, AlertCircle, Eye, FileSpreadsheet,
   Camera, RefreshCw, Wifi, WifiOff, Edit2,
-  Shield, CheckCircle2, ArrowRight, Plus, Info, Printer,
+  CheckCircle2, Plus, Info, Printer,
   ToggleLeft, ToggleRight, MapPin
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
@@ -53,13 +53,13 @@ const tdCls = 'px-4 py-3 text-xs text-varistor-dark whitespace-nowrap align-midd
 // ─── Attendance status badge ──────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<AttendanceStatus, string> = {
-  Present:   'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30',
-  Late:      'bg-amber-50 text-amber-700 border-amber-200',
-  'Half-day':'bg-blue-50 text-blue-700 border-blue-200',
-  Holiday:   'bg-purple-50 text-purple-700 border-purple-200',
-  'W.O':     'bg-gray-100 text-gray-500 border-gray-200',
-  Leave:     'bg-teal-50 text-teal-700 border-teal-200',
-  Absent:    'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder',
+  Present: 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30',
+  Late: 'bg-amber-50 text-amber-700 border-amber-200',
+  'Half-day': 'bg-blue-50 text-blue-700 border-blue-200',
+  Holiday: 'bg-purple-50 text-purple-700 border-purple-200',
+  'W.O': 'bg-gray-100 text-gray-500 border-gray-200',
+  Leave: 'bg-teal-50 text-teal-700 border-teal-200',
+  Absent: 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder',
 };
 
 const AttendanceBadge: React.FC<{ status: AttendanceStatus }> = ({ status }) => (
@@ -576,11 +576,10 @@ export const Attendance: React.FC = () => {
             <button
               key={tab}
               onClick={() => setMainTab(tab)}
-              className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${
-                mainTab === tab
+              className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-[10px] transition-varistor capitalize ${mainTab === tab
                   ? 'bg-white text-varistor-dark shadow-varistor border border-varistor-border'
                   : 'text-varistor-muted hover:text-varistor-dark'
-              }`}
+                }`}
             >
               {tab === 'office' ? '🏢 Office Attendance' : '🏃 Field Attendance'}
             </button>
@@ -889,51 +888,6 @@ export const Attendance: React.FC = () => {
             </div>
           )}
 
-          {/* ── Section 5: Payroll Auto-Sync (Admin only) ─────────────────── */}
-          {isAdmin && (
-            <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5">
-              <SectionHeader title="Payroll Auto-Sync Pipeline" subtitle="Read-only snapshot feeds into payroll engine on the 15th" />
-
-              {/* Pipeline visual */}
-              <div className="flex items-center gap-1 flex-wrap justify-center mb-6 mt-4">
-                {[
-                  { label: 'Attendance ledger', icon: <ClipboardCheck size={16} strokeWidth={1.5} /> },
-                  { label: 'Payable days formula', icon: <TrendingUp size={16} strokeWidth={1.5} /> },
-                  { label: 'Statutory deductions', icon: <Shield size={16} strokeWidth={1.5} /> },
-                  { label: 'Reimbursements', icon: <ArrowRight size={16} strokeWidth={1.5} /> },
-                  { label: 'Final salary slip', icon: <CheckCircle2 size={16} strokeWidth={1.5} /> },
-                ].map((step, i, arr) => (
-                  <React.Fragment key={step.label}>
-                    <div className="flex flex-col items-center gap-1 min-w-[100px]">
-                      <div className="w-10 h-10 rounded-full bg-varistor-limeLight border-2 border-varistor-lime flex items-center justify-center text-varistor-lime">
-                        {step.icon}
-                      </div>
-                      <span className="text-[10px] font-semibold text-varistor-muted text-center leading-tight">{step.label}</span>
-                    </div>
-                    {i < arr.length - 1 && <ArrowRight size={14} strokeWidth={1.5} className="text-varistor-muted mb-3" />}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Formula */}
-              <div className="bg-[#0d1117] rounded-xl p-4 font-mono text-xs text-green-400 mb-4">
-                <p className="text-gray-400 mb-1">// Payroll formula (executed on payroll_date-1 snapshot)</p>
-                <p>Net pay = (Payable_days / Working_days) × Gross − (PF + PT + TDS)</p>
-                <p className="mt-1 text-gray-500">          + Reimbursements + Vari‑Point bonus</p>
-              </div>
-
-              {/* Info chips */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {['Runs: 15th every month · 09:00 IST', 'Auto-emails slip to employee'].map(chip => (
-                  <span key={chip} className="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-medium bg-varistor-limeLight text-varistor-limeText rounded-full border border-varistor-lime/30">
-                    <CheckCircle2 size={11} strokeWidth={1.5} /> {chip}
-                  </span>
-                ))}
-              </div>
-
-            </div>
-          )}
-
           {/* ── Section 6: Holiday Calendar (HR/Admin) ─────────────────────── */}
           {isHR && (
             <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor">
@@ -965,11 +919,10 @@ export const Attendance: React.FC = () => {
                           <td className={tdCls}>{fmtDate(h.date)}</td>
                           <td className={`${tdCls} font-semibold`}>{h.occasion}</td>
                           <td className={tdCls}>
-                            <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                              h.type === 'National' ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : h.type === 'Festival' ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-gray-100 text-gray-500 border-gray-200'
-                            }`}>{h.type}</span>
+                            <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${h.type === 'National' ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : h.type === 'Festival' ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-gray-100 text-gray-500 border-gray-200'
+                              }`}>{h.type}</span>
                           </td>
                         </tr>
                       ))}
@@ -1040,11 +993,10 @@ export const Attendance: React.FC = () => {
                         <button
                           key={day}
                           onClick={() => setWeekOffDay(day)}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-varistor ${
-                            weekOffDay === day
+                          className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-varistor ${weekOffDay === day
                               ? 'bg-varistor-lime text-varistor-dark border-varistor-lime'
                               : 'border-varistor-border text-varistor-muted hover:border-varistor-lime/50'
-                          }`}
+                            }`}
                         >{day}</button>
                       ))}
                     </div>
@@ -1130,11 +1082,10 @@ export const Attendance: React.FC = () => {
                   <button
                     key={type}
                     onClick={() => { setPunchType(type); setPhotoFile(null); setPhotoPreview(null); setFaceConfidence(null); }}
-                    className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-varistor flex items-center justify-center gap-2 ${
-                      punchType === type
+                    className={`flex-1 py-3 text-sm font-bold rounded-xl border transition-varistor flex items-center justify-center gap-2 ${punchType === type
                         ? 'bg-varistor-lime text-varistor-dark border-varistor-lime'
                         : 'border-varistor-border text-varistor-muted hover:border-varistor-lime/50'
-                    }`}
+                      }`}
                   >
                     <Camera size={16} strokeWidth={1.5} />
                     Punch {type.toUpperCase()} 📷
@@ -1290,9 +1241,8 @@ export const Attendance: React.FC = () => {
                         <p className="text-xs text-varistor-muted">{photo.employee_id} · {photo.department}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[11px] text-varistor-muted">{fmtDate(photo.date)}</span>
-                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                            photo.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
+                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${photo.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
                             {photo.punch_type.toUpperCase()}
                           </span>
                           {photo.confidence_score !== undefined && (
@@ -1358,9 +1308,8 @@ export const Attendance: React.FC = () => {
                         <td className={tdCls}>{entry.department}</td>
                         <td className={tdCls}>{fmtDate(entry.date)}</td>
                         <td className={tdCls}>
-                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${
-                            entry.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>{entry.punch_type.toUpperCase()}</span>
+                          <span className={`inline-block px-2 py-0.5 text-[11px] font-bold rounded-full border ${entry.punch_type === 'in' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>{entry.punch_type.toUpperCase()}</span>
                         </td>
                         <td className={tdCls}>
                           <button onClick={() => setPhotoModal(entry.photo_url)}>
@@ -1373,11 +1322,10 @@ export const Attendance: React.FC = () => {
                             : '—'}
                         </td>
                         <td className={tdCls}>
-                          <span className={`inline-block px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${
-                            entry.verification_status === 'Verified' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30'
-                            : entry.verification_status === 'Rejected' ? 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>{entry.verification_status}</span>
+                          <span className={`inline-block px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${entry.verification_status === 'Verified' ? 'bg-varistor-limeTint text-varistor-limeText border-varistor-lime/30'
+                              : entry.verification_status === 'Rejected' ? 'bg-varistor-dangerBg text-varistor-dangerText border-varistor-dangerBorder'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>{entry.verification_status}</span>
                         </td>
                         <td className={tdCls}>{relativeTime(entry.uploaded_at)}</td>
                       </tr>

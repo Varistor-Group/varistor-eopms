@@ -49,6 +49,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, []);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isOpenMobile) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isOpenMobile]);
+
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
@@ -171,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar Shell */}
-      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-varistor-surface border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px]">
+      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-varistor-surface border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px] pt-safe pb-safe pl-safe">
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
@@ -223,7 +238,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-varistor-surface w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-varistor-surface w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden pt-safe pb-safe pl-safe ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
