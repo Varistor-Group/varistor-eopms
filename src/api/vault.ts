@@ -241,7 +241,7 @@ export async function updateDocumentTemplate(
   if (patch.description !== undefined) dbPatch.description = patch.description;
   const { data, error } = await supabase
     .from('document_templates')
-    .update(dbPatch)
+    .update(dbPatch as any)
     .eq('id', templateId)
     .select()
     .single();
@@ -297,7 +297,7 @@ export async function getEmployeeDocumentSlots(
 export async function seedEmployeeSlots(
   employeeId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase.rpc('seed_employee_document_slots', { p_employee_id: employeeId });
+  const { error } = await supabase.rpc('seed_employee_document_slots' as any, { p_employee_id: employeeId });
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
 }

@@ -197,7 +197,7 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { data, error } = await supabase.rpc('delete_employee_with_auth', { p_employee_id: id });
+  const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
   
   if (error) {
     return { success: false, error: error.message };

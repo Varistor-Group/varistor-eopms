@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -256,6 +256,97 @@ export type Database = {
             referencedRelation: "employees"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      document_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      employee_document_slots: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          document_name: string
+          employee_id: string
+          id: string
+          is_custom: boolean
+          is_required: boolean
+          notes: string | null
+          status: string
+          template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          document_name: string
+          employee_id: string
+          id?: string
+          is_custom?: boolean
+          is_required?: boolean
+          notes?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          document_name?: string
+          employee_id?: string
+          id?: string
+          is_custom?: boolean
+          is_required?: boolean
+          notes?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_slots_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_slots_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_slots_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          }
         ]
       }
       documents: {
