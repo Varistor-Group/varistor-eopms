@@ -4,7 +4,8 @@ import {
   RefreshCw, ShieldCheck, AlertCircle,
   FileText, Users, Lock, Unlock, Clock, Eye, Printer,
   TrendingUp, BarChart3, CheckCircle2, Send, Trash2,
-  FileSpreadsheet, ArrowRight, X, Mail, AlertTriangle
+  FileSpreadsheet, ArrowRight, X, Mail, AlertTriangle,
+  Calendar, ToggleLeft, ToggleRight, Zap
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getMonthlyReport } from '../api/attendance';
@@ -23,10 +24,15 @@ import {
   computeLopDays,
   numberToWords,
   computeNet,
+  getPayslipSchedule,
+  updatePayslipSchedule,
+  triggerManualSend,
+  syncPayrollToServer,
   type PayrollRecord,
   type SlipRow,
   type BulkSendResult,
-  type ClBalance
+  type ClBalance,
+  type PayslipSchedule
 } from '../api/payroll';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
@@ -97,16 +103,12 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const netPayWords = numberToWords(finalPay);
 
   const c: any = record.components || {};
-  const monthlySalary = record.monthlySalary ?? record.ctc ?? 0;
   const basic = c.basic ?? 0;
   const hra = c.hra ?? 0;
   const medical = c.medical ?? 1250;
   const ta = c.ta ?? 2500;
   const lta = c.lta ?? 3500;
   const specialAllowance = c.specialAllowance ?? 0;
-  const reimbursement = c.reimbursement ?? 0;
-  const incentives = c.incentives ?? 0;
-  const overtime = c.overtime ?? 0;
 
   const pfEmployee = c.pfEmployee ?? 0;
   const pfEmployer = c.pfEmployer ?? 0;
@@ -179,7 +181,9 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const finalTotalDeductions = Array.isArray(record.deductionValues)
     ? record.deductionValues.reduce((a, b) => a + b, 0)
     : totalDeductions;
-  const finalTotalCtc = record.gross ?? totalCtc;
+  const finalTotalCtc = Array.isArray(record.additionValues)
+    ? record.additionValues.reduce((a, b) => a + b, 0)
+    : totalCtc;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">
@@ -888,6 +892,237 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               >
                 Done
               </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Payslip Schedule Panel ──────────────────────────────────────────────────────────
+
+const PayslipSchedulePanel: React.FC = () => {
+  const [schedule, setSchedule] = useState<PayslipSchedule | null>(null);
+  const [editDay, setEditDay] = useState(10);
+  const [editHour, setEditHour] = useState(10);
+  const [editMinute, setEditMinute] = useState(0);
+  const [editEnabled, setEditEnabled] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerResult, setTriggerResult] = useState<BulkSendResult | null>(null);
+  const [saveMsg, setSaveMsg] = useState('');
+
+  useEffect(() => {
+    getPayslipSchedule().then(s => {
+      setSchedule(s);
+      setEditDay(s.day);
+      setEditHour(s.hour);
+      setEditMinute(s.minute);
+      setEditEnabled(s.enabled);
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      const updated = await updatePayslipSchedule({ day: editDay, hour: editHour, minute: editMinute, enabled: editEnabled });
+      setSchedule(updated);
+      setIsEditing(false);
+      setSaveMsg('Schedule saved ✔');
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (err) {
+      setSaveMsg('Failed to save: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTrigger = async () => {
+    setTriggering(true);
+    setTriggerResult(null);
+    try {
+      const result = await triggerManualSend();
+      setTriggerResult(result);
+      // Refresh lastRun
+      const s = await getPayslipSchedule();
+      setSchedule(s);
+    } catch (err) {
+      setTriggerResult({ sent: 0, failed: [{ email: '', name: '', error: err instanceof Error ? err.message : String(err) }] });
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const padded = (n: number) => String(n).padStart(2, '0');
+  const ordinal = (n: number) => {
+    const s = ['th','st','nd','rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor mb-6 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-varistor-border bg-gradient-to-r from-varistor-limeLight to-white">
+        <div className="flex items-center gap-2">
+          <Calendar size={18} className="text-varistor-lime" />
+          <span className="font-bold text-varistor-dark text-sm">Payslip Auto-Send Schedule</span>
+          {schedule && (
+            <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              schedule.enabled
+                ? 'bg-varistor-limeTint text-varistor-limeText'
+                : 'bg-gray-100 text-gray-400'
+            }`}>
+              {schedule.enabled ? 'ENABLED' : 'DISABLED'}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-varistor-border rounded-lg hover:bg-varistor-limeLight text-varistor-dark transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+              Edit Schedule
+            </button>
+          )}
+          <button
+            onClick={handleTrigger}
+            disabled={triggering}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-60"
+          >
+            {triggering ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
+            {triggering ? 'Sending…' : 'Send Now'}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-6">
+        {!schedule ? (
+          <div className="flex items-center gap-2 text-varistor-muted text-sm">
+            <RefreshCw size={14} className="animate-spin" /> Loading schedule…
+          </div>
+        ) : !isEditing ? (
+          /* ── View Mode ── */
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[160px] bg-varistor-pageBg rounded-xl p-4 border border-varistor-border">
+                <p className="text-[11px] text-varistor-muted uppercase tracking-wider font-bold mb-1">Send Day</p>
+                <p className="text-2xl font-black text-varistor-dark">{ordinal(schedule.day)}</p>
+                <p className="text-xs text-varistor-muted">of every month</p>
+              </div>
+              <div className="flex-1 min-w-[160px] bg-varistor-pageBg rounded-xl p-4 border border-varistor-border">
+                <p className="text-[11px] text-varistor-muted uppercase tracking-wider font-bold mb-1">Send Time</p>
+                <p className="text-2xl font-black text-varistor-dark">{padded(schedule.hour)}:{padded(schedule.minute)}</p>
+                <p className="text-xs text-varistor-muted">IST (Asia/Kolkata)</p>
+              </div>
+              <div className="flex-1 min-w-[160px] bg-varistor-pageBg rounded-xl p-4 border border-varistor-border">
+                <p className="text-[11px] text-varistor-muted uppercase tracking-wider font-bold mb-1">Last Run</p>
+                <p className="text-sm font-semibold text-varistor-dark">
+                  {schedule.lastRun ? new Date(schedule.lastRun).toLocaleString('en-IN') : '— Never'}
+                </p>
+                <p className="text-xs text-varistor-muted">auto-dispatch</p>
+              </div>
+            </div>
+
+            {triggerResult && (
+              <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm ${
+                triggerResult.failed.length === 0
+                  ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                {triggerResult.skipped ? (
+                  <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>No approved/released payroll records found on server. Sync records first by approving payroll.</span></>
+                ) : triggerResult.failed.length === 0 ? (
+                  <><CheckCircle2 size={16} className="flex-shrink-0 mt-0.5" /><span>✓ {triggerResult.sent} payslips dispatched successfully.</span></>
+                ) : (
+                  <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>{triggerResult.sent} sent · {triggerResult.failed.length} failed: {triggerResult.failed.map(f => f.error).join(', ')}</span></>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ── Edit Mode ── */
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Day */}
+              <div>
+                <label className="block text-xs font-bold text-varistor-dark mb-2">Send Day (1–28)</label>
+                <input
+                  type="number"
+                  min={1} max={28}
+                  value={editDay}
+                  onChange={e => setEditDay(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
+                  className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-varistor-lime"
+                />
+                <p className="text-[10px] text-varistor-muted mt-1">Day of month (1–28; max 28 to avoid month-end issues)</p>
+              </div>
+              {/* Hour */}
+              <div>
+                <label className="block text-xs font-bold text-varistor-dark mb-2">Hour (0–23, IST)</label>
+                <input
+                  type="number"
+                  min={0} max={23}
+                  value={editHour}
+                  onChange={e => setEditHour(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-varistor-lime"
+                />
+                <p className="text-[10px] text-varistor-muted mt-1">10 = 10 AM IST</p>
+              </div>
+              {/* Minute */}
+              <div>
+                <label className="block text-xs font-bold text-varistor-dark mb-2">Minute (0–59)</label>
+                <input
+                  type="number"
+                  min={0} max={59}
+                  value={editMinute}
+                  onChange={e => setEditMinute(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-varistor-lime"
+                />
+              </div>
+            </div>
+
+            {/* Enable / Disable toggle */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setEditEnabled(v => !v)}
+                className="flex items-center gap-2 text-sm font-semibold text-varistor-dark"
+              >
+                {editEnabled
+                  ? <ToggleRight size={28} className="text-varistor-lime" />
+                  : <ToggleLeft size={28} className="text-gray-300" />}
+                {editEnabled ? 'Auto-send Enabled' : 'Auto-send Disabled'}
+              </button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+              📅 Payslips will auto-send on the <strong>{ordinal(editDay)}</strong> of every month at <strong>{padded(editHour)}:{padded(editMinute)} IST</strong>.
+              The server must be running for the cron job to fire.
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-5 py-2 bg-varistor-lime text-white text-sm font-semibold rounded-lg hover:bg-[#65a30d] disabled:opacity-60 transition-colors"
+              >
+                {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {saving ? 'Saving…' : 'Save Schedule'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  if (schedule) { setEditDay(schedule.day); setEditHour(schedule.hour); setEditMinute(schedule.minute); setEditEnabled(schedule.enabled); }
+                }}
+                className="px-5 py-2 text-sm border border-varistor-border rounded-lg hover:bg-gray-50 text-varistor-muted transition-colors"
+              >
+                Cancel
+              </button>
+              {saveMsg && <span className={`text-xs font-semibold ${saveMsg.includes('Failed') ? 'text-red-600' : 'text-varistor-limeText'}`}>{saveMsg}</span>}
             </div>
           </div>
         )}
@@ -1668,6 +1903,7 @@ const SalaryEngine: React.FC = () => {
     setRecords(data);
     setClBalances(balances);
     setLoading(false);
+    await syncPayrollToServer(data);
   }, []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1709,14 +1945,22 @@ const SalaryEngine: React.FC = () => {
     const ctc = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(ctc) || ctc <= 0) return;
     const updated = await updatePayrollRecord(id, { ctc });
-    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+    if (updated) {
+      const next = records.map(r => r.id === id ? updated : r);
+      setRecords(next);
+      await syncPayrollToServer(next);
+    }
   };
 
   const handleDeductionChange = async (id: string, value: string) => {
     const deduction = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(deduction) || deduction < 0) return;
     const updated = await updatePayrollRecord(id, { deduction });
-    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+    if (updated) {
+      const next = records.map(r => r.id === id ? updated : r);
+      setRecords(next);
+      await syncPayrollToServer(next);
+    }
   };
 
   const handleComponentChange = async (id: string, field: 'basic' | 'hra', value: string) => {
@@ -1730,12 +1974,20 @@ const SalaryEngine: React.FC = () => {
         [field]: val
       }
     });
-    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+    if (updated) {
+      const next = records.map(r => r.id === id ? updated : r);
+      setRecords(next);
+      await syncPayrollToServer(next);
+    }
   };
 
   const handleToggleFlag = async (id: string, flag: 'hasPf' | 'hasEsi' | 'hasPt', value: boolean) => {
     const updated = await updatePayrollRecord(id, { [flag]: value });
-    if (updated) setRecords(prev => prev.map(r => r.id === id ? updated : r));
+    if (updated) {
+      const next = records.map(r => r.id === id ? updated : r);
+      setRecords(next);
+      await syncPayrollToServer(next);
+    }
   };
 
   const handleCLBalanceChange = async (employeeId: string, value: string) => {
@@ -1743,6 +1995,8 @@ const SalaryEngine: React.FC = () => {
     if (isNaN(total) || total < 0) return;
     const updated = await updateClBalance(employeeId, total);
     setClBalances(prev => ({ ...prev, [employeeId]: updated }));
+    // Re-sync load to reflect changes
+    await load();
   };
 
   const handleApprove = async () => {
@@ -1889,6 +2143,9 @@ const SalaryEngine: React.FC = () => {
 
       {activeTab === 'engine' && (
         <>
+          {/* Payslip Scheduler Panel */}
+          <PayslipSchedulePanel />
+
           {/* Excel Upload Panel */}
           {showUploadPanel && (
             <ExcelUploadPanel onClose={() => setShowUploadPanel(false)} />
@@ -2191,6 +2448,183 @@ const SalaryEngine: React.FC = () => {
   );
 };
 
+// ─── Employee Salary Slip Card (Inline View) ──────────────────────────────────
+
+const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
+  const finalPay = record.netPay - (record.deduction ?? 0);
+  const netPayWords = numberToWords(finalPay);
+
+  const c: any = record.components || {};
+  const basic = c.basic ?? 0;
+  const hra = c.hra ?? 0;
+  const medical = c.medical ?? 1250;
+  const ta = c.ta ?? 2500;
+  const lta = c.lta ?? 3500;
+  const specialAllowance = c.specialAllowance ?? 0;
+
+  const pfEmployee = c.pfEmployee ?? 0;
+  const pfEmployer = c.pfEmployer ?? 0;
+  const esi = c.esi ?? 0;
+  const pt = c.pt ?? 0;
+  const tds = c.tds ?? 0;
+  const otherDeductions = c.otherDeductions ?? 0;
+
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  const totalCtc = basic + hra + medical + ta + lta + specialAllowance;
+
+  let addHeads = record.additionHeads;
+  let dedHeads = record.deductionHeads;
+  let addValues = record.additionValues;
+  let dedValues = record.deductionValues;
+
+  if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
+    const comp = computeNet({
+      monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
+      monthlyCtc: record.ctc,
+      totalDays: record.totalDays,
+      payDays: record.payDays,
+      medical: c.medical,
+      ta: c.ta,
+      lta: c.lta,
+      reimbursement: c.reimbursement,
+      incentives: c.incentives,
+      overtime: c.overtime,
+      tds: c.tds,
+      otherDeductions: c.otherDeductions,
+      employeeId: record.employeeId,
+      attendanceBreakdown: record.attendanceBreakdown,
+      hasPf: record.hasPf,
+      hasEsi: record.hasEsi,
+      hasPt: record.hasPt,
+    });
+    addHeads = comp.additionHeads;
+    dedHeads = comp.deductionHeads;
+    addValues = comp.additionValues;
+    dedValues = comp.deductionValues;
+  }
+
+  const earnings: { label: string; val: number | null }[] = [];
+  const deductions: { label: string; val: number | null }[] = [];
+
+  for (let i = 0; i < 10; i++) {
+    const addName = addHeads[i]?.trim();
+    earnings.push({ label: addName || '', val: addName ? (addValues?.[i] ?? null) : null });
+
+    const dedName = dedHeads[i]?.trim();
+    deductions.push({ label: dedName || '', val: dedName ? (dedValues?.[i] ?? null) : null });
+  }
+
+  let maxSlipRows = 0;
+  for (let i = 0; i < 10; i++) {
+    if (earnings[i]?.label || deductions[i]?.label) {
+      maxSlipRows = i + 1;
+    }
+  }
+  if (maxSlipRows === 0) maxSlipRows = 10;
+
+  const finalTotalDeductions = Array.isArray(record.deductionValues)
+    ? record.deductionValues.reduce((a, b) => a + b, 0)
+    : totalDeductions;
+  const finalTotalCtc = Array.isArray(record.additionValues)
+    ? record.additionValues.reduce((a, b) => a + b, 0)
+    : totalCtc;
+
+  return (
+    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 md:p-8 font-sans text-gray-900 leading-normal mb-6">
+      {/* Header Banner */}
+      <div className="text-center mb-4 relative pb-4 border-b border-gray-200">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <svg className="w-6 h-6 text-varistor-lime" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900">Varistor Technologies Pvt. Ltd.</h2>
+        </div>
+        <p className="text-[10px] text-gray-500">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
+        <p className="text-[10px] text-gray-500">Email - hr@varistor.in, Telephone - 080 4117 8911</p>
+      </div>
+
+      {/* Yellow Month Bar */}
+      <div className="bg-[#fef08a] text-center py-1.5 font-bold text-xs text-gray-900 border border-yellow-300 rounded mb-4">
+        Pay Slip for the Month of {record.month}
+      </div>
+
+      {/* Employee Details Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 border border-gray-300 rounded text-xs mb-4 divide-x divide-y divide-gray-300">
+        <div className="p-2 font-bold bg-gray-50">Emp ID.</div>
+        <div className="p-2">{record.employeeId || '—'}</div>
+        <div className="p-2 font-bold bg-gray-50">Designation</div>
+        <div className="p-2">{record.designation || 'WELDER'}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">Employee Name</div>
+        <div className="p-2 border-t-0">{record.employeeName}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">Department</div>
+        <div className="p-2 border-t-0">{record.department || '—'}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">No. of Days</div>
+        <div className="p-2 border-t-0">{record.totalDays ?? 30}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">Paid No. of Days</div>
+        <div className="p-2 border-t-0">{record.payDays ?? 30}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">PF UAN No.</div>
+        <div className="p-2 border-t-0">{record.pfUan || '—'}</div>
+        <div className="p-2 font-bold bg-gray-50 border-t-0">CL Balance</div>
+        <div className="p-2 border-t-0">{record.clBalance ?? 0}</div>
+      </div>
+
+      {/* Earnings & Deductions Table */}
+      <table className="w-full text-xs border border-gray-300 border-collapse mb-4 divide-y divide-gray-300">
+        <thead>
+          <tr className="bg-blue-100 divide-x divide-gray-300 font-bold">
+            <th className="p-2 text-left">Earnings</th>
+            <th className="p-2 text-right w-24">Amount (Rs.)</th>
+            <th className="p-2 text-left">Deductions</th>
+            <th className="p-2 text-right w-24">Amount (Rs.)</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {Array.from({ length: maxSlipRows }).map((_, idx) => {
+            const earn = earnings[idx] || { label: '', val: null };
+            const deduct = deductions[idx] || { label: '', val: null };
+            return (
+              <tr key={idx} className="divide-x divide-gray-300">
+                <td className="p-2">{earn.label || <span className="opacity-0">—</span>}</td>
+                <td className="p-2 text-right font-mono">
+                  {earn.label && earn.val !== null && earn.val !== undefined ? fmt(earn.val) : ''}
+                </td>
+                <td className="p-2">{deduct.label || <span className="opacity-0">—</span>}</td>
+                <td className="p-2 text-right font-mono">
+                  {deduct.label && deduct.val !== null && deduct.val !== undefined ? fmt(deduct.val) : ''}
+                </td>
+              </tr>
+            );
+          })}
+          <tr className="bg-gray-100 font-bold divide-x divide-gray-300 border-t border-gray-300">
+            <td className="p-2">Total CTC</td>
+            <td className="p-2 text-right font-mono">{fmt(finalTotalCtc)}</td>
+            <td className="p-2">Total Deduction</td>
+            <td className="p-2 text-right font-mono">{fmt(finalTotalDeductions)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Net Pay Block */}
+      <div className="grid grid-cols-1 md:grid-cols-2 border border-gray-300 rounded overflow-hidden text-xs font-bold divide-y md:divide-y-0 md:divide-x divide-gray-300 mb-4">
+        <div className="bg-green-50 p-3 flex justify-between items-center">
+          <span className="text-gray-700">{record.deduction && record.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}</span>
+          <span className="text-lg text-varistor-limeText font-black">{fmt(finalPay)}</span>
+        </div>
+        <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
+          {record.deduction && record.deduction > 0 && (
+            <span className="text-[10px] text-gray-400 mb-1">Net Pay: {fmt(record.netPay)} | Deduction: {fmt(record.deduction)}</span>
+          )}
+          <span>{netPayWords}</span>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-gray-400 text-center font-semibold mt-2">
+        This is a computer generated payslip no signature is required.
+      </p>
+    </div>
+  );
+};
+
 // ─── Employee Salary Slip View ────────────────────────────────────────────────
 
 const EmployeePayrollView: React.FC = () => {
@@ -2199,6 +2633,7 @@ const EmployeePayrollView: React.FC = () => {
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<PayrollRecord | null>(null);
+  const [activeSlipTab, setActiveSlipTab] = useState<'summary' | 'detailed'>('detailed');
 
   useEffect(() => {
     getPayrollRecords(empId).then(data => { setRecords(data); setLoading(false); });
@@ -2217,13 +2652,39 @@ const EmployeePayrollView: React.FC = () => {
   const rec = releasedRecords[0];
 
   return (
-    <div className="max-w-2xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
+    <div className="max-w-3xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
       {selected && <SalarySlip record={selected} onClose={() => setSelected(null)} />}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-varistor-dark flex items-center gap-2">
-          <FileText size={20} className="text-varistor-lime" /> My Salary Slips
-        </h1>
-        <p className="text-sm text-varistor-muted mt-0.5">Read-only · Showing your slips only · {MONTH}</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-varistor-dark flex items-center gap-2">
+            <FileText size={20} className="text-varistor-lime" /> My Salary Slips
+          </h1>
+          <p className="text-sm text-varistor-muted mt-0.5">Read-only · Showing your slips only · {MONTH}</p>
+        </div>
+        {rec && (
+          <div className="flex border border-varistor-border rounded-lg overflow-hidden bg-white text-xs">
+            <button
+              onClick={() => setActiveSlipTab('detailed')}
+              className={`px-3 py-2 font-semibold transition-colors ${
+                activeSlipTab === 'detailed'
+                  ? 'bg-varistor-lime text-white'
+                  : 'text-varistor-muted hover:bg-varistor-pageBg'
+              }`}
+            >
+              Detailed Slip
+            </button>
+            <button
+              onClick={() => setActiveSlipTab('summary')}
+              className={`px-3 py-2 font-semibold transition-colors ${
+                activeSlipTab === 'summary'
+                  ? 'bg-varistor-lime text-white'
+                  : 'text-varistor-muted hover:bg-varistor-pageBg'
+              }`}
+            >
+              Summary
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Current month not released yet */}
@@ -2249,33 +2710,48 @@ const EmployeePayrollView: React.FC = () => {
         </div>
       ) : rec ? (
         <>
-          <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 mb-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="font-bold text-varistor-dark text-base">{rec.employeeName}</p>
-                <p className="text-xs text-varistor-muted">{rec.employeeId} · {rec.department}</p>
-              </div>
-              {rec.status === 'approved'
-                ? <span className="flex items-center gap-1 text-xs font-semibold bg-varistor-limeTint text-varistor-limeText px-3 py-1.5 rounded-full"><ShieldCheck size={12} /> Approved</span>
-                : <span className="flex items-center gap-1 text-xs font-semibold bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full border border-yellow-200"><Clock size={12} /> Pending</span>
-              }
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Monthly CTC', val: fmt(rec.ctc) },
-                { label: 'Net Pay', val: fmt(rec.netPay), highlight: true },
-                { label: 'Basic', val: fmt(rec.components.basic) },
-                { label: 'HRA', val: fmt(rec.components.hra) },
-                { label: 'PF Deduction', val: fmt(rec.components.pfEmployee), deduct: true },
-                { label: 'TDS Deduction', val: fmt(rec.components.tds), deduct: true },
-              ].map(item => (
-                <div key={item.label} className={`rounded-lg p-3 border ${item.highlight ? 'bg-varistor-limeLight border-varistor-lime' : 'bg-varistor-pageBg border-varistor-border'}`}>
-                  <p className="text-[11px] text-varistor-muted">{item.label}</p>
-                  <p className={`font-bold mt-0.5 tabular-nums ${item.deduct ? 'text-red-600' : item.highlight ? 'text-varistor-limeText text-lg' : 'text-varistor-dark text-sm'}`}>{item.val}</p>
+          {activeSlipTab === 'summary' ? (
+            <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 mb-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="font-bold text-varistor-dark text-base">{rec.employeeName}</p>
+                  <p className="text-xs text-varistor-muted">{rec.employeeId} · {rec.department}</p>
                 </div>
-              ))}
+                {rec.status === 'approved'
+                  ? <span className="flex items-center gap-1 text-xs font-semibold bg-varistor-limeTint text-varistor-limeText px-3 py-1.5 rounded-full"><ShieldCheck size={12} /> Approved</span>
+                  : <span className="flex items-center gap-1 text-xs font-semibold bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full border border-yellow-200"><Clock size={12} /> Pending</span>
+                }
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Monthly CTC', val: fmt(rec.ctc) },
+                  { label: 'Net Pay', val: fmt(rec.netPay), highlight: true },
+                  { label: 'Basic', val: fmt(rec.components.basic) },
+                  { label: 'HRA', val: fmt(rec.components.hra) },
+                  { label: 'PF Deduction', val: fmt(rec.components.pfEmployee), deduct: true },
+                  { label: 'TDS Deduction', val: fmt(rec.components.tds), deduct: true },
+                ].map(item => (
+                  <div key={item.label} className={`rounded-lg p-3 border ${item.highlight ? 'bg-varistor-limeLight border-varistor-lime' : 'bg-varistor-pageBg border-varistor-border'}`}>
+                    <p className="text-[11px] text-varistor-muted">{item.label}</p>
+                    <p className={`font-bold mt-0.5 tabular-nums ${item.deduct ? 'text-red-600' : item.highlight ? 'text-varistor-limeText text-lg' : 'text-varistor-dark text-sm'}`}>{item.val}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative">
+              {/* Floating Print Button for Detailed Inline Slip */}
+              <div className="absolute right-4 top-4 z-10 flex gap-2">
+                <button
+                  onClick={() => setSelected(rec)}
+                  className="flex items-center gap-1 bg-white border border-varistor-border px-3 py-1.5 text-xs font-semibold rounded shadow-sm hover:bg-varistor-pageBg text-varistor-dark transition-colors"
+                >
+                  <Eye size={12} /> Fullscreen Print View
+                </button>
+              </div>
+              <SalarySlipCard record={rec} />
+            </div>
+          )}
 
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
             <div className="px-5 py-4 border-b border-varistor-border flex items-center justify-between">
@@ -2302,7 +2778,7 @@ const EmployeePayrollView: React.FC = () => {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-varistor-muted text-center mt-4">✉ Slip auto-mailed on 15th of each month · 10:00 IST via cron + Resend</p>
+          <p className="text-[11px] text-varistor-muted text-center mt-4">✉ Slip scheduled auto-dispatch config details in Admin console.</p>
         </>
       ) : null}
     </div>

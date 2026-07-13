@@ -219,7 +219,6 @@ export function computeNet(params: {
   /** Whether PT deduction applies (default true) */
   hasPt?: boolean;
   employeeId?: string;
-  monthlyCtc?: number;
   attendanceBreakdown?: {
     present: number;
     weekOff: number;
@@ -669,7 +668,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           employeeId: emp.employeeId,
           employeeName: emp.fullName,
           department: emp.department,
-          designation: emp.role === 'employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
+          designation: emp.role === 'Employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
           month: targetMonth,
           ctc: defaultCtc,
           monthlySalary: defaultCtc,
@@ -1162,6 +1161,7 @@ export interface SlipRow {
 export interface BulkSendResult {
   sent: number;
   failed: { email: string; name: string; error: string }[];
+  skipped?: boolean;
 }
 
 /**
@@ -1179,4 +1179,68 @@ export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
     throw new Error(err.error || `Server returned ${res.status}`);
   }
   return res.json();
+}
+
+// ─── Payslip Schedule API ─────────────────────────────────────────────────────
+
+export interface PayslipSchedule {
+  day: number;
+  hour: number;
+  minute: number;
+  enabled: boolean;
+  lastRun: string | null;
+}
+
+/** Fetch the current payslip auto-send schedule from the server. */
+export async function getPayslipSchedule(): Promise<PayslipSchedule> {
+  try {
+    const res = await fetch('http://localhost:3001/api/payroll/schedule');
+    if (!res.ok) throw new Error('Server error');
+    return res.json();
+  } catch {
+    return { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null };
+  }
+}
+
+/** Update the payslip auto-send schedule on the server. */
+export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'lastRun'>): Promise<PayslipSchedule> {
+  const res = await fetch('http://localhost:3001/api/payroll/schedule', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(schedule),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
+    throw new Error(err.error || `Server returned ${res.status}`);
+  }
+  const data = await res.json();
+  return data.schedule;
+}
+
+/** Manually trigger payslip dispatch immediately (uses server-stored records). */
+export async function triggerManualSend(): Promise<BulkSendResult> {
+  const res = await fetch('http://localhost:3001/api/payroll/trigger-send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
+    throw new Error(err.error || `Server returned ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Sync the latest payroll records from client localStorage to the server db.json.
+ *  Called whenever HR saves/approves payroll so the cron job has up-to-date data.
+ */
+export async function syncPayrollToServer(records: PayrollRecord[]): Promise<void> {
+  try {
+    await fetch('http://localhost:3001/api/payroll/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records }),
+    });
+  } catch (err) {
+    console.warn('[Payroll] Failed to sync records to server:', err);
+  }
 }
