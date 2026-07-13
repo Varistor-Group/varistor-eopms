@@ -7,15 +7,8 @@ import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
 import cron from 'node-cron';
-import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
-
-// ── Supabase Admin client (service role — server-side only) ───────────────────
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
 
 const app = express();
 const port = 3001;
@@ -25,16 +18,12 @@ app.use(express.json());
 // ── Nodemailer SMTP transporter ────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false, // true for 465, false for other ports
-  requireTLS: true,
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-  tls: {
-    rejectUnauthorized: false
-  }
 });
 
 transporter.verify((error) => {
@@ -104,25 +93,6 @@ app.post('/api/send-password-reset', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
-    // Generate a real Supabase password reset link via Admin API
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: {
-        redirectTo: `${process.env.APP_URL || 'http://localhost:5173'}/reset-password`,
-      },
-    });
-
-    if (linkError) {
-      console.error('[send-password-reset] generateLink error:', linkError);
-      return res.status(400).json({ success: false, error: linkError.message || 'Could not generate reset link. Check that this email exists in the system.' });
-    }
-
-    const resetLink = linkData.properties?.action_link;
-    if (!resetLink) {
-      return res.status(500).json({ success: false, error: 'Reset link generation failed — no link returned.' });
-    }
-
     await transporter.sendMail({
       from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: email,
@@ -135,7 +105,7 @@ app.post('/api/send-password-reset', async (req, res) => {
           <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
             <h2 style="font-size: 18px; font-weight: 600; color: #111;">Password Reset Requested</h2>
             <p style="color: #444; line-height: 1.6;">We received a request to reset the password for your Varistor EOPMS account.</p>
-            <a href="${resetLink}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
+            <a href="${process.env.APP_URL || 'http://localhost:5173'}/reset?token=PENDING_REAL_TOKEN" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
             <p style="color: #444; line-height: 1.6; margin-top: 24px;">If you did not request this, please ignore this email. Your password will not be changed.</p>
             <p style="color: #888; font-size: 12px; margin-top: 32px;">This link expires in 1 hour.</p>
           </div>
@@ -388,6 +358,13 @@ const numberToWords = (num) => {
   return `Rupees ${rupeesStr.trim()}${paiseStr} Only`;
 };
 
+const getDaysInMonth = (monthStr) => {
+  if (!monthStr) return 30;
+  const d = new Date(monthStr);
+  if (isNaN(d.getTime())) return 30;
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+};
+
 // Generate A4 Salary Slip PDF buffer using pdfkit
 const generateSalarySlipPDF = (slip) => {
   return new Promise((resolve, reject) => {
@@ -453,9 +430,9 @@ const generateSalarySlipPDF = (slip) => {
 
       // Row 3
       doc.font('Helvetica-Bold').text('No. of Days', 45, 156);
-      doc.font('Helvetica').text(String(slip.totalDays || 30), 155, 156);
+      doc.font('Helvetica').text(String(slip.totalDays || getDaysInMonth(slip.month || 'June 2026')), 155, 156);
       doc.font('Helvetica-Bold').text('Paid No. of Days', 302, 156);
-      doc.font('Helvetica').text(String(slip.payDays || 30), 405, 156);
+      doc.font('Helvetica').text(String(slip.payDays || getDaysInMonth(slip.month || 'June 2026')), 405, 156);
 
       // Row 4
       doc.font('Helvetica-Bold').text('PF UAN No.', 45, 174);
@@ -477,8 +454,8 @@ const generateSalarySlipPDF = (slip) => {
       let earnings = [];
       let deductions = [];
 
-      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
-          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+      if (Array.isArray(slip.additionHeads) && slip.additionHeads.length > 0 && Array.isArray(slip.additionValues) &&
+          Array.isArray(slip.deductionHeads) && slip.deductionHeads.length > 0 && Array.isArray(slip.deductionValues)) {
         for (let i = 0; i < 10; i++) {
           earnings.push({
             label: slip.additionHeads[i] || '',
@@ -491,7 +468,6 @@ const generateSalarySlipPDF = (slip) => {
         }
       } else {
         earnings = [
-          { label: 'Salary', val: slip.monthlySalary },
           { label: 'Basic', val: slip.basic },
           { label: 'HRA', val: slip.hra },
           { label: 'Medical', val: slip.medical },
@@ -501,6 +477,7 @@ const generateSalarySlipPDF = (slip) => {
           { label: 'Reimbursement', val: slip.reimbursement },
           { label: 'Incentives', val: slip.incentives },
           { label: 'OT Hours', val: slip.overtime },
+          { label: '', val: null },
         ];
 
         deductions = [
@@ -550,6 +527,14 @@ const generateSalarySlipPDF = (slip) => {
         currentY += 16;
       }
 
+      let finalTotalCtc = 0;
+      earnings.forEach(e => { if (e.val) finalTotalCtc += e.val; });
+      if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
+
+      let finalTotalDeductions = 0;
+      deductions.forEach(d => { if (d.val) finalTotalDeductions += d.val; });
+      if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
+
       // Vertical lines for the table grid
       doc.lineWidth(1).strokeColor('#cccccc');
       doc.moveTo(40, 186).lineTo(40, currentY).stroke();
@@ -563,10 +548,10 @@ const generateSalarySlipPDF = (slip) => {
       
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
       doc.text('Total CTC', 45, currentY + 5);
-      doc.text(fmt(slip.ctc), 210, currentY + 5, { align: 'right', width: 82 });
+      doc.text(fmt(finalTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
       
       doc.text('Total Deduction', 302, currentY + 5);
-      doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
+      doc.text(fmt(finalTotalDeductions), 470, currentY + 5, { align: 'right', width: 80 });
 
       // Outlines for Totals row
       doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
@@ -645,25 +630,14 @@ app.post('/api/payroll/send-slips', async (req, res) => {
       const words = numberToWords(finalPay);
 
       let rowsHtml = '';
-      let maxRows = 0;
-      let isCustom = false;
-      let totalEarnings = slip.monthlySalary || slip.ctc || 0;
-      let totalDeductions = slip.deductions || 0;
-
       if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
           Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+        let maxRows = 0;
         for (let i = 0; i < 10; i++) {
           if (slip.additionHeads[i] || slip.deductionHeads[i]) {
             maxRows = i + 1;
           }
         }
-      }
-
-      if (maxRows > 0) {
-        isCustom = true;
-        totalEarnings = slip.additionValues.reduce((sum, val) => sum + Number(val || 0), 0);
-        totalDeductions = slip.deductionValues.reduce((sum, val) => sum + Number(val || 0), 0);
-
         for (let i = 0; i < maxRows; i++) {
           const addHead = slip.additionHeads[i] || '';
           const addVal = addHead ? fmt(slip.additionValues[i]) : '';
@@ -679,49 +653,54 @@ app.post('/api/payroll/send-slips', async (req, res) => {
             </tr>
           `;
         }
+        
+        let finalTotalCtc = 0;
+        let finalTotalDeductions = 0;
+        slip.additionValues.forEach(v => { if (v) finalTotalCtc += v; });
+        slip.deductionValues.forEach(v => { if (v) finalTotalDeductions += v; });
+        if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
+        if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
+        
+        // Save these so we can use them in the rows below
+        slip.finalTotalCtc = finalTotalCtc;
+        slip.finalTotalDeductions = finalTotalDeductions;
       } else {
         rowsHtml = `
               <tr>
-                <td style="border:1px solid #cccccc;">Salary</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.monthlySalary)}</td>
+                <td style="border:1px solid #cccccc;">Basic</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
                 <td style="border:1px solid #cccccc;">PF Employee</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployee)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">Basic</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
+                <td style="border:1px solid #cccccc;">HRA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
                 <td style="border:1px solid #cccccc;">PF Employer</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployer)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">HRA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
+                <td style="border:1px solid #cccccc;">Medical</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
                 <td style="border:1px solid #cccccc;">ESI</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.esi)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">Medical</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
+                <td style="border:1px solid #cccccc;">TA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
                 <td style="border:1px solid #cccccc;">PT</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pt)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">TA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
+                <td style="border:1px solid #cccccc;">LTA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
                 <td style="border:1px solid #cccccc;">TDS</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.tds)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">LTA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
-                <td style="border:1px solid #cccccc;">Other Deductions</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
-              </tr>
-              <tr>
                 <td style="border:1px solid #cccccc;">Special Allowance</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.specialAllowance)}</td>
-                <td style="border:1px solid #cccccc;">&nbsp;</td>
-                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+                <td style="border:1px solid #cccccc;">Other Deductions</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
               </tr>
               <tr>
                 <td style="border:1px solid #cccccc;">Reimbursement</td>
@@ -742,6 +721,12 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
               </tr>
         `;
+        
+        const ctcSum = (slip.basic || 0) + (slip.hra || 0) + (slip.medical || 0) + (slip.ta || 0) + (slip.lta || 0) + (slip.specialAllowance || 0) + (slip.reimbursement || 0) + (slip.incentives || 0) + (slip.overtime || 0);
+        const dedSum = (slip.pfEmployee || 0) + (slip.pfEmployer || 0) + (slip.esi || 0) + (slip.pt || 0) + (slip.tds || 0) + (slip.otherDeductions || 0);
+        
+        slip.finalTotalCtc = ctcSum || slip.ctc;
+        slip.finalTotalDeductions = dedSum || slip.deductions;
       }
 
       return `<!DOCTYPE html>
@@ -781,9 +766,9 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               </tr>
               <tr>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.totalDays || 30}</td>
+                <td style="border:1px solid #cccccc;">${slip.totalDays || getDaysInMonth(slip.month || 'June 2026')}</td>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Paid No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.payDays || 30}</td>
+                <td style="border:1px solid #cccccc;">${slip.payDays || getDaysInMonth(slip.month || 'June 2026')}</td>
               </tr>
               <tr>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">PF UAN No.</td>
@@ -805,10 +790,10 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               </tr>
               ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
-                <td style="border:1px solid #cccccc;">Total Earnings</td>
-                <td style="text-align:right;border:1px solid #cccccc;color:#22c55e;">${fmt(totalEarnings)}</td>
-                <td style="border:1px solid #cccccc;">Total Deductions</td>
-                <td style="text-align:right;border:1px solid #cccccc;color:#ef4444;">${fmt(totalDeductions)}</td>
+                <td style="border:1px solid #cccccc;">Total CTC</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalCtc || slip.ctc)}</td>
+                <td style="border:1px solid #cccccc;">Total Deduction</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalDeductions || slip.deductions)}</td>
               </tr>
               <tr>
                 <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
@@ -915,8 +900,8 @@ async function buildSlipsFromDb() {
         month: rec.month,
         monthlySalary: rec.monthlySalary || rec.ctc || 0,
         ctc: rec.ctc || rec.monthlySalary || 0,
-        totalDays: rec.totalDays || 30,
-        payDays: rec.payDays || 30,
+        totalDays: rec.totalDays || getDaysInMonth(rec.month || 'June 2026'),
+        payDays: rec.payDays || getDaysInMonth(rec.month || 'June 2026'),
         clBalance: rec.clBalance || 0,
         pfUan: rec.pfUan || '—',
         basic: c.basic || 0,
@@ -1113,11 +1098,21 @@ app.put('/api/cl-balances/:employeeId', async (req, res) => {
     if (!db.employee_cl_balances) db.employee_cl_balances = {};
     const empId = req.params.employeeId;
     const existing = db.employee_cl_balances[empId] || { total: 12, used: 0 };
-    const newTotal = parseInt(req.body.total, 10);
-    if (isNaN(newTotal) || newTotal < 0) {
-      return res.status(400).json({ success: false, error: 'Invalid total value.' });
+    
+    let newTotal = existing.total;
+    let newUsed = existing.used;
+
+    if (req.body.total !== undefined) {
+      newTotal = parseInt(req.body.total, 10);
+      if (isNaN(newTotal) || newTotal < 0) return res.status(400).json({ success: false, error: 'Invalid total value.' });
     }
-    db.employee_cl_balances[empId] = { ...existing, total: newTotal };
+    
+    if (req.body.used !== undefined) {
+      newUsed = parseInt(req.body.used, 10);
+      if (isNaN(newUsed) || newUsed < 0) return res.status(400).json({ success: false, error: 'Invalid used value.' });
+    }
+
+    db.employee_cl_balances[empId] = { total: newTotal, used: newUsed };
     await writeDB(db);
     res.json({ success: true, balance: db.employee_cl_balances[empId] });
   } catch (err) {

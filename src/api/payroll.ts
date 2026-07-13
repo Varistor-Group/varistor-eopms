@@ -198,8 +198,16 @@ function getPTAmount(gross: number, ranges: any[]): number {
 }
 
 /** Single source of truth for all payroll calculations. */
+export function getDaysInMonth(monthStr: string): number {
+  if (!monthStr) return 30;
+  const d = new Date(monthStr);
+  if (isNaN(d.getTime())) return 30;
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
 export function computeNet(params: {
   monthlySalary: number;
+  month?: string;
   monthlyCtc?: number;
   totalDays?: number;
   payDays?: number;
@@ -228,7 +236,7 @@ export function computeNet(params: {
     absent: number;
   };
 }) {
-  const totalDays = params.totalDays ?? 30;
+  const totalDays = params.totalDays ?? getDaysInMonth(params.month || 'June 2026');
   const payDays = params.payDays ?? 30;
   const monthlySalary = params.monthlySalary;
   const ctc = params.monthlyCtc ?? monthlySalary;
@@ -467,7 +475,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654321',
@@ -506,7 +514,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654322',
@@ -545,7 +553,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654323',
@@ -584,7 +592,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654324',
@@ -640,19 +648,16 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     _records = loadPayrollRecords();
 
     const targetMonth = 'Jun 2026';
-    const d = new Date(`1 ${targetMonth}`);
-    const actualTotalDays = isNaN(d.getTime()) ? 30 : new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     let modified = false;
 
     for (const emp of employees) {
-      if (emp.status !== 'Active') continue;
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
       if (!exists) {
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
-          totalDays: actualTotalDays,
-          payDays: actualTotalDays,
+          totalDays: getDaysInMonth('June 2026'),
+          payDays: 30,
           medical: 1250,
           ta: 2500,
           lta: 3500,
@@ -697,8 +702,8 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           status: 'draft',
           revision: 0,
           autoFormula: true,
-          totalDays: actualTotalDays,
-          payDays: actualTotalDays,
+          totalDays: getDaysInMonth('June 2026'),
+          payDays: 30,
           clBalance: 12,
           pfUan: '—',
           hasPf: true,
@@ -922,6 +927,74 @@ export async function releaseSlips(employeeIds: string[]): Promise<void> {
   _records = _records.map(r =>
     employeeIds.includes(r.employeeId) ? { ...r, slipReleased: true } : r
   );
+  savePayrollRecords(_records);
+  syncPayrollToServer(_records);
+}
+
+/**
+ * Synchronizes the exact calculated slips (from Excel/Attendance) into the central payroll records.
+ * Marks them as released and syncs to the server.
+ */
+export async function releaseAndSyncSlips(sentRows: SlipRow[]): Promise<void> {
+  await delay(50);
+  
+  sentRows.forEach(row => {
+    if (!row.employeeId || !row.month) return;
+    const existingIdx = _records.findIndex(r => r.employeeId === row.employeeId && r.month === row.month);
+    
+    const newRecord: PayrollRecord = {
+      id: existingIdx !== -1 ? _records[existingIdx].id : `pay-${row.employeeId}-${row.month.replace(/\\s+/g, '-')}`,
+      employeeId: row.employeeId,
+      employeeName: row.name,
+      department: row.department || 'Operation',
+      designation: row.designation || 'EMPLOYEE',
+      month: row.month,
+      ctc: row.ctc,
+      monthlySalary: row.monthlySalary,
+      components: {
+        basic: row.basic || 0,
+        hra: row.hra || 0,
+        pfEmployee: row.pfEmployee || 0,
+        pfEmployer: row.pfEmployer || 0,
+        esi: row.esi || 0,
+        pt: row.pt || 0,
+        tds: row.tds || 0,
+        specialAllowance: row.specialAllowance || 0,
+        medical: row.medical || 1250,
+        ta: row.ta || 2500,
+        lta: row.lta || 3500,
+        reimbursement: row.reimbursement || 0,
+        incentives: row.incentives || 0,
+        overtime: row.overtime || 0,
+        otherDeductions: row.otherDeductions || 0
+      },
+      netPay: row.netPay,
+      status: 'approved',
+      revision: existingIdx !== -1 ? _records[existingIdx].revision + 1 : 1,
+      autoFormula: true,
+      totalDays: row.totalDays,
+      payDays: row.payDays,
+      clBalance: row.clBalance || 0,
+      pfUan: row.pfUan || '—',
+      hasPf: true,
+      hasEsi: true,
+      hasPt: true,
+      slipReleased: true,
+      additionHeads: row.additionHeads || [],
+      deductionHeads: row.deductionHeads || [],
+      additionValues: row.additionValues || [],
+      deductionValues: row.deductionValues || [],
+    };
+    
+    if (existingIdx !== -1) {
+      _records[existingIdx] = newRecord;
+    } else {
+      _records.push(newRecord);
+    }
+  });
+
+  savePayrollRecords(_records);
+  syncPayrollToServer(_records);
 }
 
 function delay(ms: number) {
@@ -969,16 +1042,11 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
     const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
     const lopDays = Math.max(0, clBal.used - clBal.total);
 
-    const [year, month] = monthStr.split('-');
-    const actualTotalDays = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
-
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
     const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
-    // Calculate days strictly based on attendance if available; else fallback to actual days in month
-    const attendanceSum = (row.present || 0) + (row.late || 0) + (row.halfDay || 0) + (row.absent || 0) + (row.weekOff || 0) + (row.holidays || 0) + (row.leaves || 0);
-    const totalDays = attendanceSum > 0 ? attendanceSum : actualTotalDays;
-    const payDays = row.payableDays || actualTotalDays;
+    const totalDays = getDaysInMonth(displayMonth);
+    const payDays = Math.min(row.payableDays, totalDays);
 
     const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
     const ta = existingIdx !== -1 ? _records[existingIdx].components.ta : 2500;

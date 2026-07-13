@@ -153,9 +153,12 @@ export function approveLeaveRequest(leaveId: string, reviewerName: string): void
 
   // Deduct from balance via direct column update
   const balanceColumnMap: Record<string, keyof { casual_used: number; sick_used: number; earned_used: number }> = {
-    Casual: 'casual_used',
-    Sick: 'sick_used',
-    Earned: 'earned_used',
+    'Casual Leave': 'casual_used',
+    'Sick Leave': 'sick_used',
+    'Earned Leave': 'earned_used',
+    'Casual': 'casual_used',
+    'Sick': 'sick_used',
+    'Earned': 'earned_used'
   };
   const balanceCol = balanceColumnMap[request.type];
 
@@ -167,7 +170,17 @@ export function approveLeaveRequest(leaveId: string, reviewerName: string): void
         const updates: Record<string, number> = {};
         updates[balanceCol] = newVal;
         supabase.from('leave_balances').update(updates as any).eq('employee_id', request.employeeId)
-          .then(({ error }) => { if (error) console.error(error); });
+          .then(({ error }) => { 
+            if (error) console.error(error); 
+            else if (balanceCol === 'casual_used') {
+              // Sync updated used balance to server.js so the payroll page sees it
+              fetch(`http://localhost:3001/api/cl-balances/${request.employeeId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ used: newVal }),
+              }).catch(console.error);
+            }
+          });
       } else {
         // Unpaid
         supabase.from('leave_balances').update({ unpaid_taken: data.unpaid_taken + request.days }).eq('employee_id', request.employeeId)

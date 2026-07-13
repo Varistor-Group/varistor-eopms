@@ -18,7 +18,7 @@ import {
   applyFormulaToAll,
   payrollAuditLog,
   sendBulkSlips,
-  releaseSlips,
+  releaseAndSyncSlips,
   fetchAllClBalances,
   updateClBalance,
   computeLopDays,
@@ -32,7 +32,8 @@ import {
   type SlipRow,
   type BulkSendResult,
   type ClBalance,
-  type PayslipSchedule
+  type PayslipSchedule,
+  getDaysInMonth
 } from '../api/payroll';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
@@ -233,9 +234,9 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
             <div className="p-2 font-bold bg-gray-50 border-t-0">Department</div>
             <div className="p-2 border-t-0">{record.department || '—'}</div>
             <div className="p-2 font-bold bg-gray-50 border-t-0">No. of Days</div>
-            <div className="p-2 border-t-0">{record.totalDays ?? 30}</div>
+            <div className="p-2 border-t-0">{record.totalDays ?? getDaysInMonth(record.month || MONTH)}</div>
             <div className="p-2 font-bold bg-gray-50 border-t-0">Paid No. of Days</div>
-            <div className="p-2 border-t-0">{record.payDays ?? 30}</div>
+            <div className="p-2 border-t-0">{record.payDays ?? getDaysInMonth(record.month || MONTH)}</div>
             <div className="p-2 font-bold bg-gray-50 border-t-0">PF UAN No.</div>
             <div className="p-2 border-t-0">{record.pfUan || '—'}</div>
             <div className="p-2 font-bold bg-gray-50 border-t-0">CL Balance</div>
@@ -351,8 +352,9 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const clBalance = payRec?.clBalance ?? 0;
         const designation = payRec?.designation || 'EMPLOYEE';
 
-        const totalDays = att.present + att.late + att.halfDay + att.absent + att.weekOff + att.holidays + att.leaves || 30;
-        const payDays = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
+        const totalDays = getDaysInMonth(MONTH);
+        const payDaysRaw = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
+        const payDays = Math.min(payDaysRaw, totalDays);
 
         const medical = payRec?.components?.medical ?? 1250;
         const ta = payRec?.components?.ta ?? 2500;
@@ -504,8 +506,10 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
 
         const monthlySalary = parseNumber(obj.monthlySalary ?? obj.ctc ?? 0);
         const ctc = parseNumber(obj.ctc ?? obj.monthlySalary ?? 0);
-        const totalDays = parseNumber(obj.totalDays ?? 30) || 30;
-        const payDays = parseNumber(obj.payDays ?? totalDays ?? 30);
+        const actualDays = getDaysInMonth(month);
+        const totalDays = actualDays;
+        const rawPayDays = parseNumber(obj.payDays ?? (parseNumber(obj.totalDays ?? actualDays) || actualDays));
+        const payDays = Math.min(rawPayDays, totalDays);
         const clBalance = parseNumber(obj.clBalance ?? 0);
         const pfUan = obj.pfUan ? String(obj.pfUan).trim() : '—';
 
@@ -623,13 +627,12 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       setSendResult(result);
       setStep('done');
 
-      // Mark slips as released so employees can now view them
-      const sentEmployeeIds = rows
-        .filter(r => !result.failed.find(f => f.email === r.email))
-        .map(r => r.employeeId)
-        .filter((id): id is string => !!id);
-      if (sentEmployeeIds.length > 0) {
-        await releaseSlips(sentEmployeeIds);
+      setStep('done');
+
+      // Sync exact calculated figures to the central database and mark as released
+      const sentRows = rows.filter(r => !result.failed.find(f => f.email === r.email));
+      if (sentRows.length > 0) {
+        await releaseAndSyncSlips(sentRows);
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -793,7 +796,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
                           <div className="text-[10px] text-gray-400">{row.designation || '—'}</div>
                         </td>
                         <td className="px-4 py-2.5 text-varistor-muted text-xs font-mono">
-                          {row.totalDays || 30} / {row.payDays || 30}
+                          {row.totalDays || getDaysInMonth(row.month || MONTH)} / {row.payDays || getDaysInMonth(row.month || MONTH)}
                         </td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{fmt(row.monthlySalary)}</td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-mono text-red-600">{fmt(row.deductions)}</td>
@@ -2117,8 +2120,7 @@ const SalaryEngine: React.FC = () => {
         {[
           { id: 'engine', label: 'Salary Engine', icon: DollarSign },
           { id: 'heads', label: 'Salary Head Master', icon: BarChart3 },
-          { id: 'formulas', label: 'Salary Formula Master', icon: FileText },
-          { id: 'employees', label: 'Employee Salary Details', icon: Users }
+          { id: 'formulas', label: 'Salary Formula Master', icon: FileText }
         ].map(tab => (
           <button
             key={tab.id}
@@ -2136,7 +2138,7 @@ const SalaryEngine: React.FC = () => {
 
       {activeTab === 'heads' && <SalaryHeadMaster onExit={() => setActiveTab('engine')} />}
       {activeTab === 'formulas' && <SalaryFormulaMaster onExit={() => setActiveTab('engine')} />}
-      {activeTab === 'employees' && <EmployeeSalaryDetails onExit={() => setActiveTab('engine')} />}
+
 
       {activeTab === 'engine' && (
         <>
@@ -2553,9 +2555,9 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
         <div className="p-2 font-bold bg-gray-50 border-t-0">Department</div>
         <div className="p-2 border-t-0">{record.department || '—'}</div>
         <div className="p-2 font-bold bg-gray-50 border-t-0">No. of Days</div>
-        <div className="p-2 border-t-0">{record.totalDays ?? 30}</div>
+        <div className="p-2 border-t-0">{record.totalDays ?? getDaysInMonth(record.month || MONTH)}</div>
         <div className="p-2 font-bold bg-gray-50 border-t-0">Paid No. of Days</div>
-        <div className="p-2 border-t-0">{record.payDays ?? 30}</div>
+        <div className="p-2 border-t-0">{record.payDays ?? getDaysInMonth(record.month || MONTH)}</div>
         <div className="p-2 font-bold bg-gray-50 border-t-0">PF UAN No.</div>
         <div className="p-2 border-t-0">{record.pfUan || '—'}</div>
         <div className="p-2 font-bold bg-gray-50 border-t-0">CL Balance</div>
