@@ -915,13 +915,6 @@ export const Attendance: React.FC = () => {
                 ))}
               </div>
 
-              {/* Dev note */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                <Info size={16} strokeWidth={1.5} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">
-                  <span className="font-bold">Note:</span> Payroll cron reads attendance snapshot on payroll_date-1. If HR edits attendance after payroll lock, a revision run is required. See <span className="font-mono bg-blue-100 px-1 rounded">attendanceService.getPayrollAttendanceSnapshot(month)</span>.
-                </p>
-              </div>
             </div>
           )}
 
