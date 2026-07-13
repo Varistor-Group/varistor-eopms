@@ -1909,9 +1909,11 @@ const SalaryEngine: React.FC = () => {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
-  const departments = ['All', ...Array.from(new Set(records.map(r => r.department)))];
+  const monthRecords = records.filter(r => r.month === MONTH);
 
-  const visible = records
+  const departments = ['All', ...Array.from(new Set(monthRecords.map(r => r.department)))];
+
+  const visible = monthRecords
     .filter(r => filterDept === 'All' || r.department === filterDept)
     .sort((a, b) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2024,9 +2026,9 @@ const SalaryEngine: React.FC = () => {
     await load();
   };
 
-  const draftCount = records.filter(r => r.status === 'draft').length;
-  const approvedCount = records.filter(r => r.status === 'approved').length;
-  const totalNetPay = records.reduce((s, r) => s + r.netPay, 0);
+  const draftCount = monthRecords.filter(r => r.status === 'draft').length;
+  const approvedCount = monthRecords.filter(r => r.status === 'approved').length;
+  const totalNetPay = monthRecords.reduce((s, r) => s + r.netPay, 0);
 
   const SortIcon = ({ field }: { field: keyof PayrollRecord }) =>
     sortField === field
@@ -2070,7 +2072,7 @@ const SalaryEngine: React.FC = () => {
             <DollarSign size={20} className="text-varistor-lime" />
             Payroll — Salary Engine
           </h1>
-          <p className="text-sm text-varistor-muted mt-0.5">Excel-driven formula engine · {MONTH} · {records.length} employees</p>
+          <p className="text-sm text-varistor-muted mt-0.5">Excel-driven formula engine · {MONTH} · {monthRecords.length} employees</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'engine' && (
