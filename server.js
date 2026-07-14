@@ -570,7 +570,7 @@ const generateSalarySlipPDF = (slip) => {
         : (slip.deductions || 0);
 
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
-      doc.text('Total CTC', 45, currentY + 5);
+      doc.text('Total Earnings', 45, currentY + 5);
       doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
       
       doc.text('Total Deduction', 302, currentY + 5);
@@ -803,7 +803,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               </tr>
               ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
-                <td style="border:1px solid #cccccc;">Total CTC</td>
+                <td style="border:1px solid #cccccc;">Total Earnings</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(
                   (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
                     ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
@@ -846,9 +846,17 @@ app.post('/api/payroll/send-slips', async (req, res) => {
     const sent = [];
     const failed = [];
 
+    const db = await readDB();
+    const employees = db.employees || [];
+
     for (const slip of slips) {
       if (!slip.email || !slip.name) {
         failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+        continue;
+      }
+      const emp = employees.find(e => e.personalEmail === slip.email || e.employeeId === slip.employeeId);
+      if (!emp || emp.status !== 'Active') {
+        failed.push({ email: slip.email, name: slip.name, error: 'Employee is inactive or not found' });
         continue;
       }
       try {
@@ -868,7 +876,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
             }
           ],
         });
-        sent.push(slip.email);
+        sent.push({ email: slip.email, name: slip.name });
         console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
       } catch (err) {
         console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
@@ -878,7 +886,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
     }
 
     console.log(`[Payroll] Done — ${sent.length} sent, ${failed.length} failed`);
-    return res.json({ success: true, sent: sent.length, failed });
+    return res.json({ success: true, sent: sent.length, sentList: sent, failed });
   } catch (outerErr) {
     console.error('[Payroll] ROUTE CRASHED:', outerErr);
     return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
@@ -909,7 +917,7 @@ async function buildSlipsFromDb() {
     for (const rec of payrollRecords) {
       if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
       const emp = employees.find(e => e.employeeId === rec.employeeId);
-      if (!emp || !emp.personalEmail) continue;
+      if (!emp || !emp.personalEmail || emp.status !== 'Active') continue;
 
       const c = rec.components || {};
       slips.push({
@@ -940,7 +948,7 @@ async function buildSlipsFromDb() {
         incentives: c.incentives || 0,
         overtime: c.overtime || 0,
         otherDeductions: c.otherDeductions || 0,
-        deductions: (c.pfEmployee || 0) + (c.pfEmployer || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
+        deductions: (c.pfEmployee || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
         netPay: rec.netPay || 0,
         deduction: rec.deduction || 0,
         additionHeads: rec.additionHeads || [],

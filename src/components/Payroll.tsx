@@ -125,7 +125,11 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   let addValues = record.additionValues;
   let dedValues = record.deductionValues;
 
-  if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
+  // Only re-compute if the record has no saved heads/values at all.
+  // If they exist (even partly empty), use them — they were calculated
+  // at the time HR set the CTC and are the source of truth for the PDF/email.
+  const hasSavedHeads = Array.isArray(addHeads) && addHeads.some(h => h?.trim());
+  if (!hasSavedHeads) {
     const comp = computeNet({
       monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
       monthlyCtc: record.ctc,
@@ -386,6 +390,9 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           otherDeductions,
           employeeId: att.employee_id,
           attendanceBreakdown,
+          hasPf: payRec?.hasPf,
+          hasEsi: payRec?.hasEsi,
+          hasPt: payRec?.hasPt,
         });
 
         parsed.push({
@@ -862,6 +869,21 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               </div>
             </div>
 
+            {sendResult.sentList && sendResult.sentList.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Successfully Delivered</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {sendResult.sentList.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-green-700">
+                      <CheckCircle2 size={12} />
+                      <span className="font-semibold">{s.name}</span>
+                      <span className="text-green-600">&lt;{s.email}&gt;</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {sendResult.failed.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                 <p className="text-xs font-bold text-red-700 uppercase tracking-wider mb-2">Failed deliveries</p>
@@ -1039,6 +1061,21 @@ const PayslipSchedulePanel: React.FC = () => {
                 ) : (
                   <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>{triggerResult.sent} sent · {triggerResult.failed.length} failed: {triggerResult.failed.map(f => `${f.name || 'Unknown'} (${f.email}): ${f.error}`).join(' | ')}</span></>
                 )}
+              </div>
+            )}
+
+            {triggerResult && triggerResult.sentList && triggerResult.sentList.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-2">
+                <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Successfully Delivered</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {triggerResult.sentList.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-green-700">
+                      <CheckCircle2 size={12} />
+                      <span className="font-semibold">{s.name}</span>
+                      <span className="text-green-600">&lt;{s.email}&gt;</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -2335,17 +2372,7 @@ const SalaryEngine: React.FC = () => {
                           </td>
                           {(['basic', 'hra'] as const).map(f => (
                             <td key={f} className="px-4 py-3">
-                              {isAdmin && !isApproved ? (
-                                <input
-                                  type="number"
-                                  key={`${rec.id}-${f}-${rec.components[f]}`}
-                                  defaultValue={rec.components[f]}
-                                  onBlur={e => handleComponentChange(rec.id, f, e.target.value)}
-                                  className="w-20 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                                />
-                              ) : (
-                                <span className="font-mono text-xs text-varistor-dark">{fmt(rec.components[f])}</span>
-                              )}
+                              <span className="font-mono text-xs text-varistor-muted" title="Auto-calculated from CTC">{fmt(rec.components[f])}</span>
                             </td>
                           ))}
                           <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>

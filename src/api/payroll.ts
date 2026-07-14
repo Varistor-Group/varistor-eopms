@@ -165,9 +165,9 @@ export function numberToWords(num: number): string {
 function evaluateFormula(equation: string, context: Record<string, number>): number {
   try {
     let sanitized = equation
-      .replace(/\bround\(/g, 'Math.round(')
-      .replace(/\bceil\(/g, 'Math.ceil(')
-      .replace(/\bfloor\(/g, 'Math.floor(')
+      .replace(/\b(?:Math\.)?round\(/g, 'Math.round(')
+      .replace(/\b(?:Math\.)?ceil\(/g, 'Math.ceil(')
+      .replace(/\b(?:Math\.)?floor\(/g, 'Math.floor(')
       .replace(/%/g, ' * 0.01');
 
     const sortedKeys = Object.keys(context).sort((a, b) => b.length - a.length);
@@ -755,6 +755,18 @@ export async function updatePayrollRecord(
     } else if (patch.monthlySalary !== undefined) {
       updated.ctc = patch.monthlySalary;
     }
+
+    // ── Keep $BS in sync with the new monthly salary ──────────────────────────
+    // computeNet reads $BS from eopms_employee_salary_details. If that key
+    // still holds the OLD CTC, every formula will produce wrong numbers.
+    try {
+      const detailsRaw = localStorage.getItem('eopms_employee_salary_details');
+      const details: Record<string, number> = detailsRaw ? JSON.parse(detailsRaw) : {};
+      details[updated.employeeId] = updated.monthlySalary;
+      localStorage.setItem('eopms_employee_salary_details', JSON.stringify(details));
+    } catch (_) { /* ignore */ }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const comp = computeNet({
       monthlySalary: updated.monthlySalary,
       totalDays: updated.totalDays,
@@ -1162,6 +1174,7 @@ export interface SlipRow {
 
 export interface BulkSendResult {
   sent: number;
+  sentList?: { email: string; name: string }[];
   failed: { email: string; name: string; error: string }[];
   skipped?: boolean;
 }

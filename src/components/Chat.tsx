@@ -69,13 +69,10 @@ export const Chat: React.FC = () => {
   const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
-<<<<<<< HEAD
   const [showMobileChannels, setShowMobileChannels] = useState(false);
   const [viewportHeight, setViewportHeight] = useState('100dvh');
-=======
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState('');
->>>>>>> 2a6e8f43351cca1edc9d5261dbcfc1dc562a025b
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

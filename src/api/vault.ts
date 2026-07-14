@@ -295,11 +295,7 @@ export async function getEmployeeDocumentSlots(
 export async function seedEmployeeSlots(
   employeeId: string
 ): Promise<{ success: boolean; error: string | null }> {
-<<<<<<< HEAD
   const { error } = await (supabase as any).rpc('seed_employee_document_slots', { p_employee_id: employeeId });
-=======
-  const { error } = await supabase.rpc('seed_employee_document_slots' as any, { p_employee_id: employeeId });
->>>>>>> 2a6e8f43351cca1edc9d5261dbcfc1dc562a025b
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
 }
