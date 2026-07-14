@@ -64,6 +64,7 @@ export const Chat: React.FC = () => {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelDepts, setNewChannelDepts] = useState<string[]>([]);
   const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
@@ -204,6 +205,28 @@ export const Chat: React.FC = () => {
     }
   };
 
+  const openEditChannel = () => {
+    setNewChannelName(activeChannel.name);
+    setNewChannelDepts(activeChannel.departments || []);
+    setNewChannelMembers(activeChannel.allowedEmployeeIds || []);
+    setChannelError(null);
+    setEditingChannelId(activeChannel.id);
+  };
+
+  const handleEditChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingChannelId) return;
+    try {
+      const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
+      const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
+      chatApi.editChannel(editingChannelId, newChannelName, allowedIds, depts);
+      refreshChannels();
+      setEditingChannelId(null);
+    } catch (err) {
+      setChannelError(err instanceof Error ? err.message : 'Could not edit channel.');
+    }
+  };
+
   const handleEditSave = (messageId: string) => {
     if (!editingDraft.trim()) return;
     chatApi.editMessage(messageId, editingDraft);
@@ -288,6 +311,15 @@ export const Chat: React.FC = () => {
             <h3 className="text-sm font-bold text-varistor-dark flex items-center gap-1">
               <Hash size={14} className="text-varistor-muted" />
               {activeChannel.name}
+              {canManageChannels && (
+                <button
+                  onClick={openEditChannel}
+                  className="ml-2 p-1 rounded hover:bg-varistor-surfaceMuted text-varistor-muted hover:text-varistor-dark transition-colors cursor-pointer"
+                  title="Edit channel"
+                >
+                  <Edit2 size={12} />
+                </button>
+              )}
             </h3>
             <div className="flex items-center gap-2 text-[10px] text-varistor-muted mt-0.5">
               <span className="flex items-center gap-1"><Users size={10} /> {activeChannel.memberCount} members</span>
@@ -576,8 +608,8 @@ export const Chat: React.FC = () => {
       </div>
 
       {/* Create Channel Modal - Admin/HR only */}
-      <Modal isOpen={showCreateChannel} onClose={() => setShowCreateChannel(false)} title="Create a channel">
-        <form onSubmit={handleCreateChannel} className="flex flex-col gap-4">
+      <Modal isOpen={showCreateChannel || !!editingChannelId} onClose={() => { setShowCreateChannel(false); setEditingChannelId(null); }} title={editingChannelId ? "Edit channel" : "Create a channel"}>
+        <form onSubmit={editingChannelId ? handleEditChannel : handleCreateChannel} className="flex flex-col gap-4">
           <Input
             label="Channel name"
             placeholder="e.g. design-team"

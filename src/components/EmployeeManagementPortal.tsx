@@ -14,6 +14,10 @@ export const EmployeeManagementPortal: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
+  type SortField = 'employeeId' | 'fullName' | 'department' | 'variPoints' | 'status' | 'dateOfJoining';
+  const [sortField, setSortField] = useState<SortField>('employeeId');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // HR Vari Points management state (Admin only)
   const [hrPointsSection, setHrPointsSection] = useState(false);
   const [selectedHrId, setSelectedHrId] = useState('');
@@ -114,10 +118,30 @@ export const EmployeeManagementPortal: React.FC = () => {
             Manage your team, roles, and onboarding.
           </p>
         </div>
-        <Button onClick={() => setView('create')} className="flex items-center gap-2">
-          <UserPlus size={16} />
-          <span>Add Employee</span>
-        </Button>
+        <div className="flex items-center gap-3">
+          <select
+            className="text-sm border border-varistor-border rounded-lg px-3 py-2 bg-white text-varistor-dark outline-none focus:ring-1 focus:ring-varistor-lime"
+            value={`${sortField}-${sortOrder}`}
+            onChange={(e) => {
+              const [field, order] = e.target.value.split('-');
+              setSortField(field as SortField);
+              setSortOrder(order as 'asc' | 'desc');
+            }}
+          >
+            <option value="employeeId-asc">Emp ID (Asc)</option>
+            <option value="employeeId-desc">Emp ID (Desc)</option>
+            <option value="fullName-asc">Name (A-Z)</option>
+            <option value="fullName-desc">Name (Z-A)</option>
+            <option value="department-asc">Department (A-Z)</option>
+            <option value="variPoints-desc">Points (High to Low)</option>
+            <option value="dateOfJoining-desc">DOJ (Newest first)</option>
+            <option value="dateOfJoining-asc">DOJ (Oldest first)</option>
+          </select>
+          <Button onClick={() => setView('create')} className="flex items-center gap-2">
+            <UserPlus size={16} />
+            <span>Add Employee</span>
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-varistor border border-varistor-border overflow-hidden shadow-sm">
@@ -135,9 +159,29 @@ export const EmployeeManagementPortal: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-varistor-border">
               {[...employees].sort((a, b) => {
-                if (a.status === 'Active' && b.status === 'Inactive') return -1;
-                if (a.status === 'Inactive' && b.status === 'Active') return 1;
-                return 0;
+                let comparison = 0;
+                switch (sortField) {
+                  case 'fullName':
+                    comparison = a.fullName.localeCompare(b.fullName);
+                    break;
+                  case 'department':
+                    comparison = a.department.localeCompare(b.department);
+                    break;
+                  case 'variPoints':
+                    comparison = a.variPoints - b.variPoints;
+                    break;
+                  case 'status':
+                    comparison = a.status.localeCompare(b.status);
+                    break;
+                  case 'dateOfJoining':
+                    comparison = (a.dateOfJoining || '').localeCompare(b.dateOfJoining || '');
+                    break;
+                  case 'employeeId':
+                  default:
+                    comparison = a.employeeId.localeCompare(b.employeeId);
+                    break;
+                }
+                return sortOrder === 'asc' ? comparison : -comparison;
               }).map((emp) => (
                 <tr key={emp.id} className={`hover:bg-varistor-pageBg/50 transition-colors ${emp.status === 'Inactive' ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4">

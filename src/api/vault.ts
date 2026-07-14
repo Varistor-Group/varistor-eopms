@@ -407,3 +407,31 @@ export async function syncTemplateSlotsRequirement(
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
 }
+
+export async function getEmployeesWithPendingDocuments(): Promise<{ pending: Set<string>, seeded: Set<string> }> {
+  const { data, error } = await supabase
+    .from('employee_document_slots')
+    .select('employee_id, document_id, status, is_required');
+
+  if (error) {
+    console.error('[getEmployeesWithPendingDocuments]', error.message);
+    return { pending: new Set(), seeded: new Set() };
+  }
+  
+  const seededSet = new Set<string>();
+  const unverifiedCounts: Record<string, number> = {};
+  
+  for (const row of (data || [])) {
+    seededSet.add(row.employee_id);
+    if (row.is_required && (!row.document_id || row.status !== 'Verified')) {
+      unverifiedCounts[row.employee_id] = (unverifiedCounts[row.employee_id] || 0) + 1;
+    }
+  }
+  
+  const pendingSet = new Set<string>();
+  for (const [empId, count] of Object.entries(unverifiedCounts)) {
+    if (count > 0) pendingSet.add(empId);
+  }
+  
+  return { pending: pendingSet, seeded: seededSet };
+}

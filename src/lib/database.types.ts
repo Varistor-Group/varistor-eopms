@@ -398,6 +398,7 @@ export type Database = {
           auth_id: string | null
           avatar_url: string | null
           created_at: string
+          date_of_joining: string
           department: string
           employee_id: string
           full_name: string
@@ -416,6 +417,7 @@ export type Database = {
           auth_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          date_of_joining?: string
           department: string
           employee_id: string
           full_name: string
@@ -434,6 +436,7 @@ export type Database = {
           auth_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          date_of_joining?: string
           department?: string
           employee_id?: string
           full_name?: string

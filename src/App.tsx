@@ -27,6 +27,7 @@ import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
 import { mockEmployeeStore } from './api/employees';
+import { FieldPunch } from './components/FieldPunch';
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
@@ -138,6 +139,7 @@ const AppContent: React.FC = () => {
         setActiveTab={setActiveTab}
         isOpenMobile={isOpenMobile}
         setIsOpenMobile={setIsOpenMobile}
+        onLogout={handleLogout}
       />
 
       {/* Main Panel Content Area */}
@@ -215,13 +217,17 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 // All employee tabs (minus vault & attendance) + task-management
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                const tabs = ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                if (currentRole === 'Field Employee') {
+                  tabs.push('field-punch');
+                }
+                return tabs;
               }
             };
 
@@ -247,6 +253,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'field-tracker' && <FieldTracker />}
+                {activeTab === 'field-punch' && <FieldPunch />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}

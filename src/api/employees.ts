@@ -23,17 +23,34 @@ export interface Employee {
   variPoints: number;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
 }
 
-export type Department =
-  | 'Finance'
-  | 'Sales'
-  | 'Operations'
-  | 'Ops Heads'
-  | 'Tech'
-  | 'Digital Marketing'
-  | 'Management'
-  | 'Human Resources';
+export type Department = string;
+
+const DEFAULT_DEPARTMENTS = [
+  'Finance',
+  'Sales',
+  'Operations',
+  'Ops Heads',
+  'Tech',
+  'Digital Marketing',
+  'Management',
+  'Human Resources'
+];
+
+export function getDepartments(): string[] {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  return Array.from(new Set([...DEFAULT_DEPARTMENTS, ...custom]));
+}
+
+export function addDepartment(name: string) {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  if (!custom.includes(name) && !DEFAULT_DEPARTMENTS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('eopms_custom_departments', JSON.stringify(custom));
+  }
+}
 
 export interface CreateEmployeeInput {
   fullName: string;
@@ -46,6 +63,7 @@ export interface CreateEmployeeInput {
   role: UserRole;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -67,6 +85,7 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     variPoints: (row.vari_points as number) ?? 0,
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
+    dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
   };
 }
 
@@ -127,6 +146,11 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   
   if (!result.success) {
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
+  }
+
+  // Update date of joining via a direct update since RPC doesn't handle it
+  if (input.dateOfJoining) {
+    await supabase.from('employees').update({ date_of_joining: input.dateOfJoining }).eq('employee_id', input.employeeId);
   }
 
   // Fetch the newly created employee row to return it
