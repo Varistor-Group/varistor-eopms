@@ -7,25 +7,5 @@ export const useVariPoints = () => {
     throw new Error('useVariPoints must be used within an EopmsProvider');
   }
   
-  return {
-    ledger: context.ledger,
-    toasts: context.toasts,
-    pointsBalance: context.pointsBalance,
-    currentRole: context.currentRole,
-    setCurrentRole: context.setCurrentRole,
-    currentUser: context.currentUser,
-    setCurrentUser: context.setCurrentUser,
-    assertAdministrativePenalty: context.assertAdministrativePenalty,
-    addToast: context.addToast,
-    dismissToast: context.dismissToast,
-    announcements: context.announcements,
-    reactToAnnouncement: context.reactToAnnouncement,
-    readAnnouncement: context.readAnnouncement,
-    addAnnouncement: context.addAnnouncement,
-    leaveRequests: context.leaveRequests,
-    leaveBalance: context.leaveBalance,
-    submitLeave: context.submitLeave,
-    approveLeave: context.approveLeave,
-    rejectLeave: context.rejectLeave,
-  };
+  return context;
 };

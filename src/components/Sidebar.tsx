@@ -29,6 +29,7 @@ interface SidebarProps {
   isOpenMobile: boolean;
   setIsOpenMobile: (open: boolean) => void;
   onLogout: () => void;
+  trainingLocked?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,7 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   isOpenMobile,
   setIsOpenMobile,
-  onLogout
+  onLogout,
+  trainingLocked = false
 }) => {
   const { currentRole, currentUser } = useVariPoints();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -136,6 +138,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }
 
+  if (trainingLocked) {
+    menuItems = menuItems.map(item => ({ ...item, enabled: item.id === 'training' }));
+  }
+
   const handleTabClick = (itemId: string, enabled: boolean) => {
     if (!enabled) return;
     setActiveTab(itemId);
@@ -171,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Non-enabled Module Tooltip */}
             {!item.enabled && (
               <span className="absolute left-full ml-2 px-2 py-1 text-xs bg-varistor-dark text-varistor-pageBg rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-nowrap">
-                Owned by another intern
+                {trainingLocked ? 'Complete your training first' : 'Owned by another intern'}
               </span>
             )}
           </button>

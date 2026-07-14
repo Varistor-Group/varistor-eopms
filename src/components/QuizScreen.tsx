@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { QuizQuestion, QuizAttempt, TrainingModuleWithStatus } from '../types';
 
 interface Props {
@@ -32,14 +33,14 @@ interface Particle {
 function Confetti() {
   const particles: Particle[] = Array.from({ length: 48 }, (_, i) => ({
     id: i,
-  // eslint-disable-next-line react-hooks/purity
+   
     x: Math.random() * 100,
-  // eslint-disable-next-line react-hooks/purity
+   
     delay: Math.random() * 1.2,
-  // eslint-disable-next-line react-hooks/purity
+   
     size: 6 + Math.random() * 8,
     color: i % 3 === 0 ? '#84cc16' : i % 3 === 1 ? '#ffffff' : '#d9f99d',
-  // eslint-disable-next-line react-hooks/purity
+   
     duration: 1.8 + Math.random() * 1.2,
   }));
 
@@ -59,7 +60,7 @@ function Confetti() {
             animationDelay: `${p.delay}s`,
             animationTimingFunction: 'ease-in',
             animationFillMode: 'forwards',
-  // eslint-disable-next-line react-hooks/purity
+   
             transform: `rotate(${Math.random() * 360}deg)`,
             opacity: 0,
           }}
@@ -115,7 +116,8 @@ function ScoreGauge({ score }: { score: number }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 const QuizScreen: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
-  const employeeId = trainingApi.getCurrentUserId();
+  const { currentUser } = useVariPoints();
+  const employeeId = currentUser?.id ?? '';
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,7 @@ const QuizScreen: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   }, [employeeId, mod.id]);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     loadQuiz();
   }, [loadQuiz]);
 
@@ -193,7 +195,7 @@ const QuizScreen: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   // ── Cooldown guard ─────────────────────────────────────────────────────────
   if (!loading && latestAttempt && !latestAttempt.passed && !retryAllowed) {
     const hoursLeft = retryUnlocksAt
-  // eslint-disable-next-line react-hooks/purity
+   
       ? Math.ceil((retryUnlocksAt.getTime() - Date.now()) / (1000 * 60 * 60))
       : 24;
 

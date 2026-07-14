@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactPlayer from 'react-player';
+
+const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';
@@ -23,6 +26,14 @@ const emptyQuestion = (): QuestionDraft => ({
   options: ['', '', '', ''],
   correct_index: 0,
 });
+
+// Matches youtube.com/watch?v=, youtu.be/, youtube.com/embed/ and /shorts/ URLs.
+const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/;
+
+function extractYouTubeId(url: string): string | null {
+  const match = url.trim().match(YOUTUBE_ID_RE);
+  return match ? match[1] : null;
+}
 
 const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) => {
   const [title, setTitle] = useState('');
@@ -49,7 +60,10 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
     return null;
   }, [file, videoUrl]);
 
+  const youtubeId = useMemo(() => extractYouTubeId(videoUrl), [videoUrl]);
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDuration(null);
     setDurationError(null);
     return () => {
@@ -107,10 +121,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const validate = (): string | null => {
     if (!title.trim()) return 'Title is required.';
     if (!description.trim()) return 'Description is required.';
-    if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a direct MP4 URL.';
-    if (videoUrl.trim() && /youtube\.com|youtu\.be/i.test(videoUrl)) {
-      return 'YouTube links are not supported — paste a direct .mp4 URL.';
-    }
+    if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a video URL.';
     if (durationError) return durationError;
     if (!duration || duration <= 0) return 'Video duration could not be detected yet. Wait a moment or check the file/URL.';
     if (!everyone && selectedRoles.length === 0) return 'Select at least one audience role, or choose Everyone.';
@@ -145,6 +156,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
       if (prerequisiteId) formData.append('prerequisite_id', prerequisiteId);
       formData.append('duration_seconds', String(Math.round(duration!)));
       formData.append('order', String(order));
+      if (youtubeId) formData.append('thumbnail_url', `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`);
       formData.append('visibleToRoles', JSON.stringify(everyone ? [] : selectedRoles));
       formData.append(
         'questions',
@@ -173,21 +185,26 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
       {/* Hidden probe video for duration auto-detection */}
       {videoSrc && (
-        <video
-          src={videoSrc}
-          preload="metadata"
-          className="hidden"
-          onLoadedMetadata={e => {
-            const d = e.currentTarget.duration;
-            if (Number.isFinite(d) && d > 0) {
-              setDuration(d);
-              setDurationError(null);
-            } else {
-              setDurationError('Could not read the video duration from this source.');
-            }
-          }}
-          onError={() => setDurationError('Could not load this video. Check the file or URL (must be a direct MP4).')}
-        />
+        <div className="absolute opacity-0 pointer-events-none w-[1px] h-[1px] overflow-hidden z-[-1]">
+          <Player
+            src={videoSrc}
+            playing={true}
+            muted
+            playsInline
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onDurationChange={(e: any) => {
+              const d = e.currentTarget?.duration;
+              if (Number.isFinite(d) && d > 0) {
+                setDuration(d);
+                setDurationError(null);
+              } else {
+                setDurationError('Could not read the video duration from this source.');
+              }
+            }}
+            onError={() => setDurationError('Could not load this video. Check the file or URL.')}
+            config={{ youtube: { disablekb: 1, rel: 0 } }}
+          />
+        </div>
       )}
 
       <div className="bg-white border border-varistor-border rounded-varistor shadow-varistor w-full max-w-2xl my-auto">
@@ -238,7 +255,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
 
           {/* Video source */}
           <div className="space-y-3">
-            <label className={labelCls}>Video (MP4 only, max 200 MB)</label>
+            <label className={labelCls}>Video (MP4 upload, or a YouTube / direct video link)</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -255,7 +272,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
               className={inputCls}
               value={videoUrl}
               onChange={e => handleUrlChange(e.target.value)}
-              placeholder="Paste a direct MP4 URL (not YouTube), e.g. https://…/video.mp4"
+              placeholder="Paste a YouTube link or a direct video URL, e.g. https://youtube.com/watch?v=… or https://…/video.mp4"
             />
 
             {/* Duration feedback */}
@@ -265,7 +282,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
                   <>
                     <CheckCircle size={12} strokeWidth={2} className="text-varistor-lime" />
                     <span className="text-varistor-successText font-medium">
-                      Duration detected: {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
+                      {youtubeId ? 'YouTube video linked' : 'Duration detected'}: {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
                     </span>
                   </>
                 ) : durationError ? (
@@ -276,7 +293,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
                 ) : (
                   <>
                     <Clock size={12} strokeWidth={1.5} className="text-varistor-muted" />
-                    <span className="text-varistor-muted">Detecting duration…</span>
+                    <span className="text-varistor-muted">{youtubeId ? 'Loading YouTube video…' : 'Detecting duration…'}</span>
                   </>
                 )}
               </div>

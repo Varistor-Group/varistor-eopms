@@ -1,4 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import ReactPlayer from 'react-player';
+
+const Player = ReactPlayer as unknown as React.ElementType;
 import {
   ArrowLeft,
   Play,
@@ -11,6 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { TrainingModuleWithStatus } from '../types';
 
 interface Props {
@@ -26,11 +30,13 @@ function formatTime(seconds: number): string {
 }
 
 const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playerRef = useRef<any>(null);
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const employeeId = trainingApi.getCurrentUserId();
+  const { currentUser } = useVariPoints();
+  const employeeId = currentUser?.id ?? '';
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,30 +55,23 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const seekBarRef = useRef<HTMLDivElement>(null);
 
   // On mount: seek to saved position
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
+  const handleReady = () => {
     const saved = mod.progress?.watched_seconds ?? 0;
-
-    const handleLoaded = () => {
-      setDuration(video.duration || mod.duration_seconds);
-      if (saved > 0 && saved < video.duration) {
-        video.currentTime = saved;
+    if (saved > 0 && playerRef.current) {
+      const d = playerRef.current.duration;
+      setDuration(Number.isFinite(d) && d > 0 ? d : mod.duration_seconds);
+      if (saved < d) {
+        playerRef.current.currentTime = saved;
         setCurrentTime(saved);
         setMaxReached(saved);
       }
-    };
-
-    video.addEventListener('loadedmetadata', handleLoaded);
-    return () => video.removeEventListener('loadedmetadata', handleLoaded);
-  }, [mod]);
+    }
+  };
 
   // Auto-pause on tab switch
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && videoRef.current) {
-        videoRef.current.pause();
+      if (document.hidden) {
         setIsPlaying(false);
       }
     };
@@ -83,8 +82,8 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   // Save progress every 5 seconds
   useEffect(() => {
     progressSaveTimer.current = setInterval(() => {
-      if (videoRef.current && isPlaying) {
-        trainingApi.updateProgress(employeeId, mod.id, Math.floor(videoRef.current.currentTime));
+      if (playerRef.current && isPlaying) {
+        trainingApi.updateProgress(employeeId, mod.id, Math.floor(playerRef.current.currentTime));
       }
     }, 5000);
     return () => {
@@ -93,46 +92,30 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   }, [isPlaying, employeeId, mod.id]);
 
 
-  const handleTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const t = video.currentTime;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleTimeUpdate = (e: any) => {
+    const t = e.currentTarget?.currentTime ?? 0;
     setCurrentTime(t);
-    setMaxReached(prev => {
-      const next = Math.max(prev, t);
-      return next;
-    });
-  }, []);
+    setMaxReached(prev => Math.max(prev, t));
 
-  const handleVideoEnded = useCallback(async () => {
+    if (duration > 0 && t >= duration - 1) {
+      handleVideoEnded();
+    }
+  };
+
+  const handleVideoEnded = () => {
     setIsPlaying(false);
     setVideoCompleted(true);
-    await trainingApi.updateProgress(employeeId, mod.id, Math.floor(duration));
-    // Slide in the quiz CTA after 300ms
+    trainingApi.updateProgress(employeeId, mod.id, Math.floor(duration));
     setTimeout(() => {
       setQuizReady(true);
       setTimeout(() => setQuizVisible(true), 50);
     }, 300);
-  }, [employeeId, mod.id, duration]);
-
-  const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) {
-      video.play();
-      setIsPlaying(true);
-    } else {
-      video.pause();
-      setIsPlaying(false);
-    }
   };
 
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
+  const togglePlay = () => setIsPlaying(!isPlaying);
+
+  const toggleMute = () => setIsMuted(!isMuted);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -158,9 +141,9 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
     if (!videoCompleted && targetTime > maxReached + 1) return;
 
     setIsDragging(true);
-    if (videoRef.current) {
+    if (playerRef.current) {
       const clampedTime = videoCompleted ? targetTime : Math.min(targetTime, maxReached);
-      videoRef.current.currentTime = clampedTime;
+      playerRef.current.currentTime = clampedTime;
       setCurrentTime(clampedTime);
     }
   };
@@ -171,8 +154,8 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
     const onMouseMove = (e: MouseEvent) => {
       const targetTime = calcSeekPosition(e);
       const clampedTime = videoCompleted ? targetTime : Math.min(targetTime, maxReached);
-      if (videoRef.current) {
-        videoRef.current.currentTime = clampedTime;
+      if (playerRef.current) {
+        playerRef.current.currentTime = clampedTime;
         setCurrentTime(clampedTime);
       }
     };
@@ -243,18 +226,36 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
         onMouseMove={handleMouseMove}
         onTouchStart={handleTouchStart}
       >
-        {/* Video element */}
-        <video
-          ref={videoRef}
-          src={mod.video_url}
-          className="w-full h-full object-contain"
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={handleVideoEnded}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
+        {/* ReactPlayer wrapper */}
+        <div className="absolute inset-0 bg-black pointer-events-none">
+          <Player
+            ref={playerRef}
+            src={mod.video_url}
+            width="100%"
+            height="100%"
+            playing={isPlaying}
+            muted={isMuted}
+            onTimeUpdate={handleTimeUpdate}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onDurationChange={(e: any) => setDuration(e.currentTarget?.duration ?? 0)}
+            onReady={handleReady}
+            onEnded={handleVideoEnded}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            controls={false}
+            playsInline
+            style={{ pointerEvents: 'none' }}
+            config={{
+              youtube: { disablekb: 1, rel: 0 }
+            }}
+          />
+        </div>
+
+        {/* Click interceptor layer for play/pause toggle */}
+        <div 
+          className="absolute inset-0 cursor-pointer z-0" 
           onClick={handleContainerClick}
           onTouchEnd={(e) => { if (!mobileTap) { e.preventDefault(); togglePlay(); } setMobileTap(false); }}
-          playsInline
         />
 
         {/* Cannot skip badge */}

@@ -89,7 +89,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   const handleDepartmentChange = (d: Department) => {
     // A department head is defined as an employee with the 'Reporting Manager' role in that department.
     const head = employees.find(e => e.department === d && e.role === 'Reporting Manager');
-    
+
     setForm(prev => ({
       ...prev,
       department: d,
@@ -119,6 +119,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!form.username.trim()) errs.username = 'Username is required.';
     if (!form.personalEmail.trim()) errs.personalEmail = 'Email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.personalEmail)) errs.personalEmail = 'Enter a valid email.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.dateOfJoining) errs.dateOfJoining = 'Date of joining is required.';
@@ -341,11 +342,10 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                     key={d}
                     type="button"
                     onClick={() => handleDepartmentChange(d)}
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${
-                      form.department === d
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${form.department === d
                         ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'
                         : 'bg-varistor-limeLight border-varistor-border text-varistor-muted hover:border-varistor-lime'
-                    }`}
+                      }`}
                   >
                     {d}
                   </button>
@@ -455,15 +455,13 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
 
       {/* ── Toast notification ── */}
       <div
-        className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${
-          toast.show ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
-        }`}
+        className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${toast.show ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+          }`}
       >
-        <div className={`flex items-start gap-3 px-4 py-3.5 rounded-varistor shadow-lg border max-w-sm ${
-          toast.type === 'success'
+        <div className={`flex items-start gap-3 px-4 py-3.5 rounded-varistor shadow-lg border max-w-sm ${toast.type === 'success'
             ? 'bg-varistor-limeTint border-[#c3f0a0]'
             : 'bg-red-50 border-red-200'
-        }`}>
+          }`}>
           {toast.type === 'success'
             ? <CheckCircle2 size={20} className="text-varistor-limeText flex-shrink-0 mt-0.5" />
             : <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />

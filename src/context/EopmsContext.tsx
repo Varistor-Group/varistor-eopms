@@ -1,10 +1,11 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 import { API_URL } from '../config/api';
+import { supabase } from '../lib/supabase';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -28,7 +29,7 @@ interface EopmsContextType {
   setCurrentRole: (role: UserRole) => void;
   currentUser: CurrentUser | null;
   setCurrentUser: (user: CurrentUser | null) => void;
-  
+
   // Kanban Actions
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
   approveTask: (taskId: string) => void;
@@ -39,7 +40,7 @@ interface EopmsContextType {
   toggleChecklistItem: (taskId: string, itemId: string) => void;
   addChecklistItem: (taskId: string, text: string) => void;
   addAttachment: (taskId: string, name: string, size: string, type: string) => void;
-  
+
   // Points System Actions
   assertAdministrativePenalty: (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number, employeeId?: string) => void;
   addToast: (message: string, points: number, type: 'credit' | 'debit') => void;
@@ -55,9 +56,13 @@ interface EopmsContextType {
   submitLeave: (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => void;
   approveLeave: (leaveId: string) => void;
   rejectLeave: (leaveId: string, comment: string) => void;
+
+  // Realtime Policy Notifications
+  policyNotification: { show: boolean; title: string };
+  setPolicyNotification: (state: { show: boolean; title: string }) => void;
 }
 
-  // eslint-disable-next-line react-refresh/only-export-components
+// eslint-disable-next-line react-refresh/only-export-components
 export const EopmsContext = createContext<EopmsContextType | undefined>(undefined);
 
 // Priority configuration matrix
@@ -259,6 +264,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
 
+  // ── Realtime Notifications state ──────────────────────────────────────────
+  const [policyNotification, setPolicyNotification] = useState({ show: false, title: '' });
+
   useEffect(() => {
     // Load async states for leaves
     const empId = currentUser?.id ?? MOCK_USER_ID;
@@ -292,7 +300,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     approveLeaveRequest(leaveId, reviewerName);
     setLeaveRequests(prev => prev.map(r => r.id === leaveId ? { ...r, status: 'Approved', reviewerName, reviewedAt: new Date().toISOString() } : r));
     addToast('Leave request approved', 0, 'credit');
-    
+
     // Refresh balance after approval
     const empId = currentUser?.id ?? MOCK_USER_ID;
     getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
@@ -307,17 +315,68 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const activeUserId = currentUser?.id ?? MOCK_USER_ID;
 
+  const knownAnnouncementsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    const loadAnnouncements = async () => {
+    const loadAnnouncements = async (isPolling = false) => {
       try {
         const data = await announcementsApi.fetchAnnouncements(activeUserId);
+
+        const unnotifiedPolicies = data.filter(ann => {
+          if (ann.type !== 'Policy') return false;
+          if (isPolling) {
+            return !knownAnnouncementsRef.current.has(ann.id);
+          } else {
+            return !ann.isRead && !knownAnnouncementsRef.current.has(ann.id);
+          }
+        });
+
+        if (unnotifiedPolicies.length > 0) {
+          const latest = unnotifiedPolicies[0];
+          setPolicyNotification({ show: true, title: latest.title || 'New Policy' });
+          setTimeout(() => {
+            setPolicyNotification(prev => ({ ...prev, show: false }));
+          }, 8000);
+        }
+
+        knownAnnouncementsRef.current = new Set(data.map(a => a.id));
         setAnnouncements(data);
       } catch (err) {
         console.error('Failed to load announcements:', err);
       }
     };
     loadAnnouncements();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Polling fallback every 10 seconds for real-time updates without WebSockets
+    const pollInterval = setInterval(() => loadAnnouncements(true), 10000);
+
+    // ── Realtime Subscription for New Announcements ──
+    const channel = supabase.channel('public:announcements')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'announcements' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const newRow = payload.new as any;
+          if (newRow.type === 'Policy') {
+            setPolicyNotification({ show: true, title: newRow.title || 'New Policy' });
+
+            // Auto-dismiss toast after 5s
+            setTimeout(() => {
+              setPolicyNotification(prev => ({ ...prev, show: false }));
+            }, 5000);
+          }
+
+          // Refresh announcements to get the new one and increment bell badge
+          loadAnnouncements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+    };
   }, [activeUserId]);
 
   const reactToAnnouncement = async (announcementId: string, emojiType: string) => {
@@ -351,7 +410,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         activeUserId
       );
       setAnnouncements(updated);
-      addToast(`New announcement posted: "${title}"`, 0, 'credit');
+      if (type === 'Policy') {
+        addToast(`A new policy has been uploaded: "${title}"`, 0, 'credit');
+      } else {
+        addToast(`New announcement posted: "${title}"`, 0, 'credit');
+      }
     } catch (err) {
       console.error('Failed to create announcement:', err);
     }
@@ -364,12 +427,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const taskDueDate = new Date(`${task.dueDate}T23:59:59`);
     const completedOnTime = SIMULATED_TODAY <= taskDueDate;
-    
+
     const ruleConfig = POINT_MATRIX[task.priority];
-    
-  // eslint-disable-next-line no-useless-assignment
+
+    // eslint-disable-next-line no-useless-assignment
     let netPoints = 0;
-  // eslint-disable-next-line no-useless-assignment
+    // eslint-disable-next-line no-useless-assignment
     let reasonMessage = '';
 
     if (completedOnTime) {
@@ -379,16 +442,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Algebraic sum: Credit - Debit (since debit is stored as a positive number in the matrix)
       netPoints = ruleConfig.onTime - ruleConfig.missed;
       reasonMessage = `Task completed past due date (${task.priority.toUpperCase()} priority)`;
-      
+
       // Consecutive Deadline Penalty Logic
-      const completionEntries = ledger.filter(l => 
-        l.employeeId === task.assigneeId && 
+      const completionEntries = ledger.filter(l =>
+        l.employeeId === task.assigneeId &&
         l.taskId !== undefined // Only look at task completion entries
       );
-      
-      if (completionEntries.length >= 2 && 
-          completionEntries[0].reason.includes('past due date') && 
-          completionEntries[1].reason.includes('past due date')) {
+
+      if (completionEntries.length >= 2 &&
+        completionEntries[0].reason.includes('past due date') &&
+        completionEntries[1].reason.includes('past due date')) {
         netPoints -= CONSECUTIVE_LATE_PENALTY;
         reasonMessage += ` [STRIKE-3: Consecutive Late Penalty Applied]`;
       }
@@ -440,11 +503,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Toast Management
   const addToast = (message: string, points: number, type: 'credit' | 'debit') => {
-  // eslint-disable-next-line react-hooks/purity
+    // eslint-disable-next-line react-hooks/purity
     const id = `toast-${Date.now()}-${Math.random()}`;
     const newToast: ToastMessage = { id, message, points, type };
     setToasts((prev) => [...prev, newToast]);
-    
+
     // Auto-dismiss after 4 seconds
     setTimeout(() => {
       dismissToast(id);
@@ -482,10 +545,10 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setTasks((prevTasks) => {
       const filtered = prevTasks.filter((t) => t.id !== taskId);
-      const updatedTask = { 
-        ...task, 
-        status: statusToSet, 
-        pointsProcessed: awardResult ? true : task.pointsProcessed 
+      const updatedTask = {
+        ...task,
+        status: statusToSet,
+        pointsProcessed: awardResult ? true : task.pointsProcessed
       };
 
       if (statusToSet === 'in_progress') {
@@ -502,7 +565,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (awardResult) {
       setLedger((prevLedger) => [awardResult.newLedgerEntry, ...prevLedger]);
       addToast(
-        awardResult.completedOnTime 
+        awardResult.completedOnTime
           ? `Approved: "${task.title}" (On-time)`
           : `Approved: "${task.title}" (Overdue)`,
         awardResult.pointsValue,
@@ -539,7 +602,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (awardResult) {
         setLedger((prevLedger) => [awardResult.newLedgerEntry, ...prevLedger]);
         addToast(
-          awardResult.completedOnTime 
+          awardResult.completedOnTime
             ? `Approved: "${task.title}" (On-time)`
             : `Approved: "${task.title}" (Overdue)`,
           awardResult.pointsValue,
@@ -577,7 +640,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => {
     // Determine assignee details from mock store, fallback to default
     const assigneeDetails = { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
-    
+
     const checklistItems = checkpoints?.map((cp, idx) => ({
       id: `cp-${Date.now()}-${idx}`,
       text: cp,
@@ -600,7 +663,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
     addToast(`Task assigned: "${title}"`, 0, 'credit');
-    
+
     // Dispatch real-time notification
     const channel = new BroadcastChannel('eopms_notifications');
     channel.postMessage({ type: 'TASK_ASSIGNED', taskId: newTask.id, title: newTask.title, assigneeId });
@@ -723,7 +786,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       timestamp: new Date().toISOString(),
       employeeId
     };
-    
+
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
     addToast(`${ruleTitle} applied: "${reason}"`, penaltyPoints, 'debit');
   };
@@ -759,7 +822,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         leaveBalance,
         submitLeave,
         approveLeave,
-        rejectLeave
+        rejectLeave,
+        policyNotification,
+        setPolicyNotification
       }}
     >
       {children}

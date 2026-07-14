@@ -149,7 +149,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 
   // The RPC returns a JSON object. We typecast it to check success.
   const result = rpcData as unknown as { success: boolean; error?: string; employee_id?: string };
-  
+
   if (!result.success) {
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
   }
@@ -159,7 +159,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
   if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
   if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
-  
+
   if (Object.keys(extraUpdates).length > 0) {
     await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
   }
@@ -236,18 +236,18 @@ export async function updateEmployee(
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
   const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
-  
+
   if (error) {
     return { success: false, error: error.message };
   }
 
   // The RPC returns a JSON object. We typecast it to check success.
   const result = data as unknown as { success: boolean; error?: string };
-  
+
   if (!result.success) {
     return { success: false, error: result.error || 'Failed to delete employee.' };
   }
-  
+
   return { success: true, error: null };
 }
 
@@ -273,9 +273,9 @@ const todayAt = (h: number, min: number) => {
 };
 
 export const mockFieldLocations: FieldEmployeeLocation[] = [
-  { employeeId: 'VAR-031', employeeName: 'Rohan Deshmukh', department: 'Sales', lat: 12.9716, lng: 77.5946, accuracy: 8, batteryLevel: 82, status: 'Active', lastUpdated: minutesAgo(2), todayCheckIn: todayAt(9, 5), distanceTravelledKm: 14.2, routeHistory: [[12.9352,77.6245],[12.9451,77.6100],[12.9716,77.5946]] },
-  { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081,77.6010],[12.9345,77.5820]] },
-  { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716,77.5946],[13.0067,77.5890]] },
+  { employeeId: 'VAR-031', employeeName: 'Rohan Deshmukh', department: 'Sales', lat: 12.9716, lng: 77.5946, accuracy: 8, batteryLevel: 82, status: 'Active', lastUpdated: minutesAgo(2), todayCheckIn: todayAt(9, 5), distanceTravelledKm: 14.2, routeHistory: [[12.9352, 77.6245], [12.9451, 77.6100], [12.9716, 77.5946]] },
+  { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081, 77.6010], [12.9345, 77.5820]] },
+  { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716, 77.5946], [13.0067, 77.5890]] },
 ];
 
 let mockLocationHistory: LocationEntry[] = [];
