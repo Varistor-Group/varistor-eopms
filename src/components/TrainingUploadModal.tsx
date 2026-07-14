@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactPlayer from 'react-player';
+
+const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';
@@ -107,10 +110,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const validate = (): string | null => {
     if (!title.trim()) return 'Title is required.';
     if (!description.trim()) return 'Description is required.';
-    if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a direct MP4 URL.';
-    if (videoUrl.trim() && /youtube\.com|youtu\.be/i.test(videoUrl)) {
-      return 'YouTube links are not supported — paste a direct .mp4 URL.';
-    }
+    if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a video URL.';
     if (durationError) return durationError;
     if (!duration || duration <= 0) return 'Video duration could not be detected yet. Wait a moment or check the file/URL.';
     if (!everyone && selectedRoles.length === 0) return 'Select at least one audience role, or choose Everyone.';
@@ -173,21 +173,22 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
       {/* Hidden probe video for duration auto-detection */}
       {videoSrc && (
-        <video
-          src={videoSrc}
-          preload="metadata"
-          className="hidden"
-          onLoadedMetadata={e => {
-            const d = e.currentTarget.duration;
-            if (Number.isFinite(d) && d > 0) {
-              setDuration(d);
-              setDurationError(null);
-            } else {
-              setDurationError('Could not read the video duration from this source.');
-            }
-          }}
-          onError={() => setDurationError('Could not load this video. Check the file or URL (must be a direct MP4).')}
-        />
+        <div className="absolute opacity-0 pointer-events-none w-[1px] h-[1px] overflow-hidden z-[-1]">
+          <Player
+            url={videoSrc}
+            playing={true}
+            muted={true}
+            onDuration={(d: number) => {
+              if (Number.isFinite(d) && d > 0) {
+                setDuration(d);
+                setDurationError(null);
+              } else {
+                setDurationError('Could not read the video duration from this source.');
+              }
+            }}
+            onError={() => setDurationError('Could not load this video. Check the file or URL.')}
+          />
+        </div>
       )}
 
       <div className="bg-white border border-varistor-border rounded-varistor shadow-varistor w-full max-w-2xl my-auto">
@@ -238,7 +239,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
 
           {/* Video source */}
           <div className="space-y-3">
-            <label className={labelCls}>Video (MP4 only, max 200 MB)</label>
+            <label className={labelCls}>Video (MP4 or Video Link, max 200 MB)</label>
             <input
               ref={fileInputRef}
               type="file"

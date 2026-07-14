@@ -112,13 +112,13 @@ export const Chat: React.FC = () => {
   };
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     loadChannelMessages(activeChannelId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannelId]);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     refreshUnread();
     const handler = () => {
       refreshUnread();
@@ -127,6 +127,7 @@ export const Chat: React.FC = () => {
     window.addEventListener(chatApi.CHAT_EVENT, handler);
     getEmployees().then(setEmployees);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   // If the active channel was deleted (by this tab or another), fall back to whatever remains.

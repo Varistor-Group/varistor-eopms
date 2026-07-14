@@ -179,7 +179,7 @@ function evaluateFormula(equation: string, context: Record<string, number>): num
     }
 
     // Safe eval using Function constructor
-    // eslint-disable-next-line no-new-func
+     
     const result = new Function(`return (${sanitized});`)();
     return typeof result === 'number' && !isNaN(result) ? Math.round(result) : 0;
   } catch (e) {
@@ -188,6 +188,7 @@ function evaluateFormula(equation: string, context: Record<string, number>): num
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPTAmount(gross: number, ranges: any[]): number {
   for (const range of ranges) {
     if (gross >= range.min && gross <= range.max) {
@@ -198,8 +199,16 @@ function getPTAmount(gross: number, ranges: any[]): number {
 }
 
 /** Single source of truth for all payroll calculations. */
+export function getDaysInMonth(monthStr: string): number {
+  if (!monthStr) return 30;
+  const d = new Date(monthStr);
+  if (isNaN(d.getTime())) return 30;
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
 export function computeNet(params: {
   monthlySalary: number;
+  month?: string;
   monthlyCtc?: number;
   totalDays?: number;
   payDays?: number;
@@ -228,7 +237,7 @@ export function computeNet(params: {
     absent: number;
   };
 }) {
-  const totalDays = params.totalDays ?? 30;
+  const totalDays = params.totalDays ?? getDaysInMonth(params.month || 'June 2026');
   const payDays = params.payDays ?? 30;
   const monthlySalary = params.monthlySalary;
   const ctc = params.monthlyCtc ?? monthlySalary;
@@ -249,6 +258,7 @@ export function computeNet(params: {
   ];
   let pfPct = 12;
   let esiPct = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let formulas: any[] = [];
   let employeeDetails: Record<string, number> = {};
 
@@ -467,7 +477,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654321',
@@ -506,7 +516,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654322',
@@ -545,7 +555,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654323',
@@ -584,7 +594,7 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     status: 'draft',
     revision: 1,
     autoFormula: true,
-    totalDays: 30,
+    totalDays: getDaysInMonth('June 2026'),
     payDays: 30,
     clBalance: 12,
     pfUan: '100987654324',
@@ -643,13 +653,12 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     let modified = false;
 
     for (const emp of employees) {
-      if (emp.status !== 'Active') continue;
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
       if (!exists) {
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
-          totalDays: 30,
+          totalDays: getDaysInMonth('June 2026'),
           payDays: 30,
           medical: 1250,
           ta: 2500,
@@ -695,7 +704,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           status: 'draft',
           revision: 0,
           autoFormula: true,
-          totalDays: 30,
+          totalDays: getDaysInMonth('June 2026'),
           payDays: 30,
           clBalance: 12,
           pfUan: '—',
@@ -932,6 +941,74 @@ export async function releaseSlips(employeeIds: string[]): Promise<void> {
   _records = _records.map(r =>
     employeeIds.includes(r.employeeId) ? { ...r, slipReleased: true } : r
   );
+  savePayrollRecords(_records);
+  syncPayrollToServer(_records);
+}
+
+/**
+ * Synchronizes the exact calculated slips (from Excel/Attendance) into the central payroll records.
+ * Marks them as released and syncs to the server.
+ */
+export async function releaseAndSyncSlips(sentRows: SlipRow[]): Promise<void> {
+  await delay(50);
+  
+  sentRows.forEach(row => {
+    if (!row.employeeId || !row.month) return;
+    const existingIdx = _records.findIndex(r => r.employeeId === row.employeeId && r.month === row.month);
+    
+    const newRecord: PayrollRecord = {
+      id: existingIdx !== -1 ? _records[existingIdx].id : `pay-${row.employeeId}-${row.month.replace(/\\s+/g, '-')}`,
+      employeeId: row.employeeId,
+      employeeName: row.name,
+      department: row.department || 'Operation',
+      designation: row.designation || 'EMPLOYEE',
+      month: row.month,
+      ctc: row.ctc,
+      monthlySalary: row.monthlySalary,
+      components: {
+        basic: row.basic || 0,
+        hra: row.hra || 0,
+        pfEmployee: row.pfEmployee || 0,
+        pfEmployer: row.pfEmployer || 0,
+        esi: row.esi || 0,
+        pt: row.pt || 0,
+        tds: row.tds || 0,
+        specialAllowance: row.specialAllowance || 0,
+        medical: row.medical || 1250,
+        ta: row.ta || 2500,
+        lta: row.lta || 3500,
+        reimbursement: row.reimbursement || 0,
+        incentives: row.incentives || 0,
+        overtime: row.overtime || 0,
+        otherDeductions: row.otherDeductions || 0
+      },
+      netPay: row.netPay,
+      status: 'approved',
+      revision: existingIdx !== -1 ? _records[existingIdx].revision + 1 : 1,
+      autoFormula: true,
+      totalDays: row.totalDays,
+      payDays: row.payDays,
+      clBalance: row.clBalance || 0,
+      pfUan: row.pfUan || '—',
+      hasPf: true,
+      hasEsi: true,
+      hasPt: true,
+      slipReleased: true,
+      additionHeads: row.additionHeads || [],
+      deductionHeads: row.deductionHeads || [],
+      additionValues: row.additionValues || [],
+      deductionValues: row.deductionValues || [],
+    };
+    
+    if (existingIdx !== -1) {
+      _records[existingIdx] = newRecord;
+    } else {
+      _records.push(newRecord);
+    }
+  });
+
+  savePayrollRecords(_records);
+  syncPayrollToServer(_records);
 }
 
 function delay(ms: number) {
@@ -946,6 +1023,7 @@ export function formatMonthToMMMYear(monthStr: string): string {
 }
 
 /** Generates or updates draft payroll records based on attendance monthly report */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
   await delay(200);
   _records = loadPayrollRecords();
@@ -953,6 +1031,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   const displayMonth = formatMonthToMMMYear(monthStr);
 
   // Load employees to fetch role/designation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let employees: any[] = [];
   try {
     const res = await fetch('http://localhost:3001/api/employees');
@@ -982,8 +1061,8 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
     const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
-    const totalDays = row.daysInMonth || (row.present + row.halfDay + row.absent + row.weekOff + row.holidays + row.leaves) || 30;
-    const payDays = row.payableDays;
+    const totalDays = getDaysInMonth(displayMonth);
+    const payDays = Math.min(row.payableDays, totalDays);
 
     const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
     const ta = existingIdx !== -1 ? _records[existingIdx].components.ta : 2500;

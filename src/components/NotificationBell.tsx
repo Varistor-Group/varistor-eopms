@@ -33,7 +33,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
   const refreshChatUnread = () => setChatUnread(chatApi.getUnreadSummary());
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     refreshChatUnread();
     const handler = () => refreshChatUnread();
     window.addEventListener(chatApi.CHAT_EVENT, handler);

@@ -26,6 +26,7 @@ import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
+import { PolicyBanner } from './components/PolicyBanner';
 import { mockEmployeeStore } from './api/employees';
 
 const FieldTrackerBackground: React.FC = () => {
@@ -42,7 +43,7 @@ const AppContent: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('eopms_current_user'));
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
 
   // Profile dropdown state
@@ -58,15 +59,15 @@ const AppContent: React.FC = () => {
   // Handle hardware back button globally
   useEffect(() => {
     // We must dynamically import to avoid breaking the web build if Capacitor is missing
-    let listener: any = null;
+    let listener: { remove: () => void } | null = null;
     
     // Hide native status bar if on mobile
     import('@capacitor/status-bar').then(({ StatusBar }) => {
       StatusBar.hide().catch(console.warn);
     }).catch(console.warn);
 
-    import('@capacitor/app').then(({ App: CapApp }) => {
-      listener = CapApp.addListener('backButton', () => {
+    import('@capacitor/app').then(async ({ App: CapApp }) => {
+      listener = await CapApp.addListener('backButton', () => {
         // First check if any inner component (like Chat sidebar) wants to consume this
         const event = new CustomEvent('app_back_button', { cancelable: true });
         window.dispatchEvent(event);
@@ -97,7 +98,7 @@ const AppContent: React.FC = () => {
       if (savedUser && savedRole) {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
-        setCurrentRole(savedRole as any);
+        setCurrentRole(savedRole as import('./types').UserRole);
         setIsLoggedIn(true);
       }
     } catch {
@@ -201,6 +202,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col lg:pl-[220px] min-w-0">
+        <PolicyBanner />
 
         {/* Top Header bar */}
         <header className="h-16 bg-varistor-surface border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">

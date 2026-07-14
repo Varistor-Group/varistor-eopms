@@ -11,6 +11,7 @@
  */
 
 import { API_URL } from '../config/api';
+import { getPayrollRecords, createRevision, updatePayrollRecord } from './payroll';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -303,7 +304,7 @@ function getDatesInMonth(month: string): string[] {
 // ─── In-memory stores ──────────────────────────────────────────────────────
 
 /** National holidays for 2026 */
-let _holidays: Holiday[] = [
+const _holidays: Holiday[] = [
   { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day',       type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
   { id: 'hol-2', date: '2026-03-28', occasion: 'Holi',               type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
   { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti',type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
@@ -317,10 +318,10 @@ let _holidays: Holiday[] = [
 
 const _holidayDates = () => _holidays.map(h => h.date);
 
-let _attendanceEdits: AttendanceEdit[] = [];
+const _attendanceEdits: AttendanceEdit[] = [];
 
 /** Dynamic field photos array */
-let _fieldPhotos: FieldPhotoEntry[] = [];
+const _fieldPhotos: FieldPhotoEntry[] = [];
 
 // Override store: HR-edited entries (stored by id for quick lookup)
 const _overrides = new Map<string, Partial<AttendanceLedgerEntry>>();
@@ -438,14 +439,13 @@ export async function updateAttendance(
 
   // Automate payroll sync
   try {
-    const payrollAPI = await import('./payroll');
     const dateMatch = ledgerId.match(/(\d{4}-\d{2})-\d{2}$/);
     if (dateMatch) {
       const d = new Date(dateMatch[1] + '-01');
       const monthStr = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
       const empId = ledgerId.replace('atl-', '').replace(`-${dateMatch[0]}`, '');
 
-      const records = await payrollAPI.getPayrollRecords();
+      const records = await getPayrollRecords();
       const rec = records.find(r => r.employeeId === empId && r.month === monthStr);
       
       if (rec) {
@@ -455,12 +455,12 @@ export async function updateAttendance(
           const workingDays = snapshot[0].workingDays;
           
           if (rec.status === 'approved') {
-             const rev = await payrollAPI.createRevision(rec.id, editorId);
+             const rev = await createRevision(rec.id, editorId);
              if (rev) {
-               await payrollAPI.updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
+               await updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
              }
           } else {
-             await payrollAPI.updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
+             await updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
           }
         }
       }
@@ -899,7 +899,7 @@ export async function getYearlyAttendanceReport(
   let remainingBalance = totalBalance;
 
   const months: EmployeeYearlyReport['months'] = [];
-  let totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
+  const totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
 
   for (let m = 0; m < 12; m++) {
     const monthStr = `${year}-${String(m + 1).padStart(2, '0')}`;
