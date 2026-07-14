@@ -18,12 +18,12 @@ const SELF_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69dae
 const DEFAULT_CHANNELS: Omit<ChatChannel, 'memberCount'>[] = [
   { id: 'all-hands', name: 'all-hands', pinned: 'POSH policy.pdf' },
   { id: 'hr-announcements', name: 'hr-announcements' },
-  { id: 'finance', name: 'finance', department: 'Finance' },
-  { id: 'sales-team', name: 'sales-team', department: 'Sales' },
-  { id: 'operations', name: 'operations', department: 'Operations' },
-  { id: 'tech-dev', name: 'tech-dev', department: 'Tech' },
-  { id: 'digital-marketing', name: 'digital-marketing', department: 'Digital Marketing' },
-  { id: 'ops-heads', name: 'ops-heads', department: 'Ops Heads' },
+  { id: 'finance', name: 'finance', departments: ['Finance'] },
+  { id: 'sales-team', name: 'sales-team', departments: ['Sales'] },
+  { id: 'operations', name: 'operations', departments: ['Operations'] },
+  { id: 'tech-dev', name: 'tech-dev', departments: ['Tech'] },
+  { id: 'digital-marketing', name: 'digital-marketing', departments: ['Digital Marketing'] },
+  { id: 'ops-heads', name: 'ops-heads', departments: ['Ops Heads'] },
 ];
 
 const CHANNELS_KEY = 'eopms_chat_channels_v1';
@@ -50,10 +50,14 @@ function slugify(name: string): string {
 function buildChannels(user?: { id: string; department?: string; role?: string }): ChatChannel[] {
   const allChannels = loadChannelList().map(c => {
     let count = mockEmployeeStore.length;
-    if (c.allowedEmployeeIds) {
-      count = c.allowedEmployeeIds.length;
-    } else if (c.department) {
-      count = mockEmployeeStore.filter(e => e.department === c.department).length;
+    if (c.departments || c.allowedEmployeeIds) {
+      // Find all employees that match the departments OR are in allowed IDs
+      const matches = mockEmployeeStore.filter(e => {
+        if (c.departments && c.departments.includes(e.department)) return true;
+        if (c.allowedEmployeeIds && c.allowedEmployeeIds.includes(e.id)) return true;
+        return false;
+      });
+      count = matches.length;
     }
     return { ...c, memberCount: count };
   });
@@ -61,9 +65,10 @@ function buildChannels(user?: { id: string; department?: string; role?: string }
   if (!user || user.role === 'Admin') return allChannels;
 
   return allChannels.filter(c => {
-    if (c.allowedEmployeeIds && !c.allowedEmployeeIds.includes(user.id)) return false;
-    if (c.department && c.department !== user.department) return false;
-    return true;
+    if (!c.departments && !c.allowedEmployeeIds) return true; // Public channel
+    if (c.departments && user.department && c.departments.includes(user.department)) return true;
+    if (c.allowedEmployeeIds && c.allowedEmployeeIds.includes(user.id)) return true;
+    return false;
   });
 }
 
@@ -112,23 +117,26 @@ export const chatApi = {
     return buildChannels(user);
   },
 
-  createChannel(name: string, allowedEmployeeIds?: string[], department?: string): ChatChannel {
+  createChannel(name: string, allowedEmployeeIds?: string[], departments?: string[]): ChatChannel {
     const channels = loadChannelList();
     const newChannel: Omit<ChatChannel, 'memberCount'> = {
       id: slugify(name) + '-' + Math.random().toString(36).slice(2, 6),
       name,
       allowedEmployeeIds: allowedEmployeeIds && allowedEmployeeIds.length > 0 ? allowedEmployeeIds : undefined,
-      department
+      departments: departments && departments.length > 0 ? departments : undefined
     };
     channels.push(newChannel);
     saveChannelList(channels);
     notifyUpdated();
     
     let count = mockEmployeeStore.length;
-    if (newChannel.allowedEmployeeIds) {
-      count = newChannel.allowedEmployeeIds.length;
-    } else if (newChannel.department) {
-      count = mockEmployeeStore.filter(e => e.department === newChannel.department).length;
+    if (newChannel.departments || newChannel.allowedEmployeeIds) {
+      const matches = mockEmployeeStore.filter(e => {
+        if (newChannel.departments && newChannel.departments.includes(e.department)) return true;
+        if (newChannel.allowedEmployeeIds && newChannel.allowedEmployeeIds.includes(e.id)) return true;
+        return false;
+      });
+      count = matches.length;
     }
     return { ...newChannel, memberCount: count };
   },
@@ -173,6 +181,16 @@ export const chatApi = {
 
   deleteMessage(messageId: string) {
     const messages = loadMessages().filter(m => m.id !== messageId);
+    saveMessages(messages);
+    notifyUpdated();
+  },
+
+  editMessage(messageId: string, newText: string) {
+    const messages = loadMessages();
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index === -1) return;
+    
+    messages[index] = { ...messages[index], text: newText, edited: true };
     saveMessages(messages);
     notifyUpdated();
   },

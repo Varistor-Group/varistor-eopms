@@ -113,7 +113,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     else if (!/\S+@\S+\.\S+/.test(form.personalEmail)) errs.personalEmail = 'Enter a valid email.';
     if (!form.phone.trim()) errs.phone = 'Phone number is required.';
     if (!form.department) errs.department = 'Please select a department.';
-    if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
+    // Reporting manager is now optional (can be null/None)
     if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -311,14 +311,21 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
             </Field>
 
             {/* Reporting Manager */}
-            <Field label="Reporting Manager" required error={errors.reportingManager}>
-              <input
-                type="text"
+            <Field label="Reporting Manager" error={errors.reportingManager}>
+              <select
                 className={inputCls(!!errors.reportingManager)}
-                placeholder="Manager name..."
                 value={form.reportingManager}
                 onChange={set('reportingManager')}
-              />
+              >
+                <option value="">None</option>
+                {employees
+                  .filter(e => e.role === 'Reporting Manager' || e.role === 'Admin')
+                  .map(m => (
+                    <option key={m.id} value={m.fullName}>
+                      {m.fullName} ({m.department})
+                    </option>
+                  ))}
+              </select>
             </Field>
 
             {/* System Role */}
