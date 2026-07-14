@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus, Menu } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus, Menu, Edit2 } from 'lucide-react';
 import { chatApi } from '../api/chat';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Modal } from './shared/Modal';
@@ -65,13 +65,17 @@ export const Chat: React.FC = () => {
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
-  const [newChannelType, setNewChannelType] = useState<'All' | 'Department' | 'Custom'>('All');
-  const [newChannelDept, setNewChannelDept] = useState('');
+  const [newChannelDepts, setNewChannelDepts] = useState<string[]>([]);
   const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+<<<<<<< HEAD
   const [showMobileChannels, setShowMobileChannels] = useState(false);
   const [viewportHeight, setViewportHeight] = useState('100dvh');
+=======
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState('');
+>>>>>>> 2a6e8f43351cca1edc9d5261dbcfc1dc562a025b
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -206,6 +210,8 @@ export const Chat: React.FC = () => {
 
   const openCreateChannel = () => {
     setNewChannelName('');
+    setNewChannelDepts([]);
+    setNewChannelMembers([]);
     setChannelError(null);
     setShowCreateChannel(true);
   };
@@ -213,15 +219,22 @@ export const Chat: React.FC = () => {
   const handleCreateChannel = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const allowedIds = newChannelType === 'Custom' ? newChannelMembers : undefined;
-      const dept = newChannelType === 'Department' ? newChannelDept : undefined;
-      const channel = chatApi.createChannel(newChannelName, allowedIds, dept);
+      const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
+      const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
+      const channel = chatApi.createChannel(newChannelName, allowedIds, depts);
       refreshChannels();
       setActiveChannelId(channel.id);
       setShowCreateChannel(false);
     } catch (err) {
       setChannelError(err instanceof Error ? err.message : 'Could not create channel.');
     }
+  };
+
+  const handleEditSave = (messageId: string) => {
+    if (!editingDraft.trim()) return;
+    chatApi.editMessage(messageId, editingDraft);
+    setEditingMessageId(null);
+    setEditingDraft('');
   };
 
   const handleDeleteChannel = (e: React.MouseEvent, channel: ChatChannel) => {
@@ -367,6 +380,18 @@ export const Chat: React.FC = () => {
                     >
                       <Smile size={11} />
                     </button>
+                    {message.isSelf && (
+                      <button
+                        onClick={() => {
+                          setEditingMessageId(message.id);
+                          setEditingDraft(message.text || '');
+                        }}
+                        title="Edit message"
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-varistor-muted hover:text-varistor-dark hover:bg-varistor-surfaceMuted transition-all cursor-pointer"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                    )}
                     {canDelete && (
                       <button
                         onClick={() => handleDeleteMessage(message)}
@@ -426,7 +451,25 @@ export const Chat: React.FC = () => {
                           : 'bg-varistor-surfaceMuted text-varistor-dark'
                       }`}
                     >
-                      {renderMessageText(message.text)}
+                      {editingMessageId === message.id ? (
+                        <div className="flex flex-col gap-2 min-w-[200px]">
+                          <textarea
+                            value={editingDraft}
+                            onChange={(e) => setEditingDraft(e.target.value)}
+                            className="w-full text-black bg-white rounded p-1.5 text-xs outline-none focus:ring-2 focus:ring-black/20 resize-none min-h-[60px]"
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <button onClick={() => setEditingMessageId(null)} className="px-2 py-1 bg-black/10 hover:bg-black/20 rounded text-[10px] font-bold cursor-pointer">Cancel</button>
+                            <button onClick={() => handleEditSave(message.id)} className="px-2 py-1 bg-black text-white hover:bg-gray-800 rounded text-[10px] font-bold cursor-pointer">Save</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {renderMessageText(message.text)}
+                          {message.edited && <span className="ml-1 text-[9px] opacity-60">(edited)</span>}
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -589,36 +632,29 @@ export const Chat: React.FC = () => {
             error={channelError ?? undefined}
             autoFocus
           />
-          <div>
-            <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Who can access?</label>
-            <select
-              value={newChannelType}
-              onChange={e => setNewChannelType(e.target.value as any)}
-              className="w-full text-sm bg-varistor-surface text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-            >
-              <option value="All">All Employees</option>
-              <option value="Department">Specific Department</option>
-              <option value="Custom">Selected Employees</option>
-            </select>
-          </div>
-          {newChannelType === 'Department' && (
-            <div>
-              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Department</label>
-              <select
-                value={newChannelDept}
-                onChange={e => setNewChannelDept(e.target.value)}
-                className="w-full text-sm bg-varistor-surface text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-              >
-                <option value="">-- Choose --</option>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Departments (Optional)</label>
+              <div className="max-h-48 overflow-y-auto border border-varistor-border rounded-lg p-2 space-y-1">
                 {Array.from(new Set(employees.map(e => e.department))).filter(Boolean).map(d => (
-                  <option key={d} value={d}>{d}</option>
+                  <label key={d} className="flex items-center gap-2 text-sm hover:bg-varistor-surfaceMuted p-1.5 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newChannelDepts.includes(d)}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewChannelDepts(prev => [...prev, d]);
+                        else setNewChannelDepts(prev => prev.filter(dept => dept !== d));
+                      }}
+                      className="rounded text-varistor-lime focus:ring-varistor-lime"
+                    />
+                    {d}
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
-          )}
-          {newChannelType === 'Custom' && (
-            <div>
-              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Members</label>
+            
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Specific Employees (Optional)</label>
               <div className="max-h-48 overflow-y-auto border border-varistor-border rounded-lg p-2 space-y-1">
                 {employees.map(emp => (
                   <label key={emp.id} className="flex items-center gap-2 text-sm hover:bg-varistor-surfaceMuted p-1.5 rounded cursor-pointer">
@@ -636,12 +672,13 @@ export const Chat: React.FC = () => {
                 ))}
               </div>
             </div>
-          )}
+          </div>
+          <p className="text-xs text-varistor-muted mt-1">If neither is selected, the channel will be public (all employees).</p>
           <div className="flex justify-end gap-2 mt-2">
             <Button type="button" variant="secondary" onClick={() => setShowCreateChannel(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={!newChannelName.trim() || (newChannelType === 'Department' && !newChannelDept) || (newChannelType === 'Custom' && newChannelMembers.length === 0)}>
+            <Button type="submit" variant="primary" disabled={!newChannelName.trim()}>
               Create channel
             </Button>
           </div>

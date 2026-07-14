@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
+import { API_URL } from '../config/api';
 
 export interface Employee {
   id: string;
@@ -147,7 +148,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 
   let emailErrorMsg: string | null = null;
   try {
-    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
+    const emailRes = await fetch(`${API_URL}/api/send-credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -196,7 +197,7 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { data, error } = await supabase.rpc('delete_employee_with_auth', { p_employee_id: id });
+  const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
   
   if (error) {
     return { success: false, error: error.message };
@@ -305,7 +306,7 @@ getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.leng
 
 export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {
   try {
-    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
+    const emailRes = await fetch(`${API_URL}/api/send-credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

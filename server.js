@@ -18,7 +18,7 @@ const supabaseAdmin = createClient(
 );
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 app.use(express.json());
 
@@ -478,7 +478,8 @@ const generateSalarySlipPDF = (slip) => {
       let deductions = [];
 
       if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
-          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues) &&
+          (slip.additionHeads.length > 0 || slip.deductionHeads.length > 0)) {
         for (let i = 0; i < 10; i++) {
           earnings.push({
             label: slip.additionHeads[i] || '',
@@ -653,7 +654,8 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
       let rowsHtml = '';
       if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
-          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
+          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues) &&
+          (slip.additionHeads.length > 0 || slip.deductionHeads.length > 0)) {
         let maxRows = 0;
         for (let i = 0; i < 10; i++) {
           if (slip.additionHeads[i] || slip.deductionHeads[i]) {
@@ -1691,5 +1693,5 @@ app.post('/api/activity', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`[Email Server] running on http://localhost:${port}`);
+  console.log(`[Email Server] running on port ${port}`);
 });

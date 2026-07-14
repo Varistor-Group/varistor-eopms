@@ -1037,7 +1037,7 @@ const PayslipSchedulePanel: React.FC = () => {
                 ) : triggerResult.failed.length === 0 ? (
                   <><CheckCircle2 size={16} className="flex-shrink-0 mt-0.5" /><span>✓ {triggerResult.sent} payslips dispatched successfully.</span></>
                 ) : (
-                  <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>{triggerResult.sent} sent · {triggerResult.failed.length} failed: {triggerResult.failed.map(f => f.error).join(', ')}</span></>
+                  <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>{triggerResult.sent} sent · {triggerResult.failed.length} failed: {triggerResult.failed.map(f => `${f.name || 'Unknown'} (${f.email}): ${f.error}`).join(' | ')}</span></>
                 )}
               </div>
             )}

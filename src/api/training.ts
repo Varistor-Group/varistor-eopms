@@ -13,6 +13,7 @@ import type {
   TrainingStatus,
   UserRole,
 } from '../types';
+import { API_URL } from '../config/api';
 
 // ─── Status resolver (unchanged logic) ──────────────────────────────────────
 
@@ -221,7 +222,7 @@ export const trainingApi = {
 
     // Send email via Express server (best-effort)
     try {
-      await fetch('http://localhost:3001/api/quiz/submit', {
+      await fetch(`${API_URL}/api/quiz/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employeeEmail, hrEmail, moduleTitle, score, passed }),

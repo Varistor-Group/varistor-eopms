@@ -44,6 +44,7 @@ import {
 } from '../lib/faceVerification';
 import { syncPayrollFromAttendance } from '../api/payroll';
 import { YearlyAttendanceReport } from './YearlyAttendanceReport';
+import { API_URL } from '../config/api';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -378,7 +379,7 @@ export const Attendance: React.FC = () => {
       if (singleEmployeeId) {
         rows = rows.filter(r => r.employee_id === singleEmployeeId);
       }
-      const res = await fetch('http://localhost:3001/api/attendance/export-pdf', {
+      const res = await fetch(`${API_URL}/api/attendance/export-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, month: type === 'daily' ? selectedDate : reportMonth, type }),

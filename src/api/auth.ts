@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { UserRole } from '../types';
+import { API_URL } from '../config/api';
 
 export interface AuthUser {
   id: string;          // employees.id e.g. "VAR-001"
@@ -133,7 +134,7 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
   }
 
   try {
-    const res = await fetch('http://localhost:3001/api/send-password-reset', {
+    const res = await fetch(`${API_URL}/api/send-password-reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),

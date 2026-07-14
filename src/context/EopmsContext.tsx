@@ -4,6 +4,7 @@ import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriorit
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
+import { API_URL } from '../config/api';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -271,7 +272,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast('Leave request submitted successfully', 0, 'credit');
 
     // Fire-and-forget manager notification email (same pattern as createEmployee)
-    fetch('http://localhost:3001/api/leave/notify-manager', {
+    fetch(`${API_URL}/api/leave/notify-manager`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
