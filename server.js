@@ -640,7 +640,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
     const buildSlipHtml = (slip) => {
       const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const finalPay = slip.netPay - (slip.deduction || 0);
+      const finalPay = slip.netPay + (slip.reimbursement || 0) + (slip.overtime || 0) + (slip.incentives || 0) - (slip.deduction || 0);
       const words = numberToWords(finalPay);
 
       let rowsHtml = '';
@@ -669,9 +669,27 @@ app.post('/api/payroll/send-slips', async (req, res) => {
           `;
         }
         
+        // Append post-tax earnings
+        const postEarnings = [];
+        if (slip.reimbursement) postEarnings.push({ label: 'Travel Allowance', val: slip.reimbursement });
+        if (slip.overtime) postEarnings.push({ label: 'Overtime', val: slip.overtime });
+        if (slip.incentives) postEarnings.push({ label: 'Incentives', val: slip.incentives });
+
+        postEarnings.forEach((e) => {
+          rowsHtml += `
+            <tr>
+              <td style="border:1px solid #cccccc;">${e.label}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${fmt(e.val)}</td>
+              <td style="border:1px solid #cccccc;">&nbsp;</td>
+              <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+            </tr>
+          `;
+        });
+        
         let finalTotalCtc = 0;
         let finalTotalDeductions = 0;
         slip.additionValues.forEach(v => { if (v) finalTotalCtc += v; });
+        postEarnings.forEach(e => { finalTotalCtc += e.val; });
         slip.deductionValues.forEach(v => { if (v) finalTotalDeductions += v; });
         if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
         if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
@@ -718,7 +736,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">Reimbursement</td>
+                <td style="border:1px solid #cccccc;">Travel Allowance</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.reimbursement)}</td>
                 <td style="border:1px solid #cccccc;">&nbsp;</td>
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
@@ -730,7 +748,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
               </tr>
               <tr>
-                <td style="border:1px solid #cccccc;">OT Hours</td>
+                <td style="border:1px solid #cccccc;">Overtime</td>
                 <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.overtime)}</td>
                 <td style="border:1px solid #cccccc;">&nbsp;</td>
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
@@ -806,27 +824,21 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               ${rowsHtml}
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
                 <td style="border:1px solid #cccccc;">Total Earnings</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
-                  (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
-                    ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
-                    : (slip.ctc || 0)
-                )}</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalCtc)}</td>
                 <td style="border:1px solid #cccccc;">Total Deduction</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
-                  (Array.isArray(slip.deductionValues) && slip.deductionValues.length > 0)
-                    ? slip.deductionValues.reduce((a, b) => a + (b || 0), 0)
-                    : (slip.deductions || 0)
-                )}</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalDeductions)}</td>
               </tr>
               <tr>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
-                  ${slip.deduction && slip.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}
+                <td bgcolor="#e2e8f0" colspan="3" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
+                  Final Pay [In-Hand]
                 </td>
                 <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">
                   ${fmt(finalPay)}
                 </td>
-                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">
-                  ${slip.deduction && slip.deduction > 0 ? `Net Pay: ${fmt(slip.netPay)} | Deduction: ${fmt(slip.deduction)}<br/>` : ''}${words}
+              </tr>
+              <tr>
+                <td bgcolor="#f1f5f9" colspan="4" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">
+                  ${words}
                 </td>
               </tr>
             </table>
@@ -915,8 +927,18 @@ async function buildSlipsFromDb() {
       return [];
     }
 
-    const slips = [];
+    // Keep only the latest revision for each employee to prevent duplicates and stale revisions
+    const latestRecordsMap = {};
     for (const rec of payrollRecords) {
+      const existing = latestRecordsMap[rec.employeeId];
+      if (!existing || rec.revision > existing.revision) {
+        latestRecordsMap[rec.employeeId] = rec;
+      }
+    }
+    const filteredRecords = Object.values(latestRecordsMap);
+
+    const slips = [];
+    for (const rec of filteredRecords) {
       if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
       const emp = employees.find(e => e.employeeId === rec.employeeId);
       if (!emp || !emp.personalEmail || emp.status !== 'Active') continue;

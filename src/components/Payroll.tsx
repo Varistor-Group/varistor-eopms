@@ -176,13 +176,20 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
     }
   }
 
+  const postNetEarnings = [];
+  if (record.components?.reimbursement) postNetEarnings.push({ label: 'Travel Allowance', val: record.components.reimbursement });
+  if (record.components?.overtime) postNetEarnings.push({ label: 'Overtime', val: record.components.overtime });
+  if (record.components?.incentives) postNetEarnings.push({ label: 'Incentives', val: record.components.incentives });
+
+  earnings.push(...postNetEarnings);
+
   let maxSlipRows = 0;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < Math.max(earnings.length, deductions.length); i++) {
     if (earnings[i]?.label || deductions[i]?.label) {
       maxSlipRows = i + 1;
     }
   }
-  if (maxSlipRows === 0) maxSlipRows = 10;
+  if (maxSlipRows === 0) maxSlipRows = Math.max(10, earnings.length);
 
   const finalTotalDeductions = Array.isArray(record.deductionValues)
     ? record.deductionValues.reduce((a, b) => a + b, 0)
@@ -252,10 +259,10 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           <table className="w-full text-xs border border-gray-300 border-collapse mb-4 divide-y divide-gray-300">
             <thead>
               <tr className="bg-blue-100 divide-x divide-gray-300 font-bold">
-                <th className="p-2 text-left">Earnings</th>
-                <th className="p-2 text-right w-28">Amount (Rs.)</th>
-                <th className="p-2 text-left">Deductions</th>
-                <th className="p-2 text-right w-28">Amount (Rs.)</th>
+                <th className="px-3 py-2 border-r border-gray-200 w-1/4">Earnings</th>
+                <th className="px-3 py-2 border-r border-gray-200 w-1/4">Amount (Rs.)</th>
+                <th className="px-3 py-2 border-r border-gray-200 w-1/4">Deductions</th>
+                <th className="px-3 py-2 w-1/4">Amount (Rs.)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -276,7 +283,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
                 );
               })}
               <tr className="bg-gray-100 font-bold divide-x divide-gray-300 border-t border-gray-300">
-                <td className="p-2">Total CTC</td>
+                <td className="p-2">Total Earnings</td>
                 <td className="p-2 text-right font-mono">{fmt(finalTotalCtc)}</td>
                 <td className="p-2">Total Deduction</td>
                 <td className="p-2 text-right font-mono">{fmt(finalTotalDeductions)}</td>
@@ -287,8 +294,8 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           {/* Net Pay Block */}
           <div className="grid grid-cols-2 border border-gray-300 rounded overflow-hidden text-sm font-bold divide-x divide-gray-300 mb-4">
             <div className="bg-green-50 p-3 flex justify-between items-center">
-              <span className="text-gray-700">{record.deduction && record.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}</span>
-              <span className="text-xl text-varistor-limeText font-black">{fmt(finalPay)}</span>
+              <span className="text-gray-700">Final Pay [In-Hand]</span>
+              <span className="text-xl text-varistor-limeText font-black">{fmt(record.netPay + (record.components?.reimbursement ?? 0) + (record.components?.overtime ?? 0) + (record.components?.incentives ?? 0) - (record.deduction ?? 0))}</span>
             </div>
             <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
               {record.deduction && record.deduction > 0 && (
@@ -379,6 +386,9 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           absent: att.absent || 0
         };
 
+        const clBal = clBalances[att.employee_id] ?? { total: 12, used: 0 };
+        const lopDays = computeLopDays(clBal);
+
         const comp = computeNet({
           monthlySalary,
           totalDays,
@@ -393,6 +403,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           otherDeductions,
           employeeId: att.employee_id,
           attendanceBreakdown,
+          lopDays,
           hasPf: payRec?.hasPf,
           hasEsi: payRec?.hasEsi,
           hasPt: payRec?.hasPt,
@@ -531,10 +542,14 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const tds = parseNumber(obj.tds ?? 0);
         const otherDeductions = parseNumber(obj.otherDeductions ?? 0);
 
+        const clBal = clBalances[employeeId] ?? { total: 12, used: 0 };
+        const lopDays = computeLopDays(clBal);
+
         const comp = computeNet({
           monthlySalary,
           totalDays,
           payDays,
+          lopDays,
           medical,
           ta,
           lta,
@@ -1433,10 +1448,10 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       const defaults = [
         { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
         { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
-        { code: "F3", name: "MEDICAL ALLOWANCE", equation: "1250" },
-        { code: "F4", name: "TA", equation: "2500" },
-        { code: "F5", name: "LTA", equation: "3500" },
-        { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, (($BS / $DIM) * ($SP + $SW + $SL + $SH)) - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
+        { code: "F3", name: "MEDICAL ALLOWANCE", equation: "Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))" },
+        { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
+        { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
+        { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, $BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
         { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
         { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
         { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
@@ -1905,14 +1920,18 @@ export const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit
 // ─── Admin Salary Engine ──────────────────────────────────────────────────────
 
 const FORMULAS = [
-  { component: 'Prorata', formula: '= round((monthly_salary / total_days) * pay_days)', auto: true },
-  { component: 'Basic', formula: '= round(prorata * 50%)', auto: true },
+  { component: 'Basic', formula: '= round(CTC * 50% / total_days * pay_days)', auto: true },
   { component: 'HRA', formula: '= round(basic * 50%)', auto: true },
+  { component: 'Medical Allowance', formula: '= round(1250 / total_days * pay_days)', auto: true },
+  { component: 'TA', formula: '= round(2500 / total_days * pay_days)', auto: true },
+  { component: 'LTA', formula: '= round(3500 / total_days * pay_days)', auto: true },
+  { component: 'Special Allowance', formula: '= max(0, Monthly CTC − (Basic + HRA + Medical + TA + LTA))', auto: true },
   { component: 'PF Employee', formula: '= 1800 if basic >= 15000 else round(basic * 12%)', auto: true },
   { component: 'ESI', formula: '= 0 if monthly_ctc > 21000 else ceil(gross * 3.25%)', auto: true },
   { component: 'PT', formula: '= 200 if gross >= 15001 else 0', auto: true },
-  { component: 'LOP Deduction', formula: '= (used_cl - cl_total) * (monthly_salary / total_days) if used > total else 0', auto: true },
+  { component: 'Net Pay', formula: '= Monthly CTC − Total Deductions', auto: true },
 ];
+
 
 const SalaryEngine: React.FC = () => {
   const { currentRole } = useVariPoints();
@@ -1940,16 +1959,80 @@ const SalaryEngine: React.FC = () => {
       getPayrollRecords(),
       fetchAllClBalances(),
     ]);
-    setRecords(data);
+    
+    let needsSync = false;
+    const updatedData = data.map(rec => {
+      if (rec.status === 'approved') return rec;
+      const clBal = balances[rec.employeeId] ?? { total: 12, used: 0 };
+      const lopDays = computeLopDays(clBal);
+      
+      const comp = computeNet({
+        monthlySalary: rec.monthlySalary ?? rec.ctc ?? 0,
+        monthlyCtc: rec.ctc,
+        totalDays: rec.totalDays,
+        payDays: rec.payDays,
+        lopDays: lopDays,
+        hasPf: rec.hasPf !== false,
+        hasEsi: rec.hasEsi !== false,
+        hasPt: rec.hasPt !== false,
+        employeeId: rec.employeeId,
+        attendanceBreakdown: rec.attendanceBreakdown,
+        basic: rec.components?.basic,
+        hra: rec.components?.hra,
+        reimbursement: rec.components?.reimbursement,
+        overtime: rec.components?.overtime,
+        incentives: rec.components?.incentives,
+      });
+
+      if (rec.netPay !== comp.netPay || JSON.stringify(rec.additionValues) !== JSON.stringify(comp.additionValues)) {
+        needsSync = true;
+        return {
+          ...rec,
+          components: {
+            ...rec.components,
+            basic: comp.additionValues[0],
+            hra: comp.additionValues[1],
+            medical: comp.additionValues[2],
+            ta: comp.additionValues[3],
+            lta: comp.additionValues[4],
+            specialAllowance: comp.additionValues[5]
+          },
+          deductionValues: comp.deductionValues,
+          additionValues: comp.additionValues,
+          gross: comp.gross,
+          deduction: comp.totalDeductions,
+          netPay: comp.netPay,
+        };
+      }
+      return rec;
+    });
+
+    setRecords(updatedData);
     setClBalances(balances);
     setLoading(false);
-    await syncPayrollToServer(data);
+    
+    if (needsSync) {
+      await syncPayrollToServer(updatedData);
+    } else {
+      await syncPayrollToServer(data);
+    }
   }, []);
 
    
   useEffect(() => { load(); }, [load]);
 
-  const monthRecords = records.filter(r => r.month === MONTH);
+  // Keep only the latest revision for each employee in the month to avoid duplicate keys and rows
+  const monthRecords = Object.values(
+    records
+      .filter(r => r.month === MONTH)
+      .reduce((acc, r) => {
+        const existing = acc[r.employeeId];
+        if (!existing || r.revision > existing.revision) {
+          acc[r.employeeId] = r;
+        }
+        return acc;
+      }, {} as Record<string, PayrollRecord>)
+  );
 
   const departments = ['All', ...Array.from(new Set(monthRecords.map(r => r.department)))];
 
@@ -2005,7 +2088,7 @@ const SalaryEngine: React.FC = () => {
     }
   };
 
-  const handleComponentChange = async (id: string, field: 'basic' | 'hra', value: string) => {
+  const handleComponentChange = async (id: string, field: 'basic' | 'hra' | 'reimbursement' | 'overtime', value: string) => {
     const val = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(val) || val < 0) return;
     const rec = records.find(r => r.id === id);
@@ -2291,7 +2374,10 @@ const SalaryEngine: React.FC = () => {
                         { key: null, label: 'LOP' },
                         { key: null, label: 'Basic' },
                         { key: null, label: 'HRA' },
+                        { key: null, label: 'Special Allowance' },
                         { key: null, label: 'Net Pay' },
+                        { key: null, label: 'Travel Allowance' },
+                        { key: null, label: 'Overtime' },
                         { key: null, label: 'Deductions' },
                         { key: null, label: 'Final Pay' },
                         { key: null, label: 'PF' },
@@ -2342,6 +2428,9 @@ const SalaryEngine: React.FC = () => {
                                 type="number"
                                 defaultValue={rec.ctc}
                                 onBlur={e => handleCTCChange(rec.id, e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
                                 className="w-28 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
                               />
                             ) : (
@@ -2356,6 +2445,9 @@ const SalaryEngine: React.FC = () => {
                                   type="number"
                                   defaultValue={clBal.total}
                                   onBlur={e => handleCLBalanceChange(rec.employeeId, e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                  }}
                                   min={0}
                                   className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
                                   title="Total CL days entitlement"
@@ -2381,13 +2473,51 @@ const SalaryEngine: React.FC = () => {
                               <span className="font-mono text-xs text-varistor-muted" title="Auto-calculated from CTC">{fmt(rec.components[f])}</span>
                             </td>
                           ))}
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-varistor-muted" title="Balancing amount to make Gross equal CTC">
+                              {fmt(rec.components.specialAllowance ?? 0)}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
+                          <td className="px-4 py-3">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="number"
+                                defaultValue={rec.components.reimbursement ?? 0}
+                                onBlur={e => handleComponentChange(rec.id, 'reimbursement', e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
+                                className="w-16 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                              />
+                            ) : (
+                              <span className="font-mono text-xs">{fmt(rec.components.reimbursement ?? 0)}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isAdmin && !isApproved ? (
+                              <input
+                                type="number"
+                                defaultValue={rec.components.overtime ?? 0}
+                                onBlur={e => handleComponentChange(rec.id, 'overtime', e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
+                                className="w-16 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                              />
+                            ) : (
+                              <span className="font-mono text-xs">{fmt(rec.components.overtime ?? 0)}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             {isAdmin && !isApproved ? (
                               <input
                                 type="number"
                                 defaultValue={rec.deduction ?? 0}
                                 onBlur={e => handleDeductionChange(rec.id, e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') e.currentTarget.blur();
+                                }}
                                 className="w-20 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
                               />
                             ) : (
@@ -2395,7 +2525,7 @@ const SalaryEngine: React.FC = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-varistor-limeText">
-                            {fmt(rec.netPay - (rec.deduction ?? 0))}
+                            {fmt(rec.netPay + (rec.components.reimbursement ?? 0) + (rec.components.overtime ?? 0) + (rec.components.incentives ?? 0) - (rec.deduction ?? 0))}
                           </td>
                           {/* PF checkbox */}
                           <td className="px-4 py-3 text-center">
@@ -2510,11 +2640,15 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   let dedValues = record.deductionValues;
 
   if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
+    const clBal = clBalances[record.employeeId] ?? { total: 12, used: 0 };
+    const lopDays = computeLopDays(clBal);
+
     const comp = computeNet({
       monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
       monthlyCtc: record.ctc,
       totalDays: record.totalDays,
       payDays: record.payDays,
+      lopDays: lopDays,
       medical: c.medical,
       ta: c.ta,
       lta: c.lta,

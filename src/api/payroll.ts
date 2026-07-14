@@ -215,6 +215,9 @@ export function computeNet(params: {
   medical?: number;
   ta?: number;
   lta?: number;
+  basic?: number;
+  hra?: number;
+  specialAllowance?: number;
   reimbursement?: number;
   incentives?: number;
   overtime?: number;
@@ -276,10 +279,10 @@ export function computeNet(params: {
     const defaultFormulas = [
       { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
       { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
-      { code: "F3", name: "MEDICAL ALLOWANCE", equation: "1250" },
-      { code: "F4", name: "TA", equation: "2500" },
-      { code: "F5", name: "LTA", equation: "3500" },
-      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, (($BS / $DIM) * ($SP + $SW + $SL + $SH)) - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
+      { code: "F3", name: "MEDICAL ALLOWANCE", equation: "Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "$BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)" },
       { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
       { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
       { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
@@ -288,6 +291,36 @@ export function computeNet(params: {
     if (formulas.length < 9) {
       formulas = defaultFormulas;
       localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaultFormulas));
+    } else {
+      // Migrate F3/F4/F5 to pro-rated formulas if they still use old flat values
+      let migrated = false;
+      const flatMed = /^1250$/;
+      const flatTa  = /^2500$/;
+      const flatLta = /^3500$/;
+      formulas = formulas.map((f: {code: string; name: string; equation: string}) => {
+        if ((f.code === 'F3' || f.name?.toUpperCase().includes('MEDICAL')) && flatMed.test(f.equation?.trim())) {
+          migrated = true;
+          return { ...f, equation: 'Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))' };
+        }
+        if ((f.code === 'F4' || f.name?.toUpperCase() === 'TA') && flatTa.test(f.equation?.trim())) {
+          migrated = true;
+          return { ...f, equation: 'Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))' };
+        }
+        if ((f.code === 'F5' || f.name?.toUpperCase() === 'LTA') && flatLta.test(f.equation?.trim())) {
+          migrated = true;
+          return { ...f, equation: 'Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))' };
+        }
+        // Migrate old pro-rata or clamped special allowance formula to raw CTC-based formula
+        if ((f.code === 'F6' || f.name?.toUpperCase().includes('SPECIAL')) &&
+            (f.equation?.includes('Math.max(0') || (f.equation?.includes('$DIM') && f.equation?.includes('$SP')))) {
+          migrated = true;
+          return { ...f, equation: '$BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)' };
+        }
+        return f;
+      });
+      if (migrated) {
+        localStorage.setItem('eopms_salary_formulas', JSON.stringify(formulas));
+      }
     }
     const detailsRaw = localStorage.getItem('eopms_employee_salary_details');
     if (detailsRaw) {
@@ -298,10 +331,8 @@ export function computeNet(params: {
   }
 
   // 2. Determine $BS (Base/Reference Amount)
-  let refAmt = monthlySalary;
-  if (params.employeeId && employeeDetails[params.employeeId] !== undefined) {
-    refAmt = employeeDetails[params.employeeId];
-  }
+  // Prioritize the passed monthlySalary (the record's CTC), falling back to master settings only if zero/undefined.
+  let refAmt = monthlySalary || (params.employeeId ? employeeDetails[params.employeeId] : 0) || 0;
 
   // 3. Determine attendance values
   const present = params.attendanceBreakdown?.present ?? payDays;
@@ -330,7 +361,24 @@ export function computeNet(params: {
     if (!headName) continue;
 
     const formula = formulas.find(f => f.name?.trim().toLowerCase() === headName.toLowerCase());
-    if (formula?.equation) {
+    
+    // Check for manual overrides first
+    if (headName.toLowerCase() === 'basic' && params.basic !== undefined) {
+      additionValues[i] = params.basic;
+    } else if (headName.toLowerCase() === 'hra' && params.hra !== undefined) {
+      additionValues[i] = params.hra;
+    } else if (headName.toLowerCase().includes('special') && params.specialAllowance !== undefined) {
+      additionValues[i] = params.specialAllowance;
+    } else if (['medical', 'medical allowance'].includes(headName.toLowerCase()) && params.medical !== undefined) {
+      additionValues[i] = params.medical;
+    } else if (['ta', 'travel allowance'].includes(headName.toLowerCase()) && params.ta !== undefined) {
+      additionValues[i] = params.ta;
+    } else if (['lta', 'leave travel allowance'].includes(headName.toLowerCase()) && params.lta !== undefined) {
+      additionValues[i] = params.lta;
+    } else if (headName.toLowerCase().includes('special')) {
+      const sumOtherAdditions = additionValues.reduce((acc, v, idx) => idx < i ? acc + v : acc, 0);
+      additionValues[i] = monthlySalary - sumOtherAdditions;
+    } else if (formula?.equation) {
       additionValues[i] = evaluateFormula(formula.equation, context);
     } else {
       // Fallback
@@ -340,18 +388,11 @@ export function computeNet(params: {
         const basicVal = context['$basic'] ?? Math.round(prorata * 0.5);
         additionValues[i] = Math.round(basicVal * 0.5);
       } else if (['medical', 'medical allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.medical ?? 1250;
-      } else if (['ta', 'travel allowance', 'transport allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.ta ?? 2500;
-      } else if (headName.toLowerCase() === 'lta') {
-        additionValues[i] = params.lta ?? 3500;
-      } else if (['special allowance', 'special'].includes(headName.toLowerCase())) {
-        const basicVal = context['$basic'] ?? Math.round(prorata * 0.5);
-        const hraVal = context['$hra'] ?? Math.round(basicVal * 0.5);
-        const medVal = params.medical ?? 1250;
-        const taVal = params.ta ?? 2500;
-        const ltaVal = params.lta ?? 3500;
-        additionValues[i] = Math.max(0, prorata - (basicVal + hraVal + medVal + taVal + ltaVal));
+        additionValues[i] = params.medical ?? Math.round(1250 / totalDays * payDays);
+      } else if (['ta', 'travel allowance'].includes(headName.toLowerCase())) {
+        additionValues[i] = params.ta ?? Math.round(2500 / totalDays * payDays);
+      } else if (['lta', 'leave travel allowance'].includes(headName.toLowerCase())) {
+        additionValues[i] = params.lta ?? Math.round(3500 / totalDays * payDays);
       } else {
         additionValues[i] = 0;
       }
@@ -416,14 +457,23 @@ export function computeNet(params: {
   const dailyRate = Math.round(monthlySalary / totalDays);
   const lopDeduction = lopDays * dailyRate;
 
-  const totalDeductions = deductionValues.reduce((a, b) => a + b, 0) + lopDeduction;
-  const netPay = gross - totalDeductions + (params.reimbursement ?? 0) + (params.incentives ?? 0) + (params.overtime ?? 0);
+  if (lopDeduction > 0) {
+    const emptyIdx = dedHeads.findIndex(h => !h || h.trim() === '');
+    if (emptyIdx !== -1) {
+      dedHeads[emptyIdx] = 'Loss of Pay';
+      deductionValues[emptyIdx] = lopDeduction;
+    }
+  }
+
+  const totalDeductions = deductionValues.reduce((a, b) => a + b, 0);
+  const netPay = gross - totalDeductions;
 
   // Return standard fields for compatibility
   const medical = context['$medical'] ?? context['$medicalallowance'] ?? 1250;
   const ta = context['$ta'] ?? context['$travelallowance'] ?? 2500;
   const lta = context['$lta'] ?? 3500;
-  const specialAllowance = context['$specialallowance'] ?? (prorata - (basic + (context['$hra'] ?? 0) + medical + ta + lta));
+  const specialAllowance = context['$specialallowance'] ?? context['$SPECIALALLOWANCE'] ??
+    (monthlySalary - (basic + (context['$hra'] ?? 0) + medical + ta + lta));
 
   return {
     monthlySalary,
@@ -749,16 +799,15 @@ export async function updatePayrollRecord(
   const updated: PayrollRecord = { ...rec, ...patch };
   const needsRecompute =
     patch.autoFormula ||
-    (updated.autoFormula && (
-      patch.monthlySalary !== undefined ||
-      patch.ctc !== undefined ||
-      patch.payDays !== undefined ||
-      patch.totalDays !== undefined ||
-      patch.hasPf !== undefined ||
-      patch.hasEsi !== undefined ||
-      patch.hasPt !== undefined
-    ));
+    patch.monthlySalary !== undefined ||
+    patch.ctc !== undefined ||
+    patch.payDays !== undefined ||
+    patch.totalDays !== undefined ||
+    patch.hasPf !== undefined ||
+    patch.hasEsi !== undefined ||
+    patch.hasPt !== undefined;
   if (needsRecompute) {
+    updated.autoFormula = true;
     if (patch.ctc !== undefined) {
       updated.monthlySalary = patch.ctc;
     } else if (patch.monthlySalary !== undefined) {
@@ -820,7 +869,7 @@ export async function updatePayrollRecord(
     const c = updated.components;
     const gross = c.basic + c.hra + c.medical + c.ta + c.lta + c.specialAllowance;
     const totalDeductions = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + c.otherDeductions;
-    updated.netPay = gross - totalDeductions + c.reimbursement + c.incentives + c.overtime;
+    updated.netPay = gross - totalDeductions;
   }
   _records[idx] = updated;
   savePayrollRecords(_records);
