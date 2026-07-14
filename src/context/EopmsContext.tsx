@@ -810,10 +810,6 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
     addToast(`${ruleTitle} applied: "${reason}"`, pointsAmount, transactionType);
-
-    // Async log to VP Audit Trail (Supabase)
-    const adminId = currentUser?.id ?? 'VAR-001'; // Fallback to an admin ID
-    vpAuditApi.logTransaction(adminId, pointsAmount, transactionType, reason, employeeId).catch(console.error);
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Megaphone, Camera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PerformanceMeter } from '../PerformanceMeter';
@@ -31,7 +31,7 @@ export const EmployeeDashboardView: React.FC = () => {
   const performanceScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const formatRelativeTime = (dateString: string) => {
-  // eslint-disable-next-line react-hooks/purity
+    // eslint-disable-next-line react-hooks/purity
     const diffMs = Date.now() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
@@ -96,23 +96,23 @@ export const EmployeeDashboardView: React.FC = () => {
             <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()} {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}{isBirthday() ? '! 🎉' : ''}</h1>
             <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser?.department ?? 'General'} Team · {currentUser?.role ?? mockStoreUser?.role ?? 'Employee'}</p>
             <div className="mt-2 flex items-center">
-            {isTracking ? (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
-                <MapPin size={12} />
-                Location sharing active
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                <AlertCircle size={12} />
-                Location sharing unavailable
-              </span>
-            )}
+              {isTracking ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
+                  <MapPin size={12} />
+                  Location sharing active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <AlertCircle size={12} />
+                  Location sharing unavailable
+                </span>
+              )}
             </div>
             {/* Inline avatar URL editor */}
             {editingAvatar && (
-              <ProfilePictureEditor 
-                onClose={() => setEditingAvatar(false)} 
-                className="absolute top-16 left-0 mt-2" 
+              <ProfilePictureEditor
+                onClose={() => setEditingAvatar(false)}
+                className="absolute top-16 left-0 mt-2"
               />
             )}
           </div>
@@ -127,7 +127,7 @@ export const EmployeeDashboardView: React.FC = () => {
 
       {/* 3-Column Layout Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-6 mt-4 md:mt-0">
-        
+
         {/* Column 1: Performance Meter & Today's Tasks */}
         <div className="space-y-6">
           <PerformanceMeter score={performanceScore} />
@@ -139,7 +139,7 @@ export const EmployeeDashboardView: React.FC = () => {
           <PointsBalance />
 
           {/* Announcements Card */}
-          <div 
+          <div
             onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'announcements' }))}
             className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md cursor-pointer"
           >
@@ -157,17 +157,16 @@ export const EmployeeDashboardView: React.FC = () => {
               ) : (
                 announcements.map((ann) => {
                   const isBirthday = ann.type === 'Birthday';
-                  
+
                   if (isBirthday) {
                     return (
-                      <div 
-                        key={ann.id} 
+                      <div
+                        key={ann.id}
                         onClick={() => readAnnouncement(ann.id)}
-                        className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${
-                          ann.isRead 
+                        className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${ann.isRead
                             ? 'border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface'
                             : 'border-varistor-lime bg-varistor-limeLight hover:bg-varistor-surface'
-                        }`}
+                          }`}
                       >
                         {!ann.isRead && (
                           <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-varistor-lime animate-pulse" />
@@ -177,7 +176,7 @@ export const EmployeeDashboardView: React.FC = () => {
                           <p className="text-[10px] text-varistor-muted mt-0.5 leading-relaxed truncate">{ann.content}</p>
                           <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-varistor-border border-dashed">
                             <span className="text-[9px] text-varistor-muted font-semibold uppercase">{ann.author_role} · {formatRelativeTime(ann.created_at)}</span>
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 reactToAnnouncement(ann.id, '🎉');
@@ -194,14 +193,13 @@ export const EmployeeDashboardView: React.FC = () => {
                   }
 
                   return (
-                    <div 
+                    <div
                       key={ann.id}
                       onClick={() => readAnnouncement(ann.id)}
-                      className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${
-                        ann.isRead 
+                      className={`p-3 border rounded-lg transition-varistor cursor-pointer relative ${ann.isRead
                           ? 'border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface'
                           : 'border-varistor-border bg-varistor-surface hover:bg-varistor-surfaceMuted'
-                      }`}
+                        }`}
                     >
                       {!ann.isRead && (
                         <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-varistor-lime animate-pulse" />
@@ -213,7 +211,7 @@ export const EmployeeDashboardView: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-[10px] text-varistor-muted mt-1 leading-normal truncate">{ann.content}</p>
-                      
+
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {ann.reactions.map((r) => {
                           if (r.count === 0 && !['👍', '❤️', '🎉'].includes(r.emoji)) return null;
@@ -225,11 +223,10 @@ export const EmployeeDashboardView: React.FC = () => {
                                 reactToAnnouncement(ann.id, r.emoji);
                                 readAnnouncement(ann.id);
                               }}
-                              className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                r.reactedByUser 
-                                  ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText font-bold' 
+                              className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border transition-all cursor-pointer ${r.reactedByUser
+                                  ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText font-bold'
                                   : 'bg-varistor-surfaceMuted border-varistor-border text-varistor-muted hover:bg-varistor-surface hover:border-varistor-muted'
-                              }`}
+                                }`}
                             >
                               <span>{r.emoji}</span>
                               {r.count > 0 && <span className="font-bold">{r.count}</span>}
@@ -248,7 +245,7 @@ export const EmployeeDashboardView: React.FC = () => {
         {/* Column 3: Leave Balance (Mocked for complete shell structure) */}
         <div className="space-y-6">
           {/* Leaves Tracker */}
-          <div 
+          <div
             onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'leaves' }))}
             className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[210px] justify-between transition-varistor hover:shadow-md cursor-pointer"
           >
@@ -286,7 +283,7 @@ export const EmployeeDashboardView: React.FC = () => {
           </div>
 
           {/* HR Document Vault Info Box */}
-          <div 
+          <div
             onClick={() => window.dispatchEvent(new CustomEvent('navigateTab', { detail: 'vault' }))}
             className="bg-gradient-to-tr from-varistor-surface to-varistor-surfaceMuted rounded-varistor border border-varistor-border p-5 shadow-varistor flex flex-col h-[280px] justify-between transition-varistor hover:shadow-md cursor-pointer"
           >

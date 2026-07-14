@@ -9,7 +9,7 @@ import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
 export const EmployeeManagementPortal: React.FC = () => {
-  const { currentRole, assertAdministrativePenalty, addToast } = useVariPoints();
+  const { currentRole, assertAdministrativeTransaction, addToast } = useVariPoints();
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);

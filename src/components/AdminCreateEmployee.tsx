@@ -41,6 +41,8 @@ const EMPTY_FORM: CreateEmployeeInput = {
   reportingManager: '',
   role: 'Employee',
   is_field_employee: false,
+  shiftStart: '09:30',
+  shiftEnd: '18:30',
   avatarUrl: '',
   dateOfJoining: new Date().toISOString().split('T')[0],
 };

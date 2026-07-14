@@ -71,6 +71,8 @@ export interface CreateEmployeeInput {
   dateOfJoining: string;
   dateOfBirth?: string;
   uanNumber?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -164,6 +166,8 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
   if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
   if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
+  if (input.shiftStart) extraUpdates.shift_start = input.shiftStart;
+  if (input.shiftEnd) extraUpdates.shift_end = input.shiftEnd;
 
   if (Object.keys(extraUpdates).length > 0) {
     await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
