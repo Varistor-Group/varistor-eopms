@@ -10,7 +10,7 @@ import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
 export const EmployeeManagementPortal: React.FC = () => {
-  const { currentRole, assertAdministrativePenalty, addToast } = useVariPoints();
+  const { currentRole, assertAdministrativeTransaction, addToast } = useVariPoints();
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'audit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -102,15 +102,10 @@ export const EmployeeManagementPortal: React.FC = () => {
       return;
     }
     setHrPointsLoading(true);
-    // Use existing assertAdministrativePenalty for debit, or a credit entry for credit
-    // Per existing pattern: assertAdministrativePenalty handles debit with reason + employeeId
     if (hrPointsType === 'debit') {
-      assertAdministrativePenalty('custom', hrPointsReason, pts, selectedHrId);
+      assertAdministrativeTransaction('custom_debit', hrPointsReason, pts, selectedHrId);
     } else {
-      // For credits to HR users, we follow the same pattern — use 'custom' with negative penalty (credit)
-      // The existing function only supports debit. For HR credits, log to activity and show toast.
-      // TODO: When connecting to Supabase, use a dedicated creditPoints(employeeId, points, reason) function.
-      addToast(`Vari Points credited: +${pts} VP to ${hrUsers.find(h => h.id === selectedHrId)?.fullName || 'HR user'} — "${hrPointsReason}"`, pts, 'credit');
+      assertAdministrativeTransaction('custom_credit', hrPointsReason, pts, selectedHrId);
     }
     // Reset form
     setHrPointsAmount('');

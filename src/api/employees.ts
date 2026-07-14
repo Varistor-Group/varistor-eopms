@@ -23,6 +23,8 @@ export interface Employee {
   variPoints: number;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 export type Department =
@@ -46,6 +48,8 @@ export interface CreateEmployeeInput {
   role: UserRole;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -67,6 +71,8 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     variPoints: (row.vari_points as number) ?? 0,
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
+    shiftStart: (row.shift_start as string) ?? undefined,
+    shiftEnd: (row.shift_end as string) ?? undefined,
   };
 }
 
@@ -115,7 +121,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     p_role: input.role,
     p_temp_password: tempPassword,
     p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: input.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=84CC16&color=fff&size=200&bold=true`,
+    p_avatar_url: input.avatarUrl ?? undefined,
   });
 
   if (rpcError) {
@@ -129,11 +135,19 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
   }
 
+  // Update shift start and end after creation if provided
+  if (input.shiftStart || input.shiftEnd) {
+    await supabase.from('employees').update({
+      shift_start: input.shiftStart ?? null,
+      shift_end: input.shiftEnd ?? null
+    }).eq('employee_id', input.employeeId);
+  }
+
   // Fetch the newly created employee row to return it
   const { data: empRow } = await supabase
     .from('employees')
     .select('*')
-    .eq('id', input.employeeId)
+    .eq('employee_id', input.employeeId)
     .single();
 
   // Create leave balance entry
@@ -188,6 +202,8 @@ export async function updateEmployee(
       ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
       ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
+      ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
+      ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
     })
     .eq('id', id)
     .select()

@@ -51,18 +51,22 @@ const AppContent: React.FC = () => {
       const dobDate = new Date(currentUser.dob);
       if (today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate()) {
         const title = `Today is ${currentUser.name}'s birthday! Wish them a great day! 🎂`;
+        const storageKey = `bday_posted_${currentUser.id}_${today.getFullYear()}_${today.getMonth()}_${today.getDate()}`;
+        
         // Prevent duplicate posts today
         const hasAnnounced = announcements.some(a => 
           a.type === 'Birthday' && 
           a.title === title && 
           new Date(a.created_at).toDateString() === today.toDateString()
         );
-        if (!hasAnnounced) {
+        
+        if (!hasAnnounced && !localStorage.getItem(storageKey)) {
+           localStorage.setItem(storageKey, 'true');
            addAnnouncement(title, 'Join us in wishing them the happiest of birthdays!', 'Birthday', 'Admin');
         }
       }
     }
-  }, [currentUser?.dob, currentUser?.name, announcements.length]);
+  }, [currentUser?.dob, currentUser?.name, currentUser?.id, announcements]);
 
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);

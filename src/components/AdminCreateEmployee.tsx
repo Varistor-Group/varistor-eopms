@@ -50,6 +50,8 @@ const EMPTY_FORM: CreateEmployeeInput = {
   role: 'Employee',
   is_field_employee: false,
   avatarUrl: '',
+  shiftStart: '09:30',
+  shiftEnd: '18:30',
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -353,6 +355,25 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 </div>
               </label>
             </div>
+
+            {/* Shift Timings */}
+            <Field label="Shift Start Time">
+              <input
+                type="time"
+                className={inputCls()}
+                value={form.shiftStart ?? ''}
+                onChange={set('shiftStart')}
+              />
+            </Field>
+            
+            <Field label="Shift End Time">
+              <input
+                type="time"
+                className={inputCls()}
+                value={form.shiftEnd ?? ''}
+                onChange={set('shiftEnd')}
+              />
+            </Field>
           </div>
 
           {/* Actions */}

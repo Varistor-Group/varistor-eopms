@@ -45,6 +45,8 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
     variPoints: (employee.variPoints ?? 0).toString(),
+    shiftStart: employee.shiftStart ?? '09:30',
+    shiftEnd: employee.shiftEnd ?? '18:30',
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -89,6 +91,8 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       role: form.role,
       status: form.status,
       variPoints: Number(form.variPoints),
+      shiftStart: form.shiftStart,
+      shiftEnd: form.shiftEnd,
     });
 
     if (!success || error) {
@@ -173,6 +177,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
 
             <Field label="Reporting Manager" required error={errors.reportingManager}>
               <input className={inputCls(!!errors.reportingManager)} value={form.reportingManager} onChange={set('reportingManager')} />
+            </Field>
+
+            <Field label="Shift Start Time">
+              <input type="time" className={inputCls()} value={form.shiftStart ?? ''} onChange={set('shiftStart')} />
+            </Field>
+            
+            <Field label="Shift End Time">
+              <input type="time" className={inputCls()} value={form.shiftEnd ?? ''} onChange={set('shiftEnd')} />
             </Field>
           </div>
 

@@ -5,9 +5,10 @@ import { mockEmployeeStore, getEmployees, type Employee } from '../api/employees
 import { vpAuditApi, type VpAuditLog } from '../api/vpAudit';
 
 export const EngineSimulationConsole: React.FC = () => {
-  const { currentRole, assertAdministrativePenalty } = useVariPoints();
-  const [penaltyType, setPenaltyType] = useState<'misconduct' | 'late_entry' | 'custom'>('misconduct');
-  const [penaltyReason, setPenaltyReason] = useState('');
+  const { currentRole, assertAdministrativeTransaction } = useVariPoints();
+  const [transactionMode, setTransactionMode] = useState<'debit' | 'credit'>('debit');
+  const [transactionType, setTransactionType] = useState<'misconduct' | 'late_entry' | 'custom_debit' | 'custom_credit'>('misconduct');
+  const [reason, setReason] = useState('');
   const [customPoints, setCustomPoints] = useState<number | ''>('');
   const [employeeId, setEmployeeId] = useState('');
   const [logs, setLogs] = useState<VpAuditLog[]>([]);
@@ -52,15 +53,16 @@ export const EngineSimulationConsole: React.FC = () => {
   };
 
 
-  const handleAssertPenalty = (e: React.FormEvent) => {
+  const handleAssertTransaction = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!penaltyReason.trim() || !employeeId) return;
+    if (!reason.trim() || !employeeId) return;
     
-    const pointsToDeduct = penaltyType === 'custom' ? Number(customPoints) : undefined;
-    if (penaltyType === 'custom' && (!pointsToDeduct || pointsToDeduct <= 0)) return;
+    const isCustom = transactionType === 'custom_debit' || transactionType === 'custom_credit';
+    const pointsToApply = isCustom ? Number(customPoints) : undefined;
+    if (isCustom && (!pointsToApply || pointsToApply <= 0)) return;
 
-    assertAdministrativePenalty(penaltyType, penaltyReason.trim(), pointsToDeduct, employeeId);
-    setPenaltyReason('');
+    assertAdministrativeTransaction(transactionType, reason.trim(), pointsToApply, employeeId);
+    setReason('');
     setCustomPoints('');
     setEmployeeId('');
 
@@ -83,30 +85,54 @@ export const EngineSimulationConsole: React.FC = () => {
     <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
       <div>
         <h1 className="text-xl font-bold text-varistor-dark">VP Management Console</h1>
-        <p className="text-xs text-varistor-muted mt-0.5">Administrative tools for testing and asserting manual Vari Points penalties.</p>
+        <p className="text-xs text-varistor-muted mt-0.5">Administrative tools for testing and asserting manual Vari Points transactions.</p>
       </div>
 
       <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor max-w-3xl overflow-hidden">
+        
+        {/* Toggle Mode */}
+        <div className="px-6 py-4 border-b border-varistor-border flex justify-between items-center bg-gray-50/50">
+           <div className="flex bg-white rounded-lg p-1 border border-varistor-border shadow-sm">
+             <button
+               type="button"
+               onClick={() => { setTransactionMode('debit'); setTransactionType('misconduct'); setCustomPoints(''); setReason(''); }}
+               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${transactionMode === 'debit' ? 'bg-red-50 text-red-600 shadow-sm border border-red-100' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               Debit (Penalty)
+             </button>
+             <button
+               type="button"
+               onClick={() => { setTransactionMode('credit'); setTransactionType('custom_credit'); setCustomPoints(''); setReason(''); }}
+               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${transactionMode === 'credit' ? 'bg-green-50 text-green-600 shadow-sm border border-green-100' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               Credit (Reward)
+             </button>
+           </div>
+        </div>
+
         <div className="px-6 py-5 border-b border-varistor-border">
            <div className="flex items-center gap-2">
-             <ShieldAlert size={18} className="text-varistor-dangerText animate-pulse" />
-             <h3 className="text-sm font-bold text-varistor-dark uppercase tracking-wider">Debit Points Adjustment</h3>
+             <ShieldAlert size={18} className={transactionMode === 'debit' ? "text-varistor-dangerText animate-pulse" : "text-varistor-limeText"} />
+             <h3 className="text-sm font-bold text-varistor-dark uppercase tracking-wider">{transactionMode === 'debit' ? 'Debit Points Adjustment' : 'Credit Points Adjustment'}</h3>
            </div>
            <p className="text-xs text-varistor-muted mt-2">
-             Test administrative penalties: **Office Misconduct** (debits <span className="font-bold">-50 VP</span>) or **Late Entry** (debits <span className="font-bold">-25 VP</span>).
+             {transactionMode === 'debit' 
+               ? <>Test administrative penalties: **Office Misconduct** (debits <span className="font-bold text-varistor-dangerText">-50 VP</span>) or **Late Entry** (debits <span className="font-bold text-varistor-dangerText">-25 VP</span>).</>
+               : <>Grant manual points for **Custom Credit** (e.g. Exceptional Performance, Overtime).</>
+             }
            </p>
         </div>
 
-        <div className="p-6 bg-varistor-dangerBg border-t border-varistor-dangerBorder">
-          <form onSubmit={handleAssertPenalty} className="space-y-4">
+        <div className={`p-6 border-t ${transactionMode === 'debit' ? 'bg-varistor-dangerBg border-varistor-dangerBorder' : 'bg-varistor-limeLight border-varistor-lime'}`}>
+          <form onSubmit={handleAssertTransaction} className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Employee Selection */}
               <div className="w-full sm:w-48">
-                <label className="text-[10px] text-varistor-dangerText font-bold uppercase tracking-wider block mb-1.5">Employee</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1.5 ${transactionMode === 'debit' ? 'text-varistor-dangerText' : 'text-varistor-limeText'}`}>Employee</label>
                 <select
                   value={employeeId}
                   onChange={(e) => setEmployeeId(e.target.value)}
-                  className="w-full bg-varistor-surface border border-varistor-dangerBorder rounded-lg px-3 py-2 text-xs text-varistor-dangerText focus:outline-none focus:border-varistor-dangerText"
+                  className={`w-full bg-varistor-surface border rounded-lg px-3 py-2 text-xs focus:outline-none ${transactionMode === 'debit' ? 'border-varistor-dangerBorder text-varistor-dangerText focus:border-varistor-dangerText' : 'border-varistor-lime text-varistor-limeText focus:border-varistor-lime'}`}
                   required
                 >
                   <option value="" disabled>Select Employee</option>
@@ -118,54 +144,63 @@ export const EngineSimulationConsole: React.FC = () => {
 
               {/* Type Selection */}
               <div className="w-full sm:w-48">
-                <label className="text-[10px] text-varistor-dangerText font-bold uppercase tracking-wider block mb-1.5">Penalty Type</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1.5 ${transactionMode === 'debit' ? 'text-varistor-dangerText' : 'text-varistor-limeText'}`}>Transaction Type</label>
                 <select
-                  value={penaltyType}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onChange={(e) => setPenaltyType(e.target.value as any)}
-                  className="w-full bg-varistor-surface border border-varistor-dangerBorder rounded-lg px-3 py-2 text-xs text-varistor-dangerText focus:outline-none focus:border-varistor-dangerText"
+                  value={transactionType}
+                  onChange={(e) => setTransactionType(e.target.value as any)}
+                  className={`w-full bg-varistor-surface border rounded-lg px-3 py-2 text-xs focus:outline-none ${transactionMode === 'debit' ? 'border-varistor-dangerBorder text-varistor-dangerText focus:border-varistor-dangerText' : 'border-varistor-lime text-varistor-limeText focus:border-varistor-lime'}`}
                 >
-                  <option value="misconduct">Office Misconduct (-50 VP)</option>
-                  <option value="late_entry">Late Entry (-25 VP)</option>
-                  <option value="custom">Custom Penalty</option>
+                  {transactionMode === 'debit' ? (
+                    <>
+                      <option value="misconduct">Office Misconduct (-50 VP)</option>
+                      <option value="late_entry">Late Entry (-25 VP)</option>
+                      <option value="custom_debit">Custom Penalty</option>
+                    </>
+                  ) : (
+                    <option value="custom_credit">Custom Credit</option>
+                  )}
                 </select>
               </div>
 
               <div className="flex-1">
-                <label className="text-[10px] text-varistor-dangerText font-bold uppercase tracking-wider block mb-1.5">Reason justification</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1.5 ${transactionMode === 'debit' ? 'text-varistor-dangerText' : 'text-varistor-limeText'}`}>Reason justification</label>
                 <input
                   type="text"
-                  placeholder={penaltyType === 'misconduct' ? "e.g. Policy breach in meeting rooms" : (penaltyType === 'late_entry' ? "e.g. Late check-in exceeding 15 minutes" : "e.g. Unauthorized absence")}
-                  value={penaltyReason}
-                  onChange={(e) => setPenaltyReason(e.target.value)}
-                  className="w-full bg-varistor-surface border border-varistor-dangerBorder rounded-lg px-3 py-2 text-xs text-varistor-dangerText focus:outline-none focus:border-varistor-dangerText transition-colors"
+                  placeholder={transactionMode === 'debit' ? (transactionType === 'misconduct' ? "e.g. Policy breach in meeting rooms" : (transactionType === 'late_entry' ? "e.g. Late check-in exceeding 15 minutes" : "e.g. Unauthorized absence")) : "e.g. Outstanding performance on client project"}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className={`w-full bg-varistor-surface border rounded-lg px-3 py-2 text-xs placeholder:opacity-50 focus:outline-none ${transactionMode === 'debit' ? 'border-varistor-dangerBorder text-varistor-dangerText focus:border-varistor-dangerText' : 'border-varistor-lime text-varistor-limeText focus:border-varistor-lime'}`}
                   required
                 />
               </div>
+            </div>
 
-              {penaltyType === 'custom' && (
-                <div className="w-full sm:w-32">
-                  <label className="text-[10px] text-varistor-dangerText font-bold uppercase tracking-wider block mb-1.5">Points to Deduct</label>
+            {/* Custom Points Input */}
+            {(transactionType === 'custom_debit' || transactionType === 'custom_credit') && (
+              <div className="pt-2">
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1.5 ${transactionMode === 'debit' ? 'text-varistor-dangerText' : 'text-varistor-limeText'}`}>Custom Points Amount</label>
+                <div className="relative w-48">
                   <input
                     type="number"
                     min="1"
                     placeholder="e.g. 100"
                     value={customPoints}
-                    onChange={(e) => setCustomPoints(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full bg-varistor-surface border border-varistor-dangerBorder rounded-lg px-3 py-2 text-xs text-varistor-dangerText focus:outline-none focus:border-varistor-dangerText transition-colors"
+                    onChange={(e) => setCustomPoints(Number(e.target.value) || '')}
+                    className={`w-full bg-varistor-surface border rounded-lg px-3 py-2 text-xs focus:outline-none ${transactionMode === 'debit' ? 'border-varistor-dangerBorder text-varistor-dangerText focus:border-varistor-dangerText' : 'border-varistor-lime text-varistor-limeText focus:border-varistor-lime'}`}
                     required
                   />
+                  <div className={`absolute right-3 top-2 text-xs font-bold ${transactionMode === 'debit' ? 'text-varistor-dangerText/50' : 'text-varistor-limeText/50'}`}>VP</div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex gap-3 justify-end pt-2">
+            <div className="pt-4 flex justify-end">
               <button
                 type="submit"
-                className="bg-red-700 hover:bg-red-800 text-white px-5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
+                className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-transform active:scale-95 ${transactionMode === 'debit' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-varistor-lime hover:bg-[#6edc00] text-varistor-limeText shadow-lg shadow-varistor-lime/20'}`}
               >
-                <AlertTriangle size={14} />
-                Submit Debit
+                <AlertTriangle size={16} />
+                {transactionMode === 'debit' ? 'Submit Debit' : 'Submit Credit'}
               </button>
             </div>
           </form>
