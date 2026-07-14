@@ -41,7 +41,7 @@ const FieldTrackerBackground: React.FC = () => {
 const AppContent: React.FC = () => {
   const { currentRole, currentUser, setCurrentUser, policyNotification, setPolicyNotification } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
-  const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole);
+  const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole, currentUser?.department);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
