@@ -6,7 +6,6 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
-import { RoleSwitcher } from './components/RoleSwitcher';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -39,7 +38,7 @@ const FieldTrackerBackground: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, currentUser, setCurrentUser, setCurrentRole } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -160,9 +159,6 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Live Role Switcher */}
-            <RoleSwitcher currentRole={currentRole} setCurrentRole={setCurrentRole} />
-
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleTheme}
