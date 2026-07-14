@@ -16,29 +16,35 @@ import {
   ScrollText,
   ClipboardCheck,
   ListChecks,
-  Download
+  Download,
+  LogOut,
+  Camera
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { ProfilePictureEditor } from './ProfilePictureEditor';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isOpenMobile: boolean;
   setIsOpenMobile: (open: boolean) => void;
+  onLogout: () => void;
+  trainingLocked?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   isOpenMobile,
-  setIsOpenMobile
+  setIsOpenMobile,
+  onLogout,
+  trainingLocked = false
 }) => {
   const { currentRole, currentUser } = useVariPoints();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -50,21 +56,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
-
-  // Lock body scroll when mobile sidebar is open
-  useEffect(() => {
-    if (isOpenMobile) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.touchAction = 'none';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.touchAction = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.touchAction = '';
-    };
-  }, [isOpenMobile]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -81,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (currentRole === 'Admin') {
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'admin', label: 'Employee Master', icon: UserPlus, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
@@ -99,7 +90,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (currentRole === 'HR') {
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'admin', label: 'Create Employee', icon: UserPlus, enabled: true },
+      { id: 'admin', label: 'Employee Master', icon: UserPlus, enabled: true },
+      { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
       { id: 'field-tracker', label: 'Field Tracking', icon: MapPin, enabled: true },
       { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
@@ -139,6 +131,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
+    
+    // Add Field Punch tab if the role is Field Employee
+    if (currentRole === 'Field Employee') {
+      menuItems.splice(3, 0, { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
+    }
+  }
+
+  if (trainingLocked) {
+    menuItems = menuItems.map(item => ({ ...item, enabled: item.id === 'training' }));
   }
 
   const handleTabClick = (itemId: string, enabled: boolean) => {
@@ -176,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Non-enabled Module Tooltip */}
             {!item.enabled && (
               <span className="absolute left-full ml-2 px-2 py-1 text-xs bg-varistor-dark text-varistor-pageBg rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-nowrap">
-                Owned by another intern
+                {trainingLocked ? 'Complete your training first' : 'Owned by another intern'}
               </span>
             )}
           </button>
@@ -188,11 +189,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar Shell */}
-      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-varistor-surface border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px] pt-safe pb-safe pl-safe">
+      <aside className="fixed inset-y-0 left-0 hidden lg:flex flex-col bg-varistor-surface border-r border-varistor-border transition-all duration-300 z-30 lg:w-[220px] w-[70px]">
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             <div className="lg:flex flex-col hidden">
               <span className="text-[10px] font-bold text-varistor-muted mt-0.5 tracking-widest uppercase">EOPMS v1.0</span>
             </div>
@@ -216,18 +217,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* User Card (Bottom) */}
-        <div className="p-4 border-t border-varistor-border lg:block hidden">
-          <div className="flex items-center gap-3">
-            <img
-              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
-              alt={currentUser?.name ?? 'User'}
-              className="w-9 h-9 rounded-full object-cover border border-varistor-border"
-            />
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-varistor-dark truncate">{currentUser?.name ?? 'User'}</p>
-              <p className="text-[10px] text-varistor-muted truncate">{currentUser?.department ?? ''}</p>
-            </div>
+        <div className="p-4 border-t border-varistor-border lg:block hidden relative">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              className="flex items-center gap-3 focus:outline-none text-left hover:opacity-80 transition-opacity min-w-0"
+            >
+              <img
+                src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+                alt={currentUser?.name ?? 'User'}
+                className="w-9 h-9 rounded-full object-cover border border-varistor-border shrink-0"
+              />
+              <div className="overflow-hidden">
+                <p className="text-xs font-semibold text-varistor-dark truncate">{currentUser?.name ?? 'User'}</p>
+                <p className="text-[10px] text-varistor-muted truncate">{currentUser?.department ?? ''}</p>
+              </div>
+            </button>
+            <button
+              onClick={onLogout}
+              title="Logout"
+              className="p-1.5 rounded-lg text-varistor-muted hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+            >
+              <LogOut size={16} strokeWidth={1.8} />
+            </button>
           </div>
+          {/* Profile Dropdown */}
+          {isProfileMenuOpen && (
+            <div className="absolute bottom-[calc(100%+8px)] left-0 w-full px-4 z-50">
+              <ProfilePictureEditor onClose={() => setIsProfileMenuOpen(false)} className="w-full relative shadow-xl" />
+            </div>
+          )}
         </div>
       </aside>
 
@@ -240,11 +259,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Mobile Drawer Shell */}
-      <aside className={`fixed inset-y-0 left-0 bg-varistor-surface w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden pt-safe pb-safe pl-safe ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 bg-varistor-surface w-64 max-w-xs flex flex-col z-[1000] transform transition-transform duration-200 lg:hidden ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             <div>
               <span className="font-semibold text-varistor-dark">Varistor EOPMS</span>
             </div>
@@ -271,18 +290,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        <div className="p-4 border-t border-varistor-border">
-          <div className="flex items-center gap-3">
-            <img
-              src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
-              alt={currentUser?.name ?? 'User'}
-              className="w-10 h-10 rounded-full object-cover"
-            />
-            <div>
-              <p className="text-sm font-semibold text-varistor-dark">{currentUser?.name ?? 'User'}</p>
-              <p className="text-xs text-varistor-muted">{currentUser?.department ?? ''}</p>
-            </div>
+        <div className="p-4 border-t border-varistor-border relative">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              className="flex items-center gap-3 focus:outline-none text-left hover:opacity-80 transition-opacity min-w-0"
+            >
+              <img
+                src={currentUser?.avatarUrl ?? 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff'}
+                alt={currentUser?.name ?? 'User'}
+                className="w-10 h-10 rounded-full object-cover shrink-0"
+              />
+              <div className="overflow-hidden">
+                <p className="text-sm font-semibold text-varistor-dark truncate">{currentUser?.name ?? 'User'}</p>
+                <p className="text-xs text-varistor-muted truncate">{currentUser?.department ?? ''}</p>
+              </div>
+            </button>
+            <button
+              onClick={onLogout}
+              title="Logout"
+              className="p-1.5 rounded-lg text-varistor-muted hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+            >
+              <LogOut size={20} strokeWidth={1.8} />
+            </button>
           </div>
+          {/* Profile Dropdown */}
+          {isProfileMenuOpen && (
+            <div className="absolute bottom-[calc(100%+8px)] left-0 w-full px-4 z-50">
+              <ProfilePictureEditor onClose={() => setIsProfileMenuOpen(false)} className="w-full relative shadow-xl" />
+            </div>
+          )}
         </div>
       </aside>
     </>

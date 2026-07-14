@@ -165,7 +165,7 @@ export interface ChatChannel {
   memberCount: number;
   pinned?: string;
   allowedEmployeeIds?: string[]; // If defined, only these employees can access the channel
-  department?: string;           // If defined, only employees in this department can access the channel
+  departments?: string[];        // If defined, employees in these departments can access the channel
 }
 
 export interface ChatAttachment {
@@ -191,6 +191,7 @@ export interface ChatMessage {
   attachment?: ChatAttachment;
   reactions?: ChatReaction[];
   timestamp: string;
+  edited?: boolean;
 }
 
 // ─── Training (Task B) ──────────────────────────────────────────────────────

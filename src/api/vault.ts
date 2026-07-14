@@ -10,11 +10,6 @@ import { encryptFile, decryptFile, getMasterKey } from '../utils/crypto';
 
 const BUCKET = 'employee-documents';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const slotsDb = () => (supabase as any).from('employee_document_slots');
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const templatesDb = () => (supabase as any).from('document_templates');
-
 export interface VaultDocument {
   id: string;
   name: string;
@@ -213,7 +208,8 @@ function rowToTemplate(row: any): DocumentTemplate {
 }
 
 export async function getDocumentTemplates(): Promise<DocumentTemplate[]> {
-  const { data, error } = await templatesDb()
+  const { data, error } = await supabase
+    .from('document_templates')
     .select('*')
     .order('sort_order', { ascending: true });
   if (error) { console.error('[getDocumentTemplates]', error.message); return []; }
@@ -225,7 +221,8 @@ export async function createDocumentTemplate(
   description: string,
   isRequired: boolean
 ): Promise<{ success: boolean; template?: DocumentTemplate; error: string | null }> {
-  const { data, error } = await templatesDb()
+  const { data, error } = await supabase
+    .from('document_templates')
     .insert({ name: name.trim(), description: description.trim(), is_required: isRequired, is_active: true })
     .select()
     .single();
@@ -242,8 +239,9 @@ export async function updateDocumentTemplate(
   if (patch.isActive !== undefined)   dbPatch.is_active   = patch.isActive;
   if (patch.name !== undefined)       dbPatch.name        = patch.name;
   if (patch.description !== undefined) dbPatch.description = patch.description;
-  const { data, error } = await templatesDb()
-    .update(dbPatch)
+  const { data, error } = await supabase
+    .from('document_templates')
+    .update(dbPatch as any)
     .eq('id', templateId)
     .select()
     .single();
@@ -254,7 +252,8 @@ export async function updateDocumentTemplate(
 export async function deleteDocumentTemplate(
   templateId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await templatesDb()
+  const { error } = await supabase
+    .from('document_templates')
     .delete()
     .eq('id', templateId);
   if (error) return { success: false, error: error.message };
@@ -286,7 +285,8 @@ function rowToSlot(row: any): EmployeeDocumentSlot {
 export async function getEmployeeDocumentSlots(
   employeeId: string
 ): Promise<EmployeeDocumentSlot[]> {
-  const { data, error } = await slotsDb()
+  const { data, error } = await supabase
+    .from('employee_document_slots')
     .select('*, documents(filename, storage_path)')
     .eq('employee_id', employeeId)
     .order('created_at', { ascending: true });
@@ -297,8 +297,7 @@ export async function getEmployeeDocumentSlots(
 export async function seedEmployeeSlots(
   employeeId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).rpc('seed_employee_document_slots', { p_employee_id: employeeId });
+  const { error } = await supabase.rpc('seed_employee_document_slots' as any, { p_employee_id: employeeId });
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
 }
@@ -309,7 +308,8 @@ export async function addCustomSlotForEmployee(
   isRequired: boolean,
   notes?: string
 ): Promise<{ success: boolean; slot?: EmployeeDocumentSlot; error: string | null }> {
-  const { data, error } = await slotsDb()
+  const { data, error } = await supabase
+    .from('employee_document_slots')
     .insert({
       employee_id: employeeId,
       template_id: null,
@@ -328,7 +328,8 @@ export async function updateSlotRequirement(
   slotId: string,
   isRequired: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .update({ is_required: isRequired })
     .eq('id', slotId);
   if (error) return { success: false, error: error.message };
@@ -340,7 +341,8 @@ export async function updateSlotStatus(
   status: DocumentStatus,
   performedBy: string = 'hr@varistor.in'
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .update({ status })
     .eq('id', slotId);
   if (error) return { success: false, error: error.message };
@@ -357,7 +359,8 @@ export async function updateSlotNotes(
   slotId: string,
   notes: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .update({ notes })
     .eq('id', slotId);
   if (error) return { success: false, error: error.message };
@@ -367,7 +370,8 @@ export async function updateSlotNotes(
 export async function removeCustomSlot(
   slotId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .delete()
     .eq('id', slotId)
     .eq('is_custom', true);
@@ -379,7 +383,8 @@ export async function linkDocumentToSlot(
   slotId: string,
   documentId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .update({ document_id: documentId, status: 'Pending' })
     .eq('id', slotId);
   if (error) return { success: false, error: error.message };
@@ -394,10 +399,39 @@ export async function syncTemplateSlotsRequirement(
   templateId: string,
   isRequired: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await slotsDb()
+  const { error } = await supabase
+    .from('employee_document_slots')
     .update({ is_required: isRequired })
     .eq('template_id', templateId)
     .eq('is_custom', false);
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };
+}
+
+export async function getEmployeesWithPendingDocuments(): Promise<{ pending: Set<string>, seeded: Set<string> }> {
+  const { data, error } = await supabase
+    .from('employee_document_slots')
+    .select('employee_id, document_id, status, is_required');
+
+  if (error) {
+    console.error('[getEmployeesWithPendingDocuments]', error.message);
+    return { pending: new Set(), seeded: new Set() };
+  }
+  
+  const seededSet = new Set<string>();
+  const unverifiedCounts: Record<string, number> = {};
+  
+  for (const row of (data || [])) {
+    seededSet.add(row.employee_id);
+    if (row.is_required && (!row.document_id || row.status !== 'Verified')) {
+      unverifiedCounts[row.employee_id] = (unverifiedCounts[row.employee_id] || 0) + 1;
+    }
+  }
+  
+  const pendingSet = new Set<string>();
+  for (const [empId, count] of Object.entries(unverifiedCounts)) {
+    if (count > 0) pendingSet.add(empId);
+  }
+  
+  return { pending: pendingSet, seeded: seededSet };
 }

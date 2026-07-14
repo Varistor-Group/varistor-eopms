@@ -57,7 +57,7 @@ export const ResetPassword: React.FC = () => {
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
             <div className="bg-[#111111] p-2.5 rounded-xl shadow-sm border border-[#111111]/20 flex items-center justify-center">
-              <img src="/logo.png" alt="Varistor Logo" className="h-8 md:h-10 w-auto object-contain block" />
+              <img src="/logo.png" alt="Varistor Logo" className="h-8 md:h-10 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             </div>
           </div>
           <h1 className="text-3xl md:text-5xl font-bold text-[#111111] leading-tight mb-4">

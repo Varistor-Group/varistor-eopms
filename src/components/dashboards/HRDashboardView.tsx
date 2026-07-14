@@ -3,14 +3,19 @@ import { Users, Calendar, FileText, Megaphone, Camera, CheckCircle, Clock } from
 import confetti from 'canvas-confetti';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
-import { mockEmployeeStore } from '../../api/employees';
+import { getEmployees, type Employee } from '../../api/employees';
 import { getLeaveRequests } from '../../api/leaves';
 
 export const HRDashboardView: React.FC = () => {
   const { currentUser } = useVariPoints();
   const [editingAvatar, setEditingAvatar] = useState(false);
 
-  const employees = mockEmployeeStore;
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  React.useEffect(() => {
+    getEmployees().then(setEmployees);
+  }, []);
+
   const allLeaves = getLeaveRequests();
   const pendingLeaves = allLeaves.filter(l => l.status === 'Pending');
   const approvedThisMonth = allLeaves.filter(l => {

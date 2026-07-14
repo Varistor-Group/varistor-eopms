@@ -82,11 +82,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           dob: user.role === 'Admin' ? new Date().toISOString().split('T')[0] : undefined, // Test DOB for Admin
         };
         setCurrentUser(loggedInUser);
-
-        // Persist session to localStorage for auto-restore on app restart
-        localStorage.setItem('eopms_current_user', JSON.stringify(loggedInUser));
-        localStorage.setItem('eopms_role', user.role);
-
         const isFirstLogin = !localStorage.getItem('eopms_first_login_done');
         if (isFirstLogin) {
           localStorage.setItem('eopms_first_login_done', 'true');
@@ -137,7 +132,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="max-w-md mx-auto md:mx-0 w-full">
           <div className="mb-8">
             <div className="inline-block bg-brand-ink p-3 md:p-4 rounded-[16px] shadow-sm border border-brand-ink/20">
-              <img src="/logo.png" alt="Varistor Logo" className="h-8 md:h-10 w-auto object-contain block" />
+              <img src="/logo.png" alt="Varistor Logo" className="h-8 md:h-10 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             </div>
           </div>
           <h1 className="text-3xl md:text-5xl font-bold text-brand-ink leading-tight mb-4">

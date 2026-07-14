@@ -6,30 +6,34 @@ import fs from 'fs/promises';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
-import cron from 'node-cron';
 import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
-const app = express();
-const port = 3001;
+// ── Supabase Admin client (service role — server-side only) ───────────────────
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-// Initialize Supabase Client for backend tasks
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const app = express();
+const port = process.env.PORT || 3001;
 
 app.use(express.json());
 
 // ── Nodemailer SMTP transporter ────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: process.env.SMTP_SECURE === 'true',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false, // true for 465, false for other ports
+  requireTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 transporter.verify((error) => {
@@ -99,6 +103,25 @@ app.post('/api/send-password-reset', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
+    // Generate a real Supabase password reset link via Admin API
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${process.env.APP_URL || 'http://localhost:5173'}/reset-password`,
+      },
+    });
+
+    if (linkError) {
+      console.error('[send-password-reset] generateLink error:', linkError);
+      return res.status(400).json({ success: false, error: linkError.message || 'Could not generate reset link. Check that this email exists in the system.' });
+    }
+
+    const resetLink = linkData.properties?.action_link;
+    if (!resetLink) {
+      return res.status(500).json({ success: false, error: 'Reset link generation failed — no link returned.' });
+    }
+
     await transporter.sendMail({
       from: `"Varistor EOPMS" <${process.env.SMTP_USER}>`,
       to: email,
@@ -111,7 +134,7 @@ app.post('/api/send-password-reset', async (req, res) => {
           <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
             <h2 style="font-size: 18px; font-weight: 600; color: #111;">Password Reset Requested</h2>
             <p style="color: #444; line-height: 1.6;">We received a request to reset the password for your Varistor EOPMS account.</p>
-            <a href="${process.env.APP_URL || 'http://localhost:5173'}/reset?token=PENDING_REAL_TOKEN" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
+            <a href="${resetLink}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
             <p style="color: #444; line-height: 1.6; margin-top: 24px;">If you did not request this, please ignore this email. Your password will not be changed.</p>
             <p style="color: #888; font-size: 12px; margin-top: 32px;">This link expires in 1 hour.</p>
           </div>
@@ -364,13 +387,6 @@ const numberToWords = (num) => {
   return `Rupees ${rupeesStr.trim()}${paiseStr} Only`;
 };
 
-const getDaysInMonth = (monthStr) => {
-  if (!monthStr) return 30;
-  const d = new Date(monthStr);
-  if (isNaN(d.getTime())) return 30;
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-};
-
 // Generate A4 Salary Slip PDF buffer using pdfkit
 const generateSalarySlipPDF = (slip) => {
   return new Promise((resolve, reject) => {
@@ -436,9 +452,9 @@ const generateSalarySlipPDF = (slip) => {
 
       // Row 3
       doc.font('Helvetica-Bold').text('No. of Days', 45, 156);
-      doc.font('Helvetica').text(String(slip.totalDays || getDaysInMonth(slip.month || 'June 2026')), 155, 156);
+      doc.font('Helvetica').text(String(slip.totalDays || 30), 155, 156);
       doc.font('Helvetica-Bold').text('Paid No. of Days', 302, 156);
-      doc.font('Helvetica').text(String(slip.payDays || getDaysInMonth(slip.month || 'June 2026')), 405, 156);
+      doc.font('Helvetica').text(String(slip.payDays || 30), 405, 156);
 
       // Row 4
       doc.font('Helvetica-Bold').text('PF UAN No.', 45, 174);
@@ -457,59 +473,34 @@ const generateSalarySlipPDF = (slip) => {
       doc.text('Amount (Rs.)', 470, 191, { align: 'right', width: 80 });
 
       // Table Row Content
-      let earnings = [];
-      let deductions = [];
+      const earnings = [
+        { label: 'Salary', val: slip.monthlySalary },
+        { label: 'Basic', val: slip.basic },
+        { label: 'HRA', val: slip.hra },
+        { label: 'Medical', val: slip.medical },
+        { label: 'TA', val: slip.ta },
+        { label: 'LTA', val: slip.lta },
+        { label: 'Special Allowance', val: slip.specialAllowance },
+        { label: 'Reimbursement', val: slip.reimbursement },
+        { label: 'Incentives', val: slip.incentives },
+        { label: 'OT Hours', val: slip.overtime },
+      ];
 
-      if (Array.isArray(slip.additionHeads) && slip.additionHeads.length > 0 && Array.isArray(slip.additionValues) &&
-          Array.isArray(slip.deductionHeads) && slip.deductionHeads.length > 0 && Array.isArray(slip.deductionValues)) {
-        for (let i = 0; i < 10; i++) {
-          earnings.push({
-            label: slip.additionHeads[i] || '',
-            val: (slip.additionHeads[i] && slip.additionValues[i] !== undefined) ? slip.additionValues[i] : null
-          });
-          deductions.push({
-            label: slip.deductionHeads[i] || '',
-            val: (slip.deductionHeads[i] && slip.deductionValues[i] !== undefined) ? slip.deductionValues[i] : null
-          });
-        }
-      } else {
-        earnings = [
-          { label: 'Basic', val: slip.basic },
-          { label: 'HRA', val: slip.hra },
-          { label: 'Medical', val: slip.medical },
-          { label: 'TA', val: slip.ta },
-          { label: 'LTA', val: slip.lta },
-          { label: 'Special Allowance', val: slip.specialAllowance },
-          { label: 'Reimbursement', val: slip.reimbursement },
-          { label: 'Incentives', val: slip.incentives },
-          { label: 'OT Hours', val: slip.overtime },
-          { label: '', val: null },
-        ];
-
-        deductions = [
-          { label: 'PF Employee', val: slip.pfEmployee },
-          { label: 'PF Employer', val: slip.pfEmployer },
-          { label: 'ESI', val: slip.esi },
-          { label: 'PT', val: slip.pt },
-          { label: 'TDS', val: slip.tds },
-          { label: 'Other Deductions', val: slip.otherDeductions },
-          { label: '', val: null },
-          { label: '', val: null },
-          { label: '', val: null },
-          { label: '', val: null },
-        ];
-      }
-
-      let maxPdfRows = 0;
-      for (let i = 0; i < 10; i++) {
-        if (earnings[i].label || deductions[i].label) {
-          maxPdfRows = i + 1;
-        }
-      }
-      if (maxPdfRows === 0) maxPdfRows = 10;
+      const deductions = [
+        { label: 'PF Employee', val: slip.pfEmployee },
+        { label: 'PF Employer', val: slip.pfEmployer },
+        { label: 'ESI', val: slip.esi },
+        { label: 'PT', val: slip.pt },
+        { label: 'TDS', val: slip.tds },
+        { label: 'Other Deductions', val: slip.otherDeductions },
+        { label: '', val: null },
+        { label: '', val: null },
+        { label: '', val: null },
+        { label: '', val: null },
+      ];
 
       let currentY = 204;
-      for (let idx = 0; idx < maxPdfRows; idx++) {
+      for (let idx = 0; idx < 10; idx++) {
         const earn = earnings[idx];
         doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
         if (earn.label) {
@@ -520,7 +511,7 @@ const generateSalarySlipPDF = (slip) => {
         }
 
         const deduct = deductions[idx];
-        if (deduct && deduct.label) {
+        if (deduct.label) {
           doc.text(deduct.label, 302, currentY + 3);
           if (deduct.val !== null && deduct.val !== undefined) {
             doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
@@ -533,14 +524,6 @@ const generateSalarySlipPDF = (slip) => {
         currentY += 16;
       }
 
-      let finalTotalCtc = 0;
-      earnings.forEach(e => { if (e.val) finalTotalCtc += e.val; });
-      if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
-
-      let finalTotalDeductions = 0;
-      deductions.forEach(d => { if (d.val) finalTotalDeductions += d.val; });
-      if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
-
       // Vertical lines for the table grid
       doc.lineWidth(1).strokeColor('#cccccc');
       doc.moveTo(40, 186).lineTo(40, currentY).stroke();
@@ -552,19 +535,12 @@ const generateSalarySlipPDF = (slip) => {
       // Totals Row
       doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
       
-      const pdfTotalCtc = (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
-        ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
-        : (slip.ctc || 0);
-      const pdfTotalDeductions = (Array.isArray(slip.deductionValues) && slip.deductionValues.length > 0)
-        ? slip.deductionValues.reduce((a, b) => a + (b || 0), 0)
-        : (slip.deductions || 0);
-
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
       doc.text('Total CTC', 45, currentY + 5);
-      doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
+      doc.text(fmt(slip.ctc), 210, currentY + 5, { align: 'right', width: 82 });
       
       doc.text('Total Deduction', 302, currentY + 5);
-      doc.text(fmt(pdfTotalDeductions), 470, currentY + 5, { align: 'right', width: 80 });
+      doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
 
       // Outlines for Totals row
       doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
@@ -577,31 +553,20 @@ const generateSalarySlipPDF = (slip) => {
       
       currentY += 20;
 
-      const finalPay = slip.netPay - (slip.deduction || 0);
-
       // Net Pay Row
       doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
       doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
       
       doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
+      doc.text('NetPay [In-Hand]', 45, currentY + 13);
       
-      if (slip.deduction && slip.deduction > 0) {
-        doc.text('Final Pay [In-Hand]', 45, currentY + 13);
-        doc.fontSize(14).font('Helvetica-Bold');
-        doc.text(fmt(finalPay), 150, currentY + 11, { align: 'right', width: 140 });
+      doc.fontSize(14).font('Helvetica-Bold');
+      doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
 
-        const words = numberToWords(finalPay);
-        doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
-        doc.text(`Net Pay: ${fmt(slip.netPay)} | Deduction: ${fmt(slip.deduction)}\n${words}`, 305, currentY + 7, { width: 242, align: 'center' });
-      } else {
-        doc.text('NetPay [In-Hand]', 45, currentY + 13);
-        doc.fontSize(14).font('Helvetica-Bold');
-        doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
-
-        const words = numberToWords(slip.netPay);
-        doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
-        doc.text(words, 305, currentY + 14, { width: 242, align: 'center' });
-      }
+      // Number to Words
+      const words = numberToWords(slip.netPay);
+      doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
+      doc.text(words, 305, currentY + 8, { width: 242, align: 'center' });
 
       // Borders for Net Pay row
       doc.moveTo(40, currentY + 36).lineTo(555, currentY + 36).stroke();
@@ -639,109 +604,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
     const buildSlipHtml = (slip) => {
       const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const finalPay = slip.netPay - (slip.deduction || 0);
-      const words = numberToWords(finalPay);
-
-      let rowsHtml = '';
-      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
-          Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues)) {
-        let maxRows = 0;
-        for (let i = 0; i < 10; i++) {
-          if (slip.additionHeads[i] || slip.deductionHeads[i]) {
-            maxRows = i + 1;
-          }
-        }
-        for (let i = 0; i < maxRows; i++) {
-          const addHead = slip.additionHeads[i] || '';
-          const addVal = addHead ? fmt(slip.additionValues[i]) : '';
-          const dedHead = slip.deductionHeads[i] || '';
-          const dedVal = dedHead ? fmt(slip.deductionValues[i]) : '';
-
-          rowsHtml += `
-            <tr>
-              <td style="border:1px solid #cccccc;">${addHead || '&nbsp;'}</td>
-              <td style="text-align:right;border:1px solid #cccccc;">${addVal || '&nbsp;'}</td>
-              <td style="border:1px solid #cccccc;">${dedHead || '&nbsp;'}</td>
-              <td style="text-align:right;border:1px solid #cccccc;">${dedVal || '&nbsp;'}</td>
-            </tr>
-          `;
-        }
-        
-        let finalTotalCtc = 0;
-        let finalTotalDeductions = 0;
-        slip.additionValues.forEach(v => { if (v) finalTotalCtc += v; });
-        slip.deductionValues.forEach(v => { if (v) finalTotalDeductions += v; });
-        if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
-        if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
-        
-        // Save these so we can use them in the rows below
-        slip.finalTotalCtc = finalTotalCtc;
-        slip.finalTotalDeductions = finalTotalDeductions;
-      } else {
-        rowsHtml = `
-              <tr>
-                <td style="border:1px solid #cccccc;">Basic</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
-                <td style="border:1px solid #cccccc;">PF Employee</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployee)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">HRA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
-                <td style="border:1px solid #cccccc;">PF Employer</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployer)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">Medical</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
-                <td style="border:1px solid #cccccc;">ESI</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.esi)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">TA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
-                <td style="border:1px solid #cccccc;">PT</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pt)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">LTA</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
-                <td style="border:1px solid #cccccc;">TDS</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.tds)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">Special Allowance</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.specialAllowance)}</td>
-                <td style="border:1px solid #cccccc;">Other Deductions</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">Reimbursement</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.reimbursement)}</td>
-                <td style="border:1px solid #cccccc;">&nbsp;</td>
-                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">Incentives</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.incentives)}</td>
-                <td style="border:1px solid #cccccc;">&nbsp;</td>
-                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
-              </tr>
-              <tr>
-                <td style="border:1px solid #cccccc;">OT Hours</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.overtime)}</td>
-                <td style="border:1px solid #cccccc;">&nbsp;</td>
-                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
-              </tr>
-        `;
-        
-        const ctcSum = (slip.basic || 0) + (slip.hra || 0) + (slip.medical || 0) + (slip.ta || 0) + (slip.lta || 0) + (slip.specialAllowance || 0) + (slip.reimbursement || 0) + (slip.incentives || 0) + (slip.overtime || 0);
-        const dedSum = (slip.pfEmployee || 0) + (slip.pfEmployer || 0) + (slip.esi || 0) + (slip.pt || 0) + (slip.tds || 0) + (slip.otherDeductions || 0);
-        
-        slip.finalTotalCtc = ctcSum || slip.ctc;
-        slip.finalTotalDeductions = dedSum || slip.deductions;
-      }
-
+      const words = numberToWords(slip.netPay);
       return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -779,9 +642,9 @@ app.post('/api/payroll/send-slips', async (req, res) => {
               </tr>
               <tr>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.totalDays || getDaysInMonth(slip.month || 'June 2026')}</td>
+                <td style="border:1px solid #cccccc;">${slip.totalDays || 30}</td>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">Paid No. of Days</td>
-                <td style="border:1px solid #cccccc;">${slip.payDays || getDaysInMonth(slip.month || 'June 2026')}</td>
+                <td style="border:1px solid #cccccc;">${slip.payDays || 30}</td>
               </tr>
               <tr>
                 <td style="font-weight:bold;border:1px solid #cccccc;background:#f9f9f9;">PF UAN No.</td>
@@ -801,31 +664,76 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td width="35%" style="border:1px solid #cccccc;">Deductions</td>
                 <td width="15%" style="text-align:right;border:1px solid #cccccc;">Amount (Rs.)</td>
               </tr>
-              ${rowsHtml}
-              <tr bgcolor="#f1f5f9" style="font-weight:bold;">
-                <td style="border:1px solid #cccccc;">Total CTC</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
-                  (Array.isArray(slip.additionValues) && slip.additionValues.length > 0)
-                    ? slip.additionValues.reduce((a, b) => a + (b || 0), 0)
-                    : (slip.ctc || 0)
-                )}</td>
-                <td style="border:1px solid #cccccc;">Total Deduction</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(
-                  (Array.isArray(slip.deductionValues) && slip.deductionValues.length > 0)
-                    ? slip.deductionValues.reduce((a, b) => a + (b || 0), 0)
-                    : (slip.deductions || 0)
-                )}</td>
+              <tr>
+                <td style="border:1px solid #cccccc;">Salary</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.monthlySalary)}</td>
+                <td style="border:1px solid #cccccc;">PF Employee</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployee)}</td>
               </tr>
               <tr>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
-                  ${slip.deduction && slip.deduction > 0 ? 'Final Pay [In-Hand]' : 'NetPay [In-Hand]'}
-                </td>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">
-                  ${fmt(finalPay)}
-                </td>
-                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">
-                  ${slip.deduction && slip.deduction > 0 ? `Net Pay: ${fmt(slip.netPay)} | Deduction: ${fmt(slip.deduction)}<br/>` : ''}${words}
-                </td>
+                <td style="border:1px solid #cccccc;">Basic</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
+                <td style="border:1px solid #cccccc;">PF Employer</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployer)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">HRA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
+                <td style="border:1px solid #cccccc;">ESI</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.esi)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Medical</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
+                <td style="border:1px solid #cccccc;">PT</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pt)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">TA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
+                <td style="border:1px solid #cccccc;">TDS</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.tds)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">LTA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
+                <td style="border:1px solid #cccccc;">Other Deductions</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Special Allowance</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.specialAllowance)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Reimbursement</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.reimbursement)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Incentives</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.incentives)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">OT Hours</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.overtime)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr bgcolor="#f1f5f9" style="font-weight:bold;">
+                <td style="border:1px solid #cccccc;">Total CTC</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ctc)}</td>
+                <td style="border:1px solid #cccccc;">Total Deduction</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.deductions)}</td>
+              </tr>
+              <tr>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">NetPay [In-Hand]</td>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">${fmt(slip.netPay)}</td>
+                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">${words}</td>
               </tr>
             </table>
           </td>
@@ -885,262 +793,6 @@ app.post('/api/payroll/send-slips', async (req, res) => {
   }
 });
 
-// ── Payroll Schedule & Records Routes ────────────────────────────────────────
-
-// In-memory cron task handle (so we can reschedule when config changes)
-let _payslipCronTask = null;
-
-/**
- * Build slip data for an employee from db records.
- * Used by the cron auto-send to construct SlipRow objects server-side.
- */
-async function buildSlipsFromDb() {
-  try {
-    const db = await readDB();
-    const employees = db.employees || [];
-    const payrollRecords = db.payroll_records || [];
-
-    if (payrollRecords.length === 0) {
-      console.log('[Payroll Cron] No payroll records found in db.json — skipping send.');
-      return [];
-    }
-
-    const slips = [];
-    for (const rec of payrollRecords) {
-      if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
-      const emp = employees.find(e => e.employeeId === rec.employeeId);
-      if (!emp || !emp.personalEmail) continue;
-
-      const c = rec.components || {};
-      slips.push({
-        name: rec.employeeName,
-        email: emp.personalEmail,
-        employeeId: rec.employeeId,
-        department: rec.department,
-        designation: rec.designation,
-        month: rec.month,
-        monthlySalary: rec.monthlySalary || rec.ctc || 0,
-        ctc: rec.ctc || rec.monthlySalary || 0,
-        totalDays: rec.totalDays || getDaysInMonth(rec.month || 'June 2026'),
-        payDays: rec.payDays || getDaysInMonth(rec.month || 'June 2026'),
-        clBalance: rec.clBalance || 0,
-        pfUan: rec.pfUan || '—',
-        basic: c.basic || 0,
-        hra: c.hra || 0,
-        medical: c.medical || 0,
-        ta: c.ta || 0,
-        lta: c.lta || 0,
-        specialAllowance: c.specialAllowance || 0,
-        pfEmployee: c.pfEmployee || 0,
-        pfEmployer: c.pfEmployer || 0,
-        esi: c.esi || 0,
-        pt: c.pt || 0,
-        tds: c.tds || 0,
-        reimbursement: c.reimbursement || 0,
-        incentives: c.incentives || 0,
-        overtime: c.overtime || 0,
-        otherDeductions: c.otherDeductions || 0,
-        deductions: (c.pfEmployee || 0) + (c.pfEmployer || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
-        netPay: rec.netPay || 0,
-        deduction: rec.deduction || 0,
-        additionHeads: rec.additionHeads || [],
-        deductionHeads: rec.deductionHeads || [],
-        additionValues: rec.additionValues || [],
-        deductionValues: rec.deductionValues || [],
-      });
-    }
-    return slips;
-  } catch (err) {
-    console.error('[Payroll Cron] Error building slips:', err);
-    return [];
-  }
-}
-
-/**
- * Core dispatch function — used by both cron and manual trigger.
- * Builds slips from db, calls send-slips logic, updates lastRun.
- */
-async function dispatchPayslips() {
-  console.log('[Payroll Cron] Starting auto-dispatch...');
-  const slips = await buildSlipsFromDb();
-  if (slips.length === 0) {
-    console.log('[Payroll Cron] No slips to send.');
-    return { sent: 0, failed: [], skipped: true };
-  }
-
-  // Reuse internal send logic by making an internal HTTP request
-  try {
-    const result = await fetch('http://localhost:3001/api/payroll/send-slips', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slips }),
-    });
-    const data = await result.json();
-
-    // Update lastRun in db
-    const db = await readDB();
-    if (!db.payroll_schedule) db.payroll_schedule = {};
-    db.payroll_schedule.lastRun = new Date().toISOString();
-    await writeDB(db);
-
-    console.log(`[Payroll Cron] Done — ${data.sent} sent, ${(data.failed || []).length} failed.`);
-    return data;
-  } catch (err) {
-    console.error('[Payroll Cron] Dispatch error:', err);
-    return { sent: 0, failed: [{ error: err.message }] };
-  }
-}
-
-/**
- * Schedule or re-schedule the cron job based on the schedule config.
- */
-function scheduleCronJob(schedule) {
-  if (_payslipCronTask) {
-    _payslipCronTask.stop();
-    _payslipCronTask = null;
-    console.log('[Payroll Cron] Previous cron task stopped.');
-  }
-
-  if (!schedule || !schedule.enabled) {
-    console.log('[Payroll Cron] Scheduling is disabled.');
-    return;
-  }
-
-  const day = Math.min(28, Math.max(1, parseInt(schedule.day) || 10));
-  const hour = Math.min(23, Math.max(0, parseInt(schedule.hour) || 10));
-  const minute = Math.min(59, Math.max(0, parseInt(schedule.minute) || 0));
-
-  const cronExpr = `${minute} ${hour} ${day} * *`;
-  console.log(`[Payroll Cron] Scheduled: '${cronExpr}' (day=${day}, ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')})`);
-
-  _payslipCronTask = cron.schedule(cronExpr, async () => {
-    console.log('[Payroll Cron] Cron triggered — dispatching payslips...');
-    await dispatchPayslips();
-  }, { timezone: 'Asia/Kolkata' });
-}
-
-// Bootstrap cron on server start
-(async () => {
-  try {
-    const db = await readDB();
-    const schedule = db.payroll_schedule;
-    if (schedule) {
-      scheduleCronJob(schedule);
-    }
-  } catch (err) {
-    console.error('[Payroll Cron] Failed to load schedule on startup:', err);
-  }
-})();
-
-// GET /api/payroll/schedule — return current schedule config
-app.get('/api/payroll/schedule', async (req, res) => {
-  try {
-    const db = await readDB();
-    res.json(db.payroll_schedule || { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// PUT /api/payroll/schedule — update schedule config and reschedule cron
-app.put('/api/payroll/schedule', async (req, res) => {
-  try {
-    const { day, hour, minute, enabled } = req.body;
-    const db = await readDB();
-    const existing = db.payroll_schedule || {};
-    const newSchedule = {
-      ...existing,
-      day: parseInt(day) || 10,
-      hour: parseInt(hour) || 10,
-      minute: parseInt(minute) || 0,
-      enabled: enabled !== false,
-    };
-    db.payroll_schedule = newSchedule;
-    await writeDB(db);
-    scheduleCronJob(newSchedule);
-    console.log('[Payroll Schedule] Updated:', newSchedule);
-    res.json({ success: true, schedule: newSchedule });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/payroll/records — sync latest payroll records from client to server
-app.post('/api/payroll/records', async (req, res) => {
-  try {
-    const { records } = req.body;
-    if (!Array.isArray(records)) {
-      return res.status(400).json({ success: false, error: 'records must be an array.' });
-    }
-    const db = await readDB();
-    db.payroll_records = records;
-    await writeDB(db);
-    console.log(`[Payroll Records] Synced ${records.length} records from client.`);
-    res.json({ success: true, count: records.length });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/payroll/trigger-send — manually trigger payslip dispatch now
-app.post('/api/payroll/trigger-send', async (req, res) => {
-  try {
-    console.log('[Payroll] Manual trigger-send requested');
-    const result = await dispatchPayslips();
-    res.json({ success: true, ...result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ── CL Balance Routes ─────────────────────────────────────────────────────────
-
-// GET all CL balances (HR view)
-app.get('/api/cl-balances', async (req, res) => {
-  const db = await readDB();
-  res.json(db.employee_cl_balances || {});
-});
-
-// GET one employee's CL balance
-app.get('/api/cl-balances/:employeeId', async (req, res) => {
-  const db = await readDB();
-  const balances = db.employee_cl_balances || {};
-  const bal = balances[req.params.employeeId];
-  if (!bal) {
-    return res.json({ total: 12, used: 0 }); // default
-  }
-  res.json(bal);
-});
-
-// PUT — HR sets total CL days for an employee
-app.put('/api/cl-balances/:employeeId', async (req, res) => {
-  try {
-    const db = await readDB();
-    if (!db.employee_cl_balances) db.employee_cl_balances = {};
-    const empId = req.params.employeeId;
-    const existing = db.employee_cl_balances[empId] || { total: 12, used: 0 };
-    
-    let newTotal = existing.total;
-    let newUsed = existing.used;
-
-    if (req.body.total !== undefined) {
-      newTotal = parseInt(req.body.total, 10);
-      if (isNaN(newTotal) || newTotal < 0) return res.status(400).json({ success: false, error: 'Invalid total value.' });
-    }
-    
-    if (req.body.used !== undefined) {
-      newUsed = parseInt(req.body.used, 10);
-      if (isNaN(newUsed) || newUsed < 0) return res.status(400).json({ success: false, error: 'Invalid used value.' });
-    }
-
-    db.employee_cl_balances[empId] = { total: newTotal, used: newUsed };
-    await writeDB(db);
-    res.json({ success: true, balance: db.employee_cl_balances[empId] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // Leaves Routes
 app.get('/api/leaves', async (req, res) => {
   const db = await readDB();
@@ -1149,18 +801,11 @@ app.get('/api/leaves', async (req, res) => {
 
 app.post('/api/leaves', async (req, res) => {
   try {
-    // Enforce mandatory reason
-    const reason = (req.body.reason || '').trim();
-    if (!reason || reason.length < 10) {
-      return res.status(400).json({ success: false, error: 'A reason of at least 10 characters is required.' });
-    }
-
     const db = await readDB();
     if (!db.leaves) db.leaves = [];
     const newLeave = {
       id: 'leave-' + Date.now().toString(),
       ...req.body,
-      reason,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
@@ -1191,37 +836,15 @@ app.put('/api/leaves/:id', async (req, res) => {
     if (index === -1) {
       return res.status(404).json({ success: false, error: 'Leave request not found.' });
     }
-
-    const leave = db.leaves[index];
-    const prevStatus = leave.status;
-    const newStatus = req.body.status;
-    db.leaves[index].status = newStatus;
-
-    // Track CL used in employee_cl_balances when Casual Leave is approved/unapproved
-    if (leave.type === 'Casual Leave' || leave.type === 'Casual') {
-      if (!db.employee_cl_balances) db.employee_cl_balances = {};
-      const empId = leave.employeeId;
-      if (!db.employee_cl_balances[empId]) {
-        db.employee_cl_balances[empId] = { total: 12, used: 0 };
-      }
-      const days = parseInt(leave.days, 10) || 0;
-      // Approving: increment used
-      if (newStatus === 'Approved' && prevStatus !== 'Approved') {
-        db.employee_cl_balances[empId].used = (db.employee_cl_balances[empId].used || 0) + days;
-      }
-      // Revoking approval (e.g. back to Pending or Rejected): decrement used
-      if (prevStatus === 'Approved' && newStatus !== 'Approved') {
-        db.employee_cl_balances[empId].used = Math.max(0, (db.employee_cl_balances[empId].used || 0) - days);
-      }
-    }
+    db.leaves[index].status = req.body.status;
 
     // Log activity
     if (!db.activity_log) db.activity_log = [];
     db.activity_log.push({
       id: Date.now().toString(),
-      action: `LEAVE_${newStatus.toUpperCase()}`,
+      action: `LEAVE_${req.body.status.toUpperCase()}`,
       by: 'hr@varistor.in',
-      details: `${newStatus} leave request for ${db.leaves[index].employeeName}`,
+      details: `${req.body.status} leave request for ${db.leaves[index].employeeName}`,
       timestamp: new Date().toISOString()
     });
 
@@ -1703,39 +1326,5 @@ app.post('/api/activity', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`[Email Server] running on http://localhost:${port}`);
-});
-
-// ─── Annual Leave Balance Reset Job (April 1st Midnight) ───────────────────
-cron.schedule('0 0 1 4 *', async () => {
-  console.log('[CRON] Starting Annual Leave Balance Reset (April 1st)...');
-  try {
-    const { error } = await supabase
-      .from('leave_balances')
-      .update({
-        casual_used: 0,
-        sick_used: 0,
-        earned_used: 0,
-        unpaid_taken: 0
-      })
-      .not('employee_id', 'is', null);
-
-    if (error) throw error;
-    console.log('[CRON] Successfully reset all leave balances to 0.');
-    
-    // Log the action to local activity log
-    const db = await readDB();
-    if (!db.activity_log) db.activity_log = [];
-    db.activity_log.push({
-      id: Date.now().toString(),
-      type: 'system',
-      message: 'Annual leave balances reset successfully',
-      timestamp: new Date().toISOString()
-    });
-    await writeDB(db);
-  } catch (err) {
-    console.error('[CRON] Failed to reset leave balances:', err.message);
-  }
-}, {
-  timezone: "Asia/Kolkata"
+  console.log(`[Email Server] running on port ${port}`);
 });

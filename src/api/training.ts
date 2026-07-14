@@ -13,6 +13,7 @@ import type {
   TrainingStatus,
   UserRole,
 } from '../types';
+import { API_URL } from '../config/api';
 
 // ─── Status resolver (unchanged logic) ──────────────────────────────────────
 
@@ -108,10 +109,6 @@ function writeSavedAnswers(data: Record<string, Record<string, number>>) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export const trainingApi = {
-  getCurrentUserId(): string {
-    return 'user-session'; // resolved from auth session in callers
-  },
-
   async fetchModulesWithStatus(employeeId: string, role?: UserRole): Promise<TrainingModuleWithStatus[]> {
     const [{ data: modulesData }, { data: progressData }, { data: attemptsData }] = await Promise.all([
       supabase.from('training_modules').select('*').order('order', { ascending: true }),
@@ -221,7 +218,7 @@ export const trainingApi = {
 
     // Send email via Express server (best-effort)
     try {
-      await fetch('http://localhost:3001/api/quiz/submit', {
+      await fetch(`${API_URL}/api/quiz/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employeeEmail, hrEmail, moduleTitle, score, passed }),

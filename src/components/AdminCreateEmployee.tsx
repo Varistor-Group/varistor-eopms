@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, ShieldAlert, UserPlus } from 'lucide-react';
-import { createEmployee, getEmployees } from '../api/employees';
+import { createEmployee, getEmployees, getDepartments, addDepartment } from '../api/employees';
 import type { CreateEmployeeInput, Department, Employee } from '../api/employees';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -29,14 +29,6 @@ const inputCls = (hasError?: boolean) =>
   focus:ring-2 focus:ring-varistor-lime/40
   ${hasError ? 'border-red-400 focus:border-red-400' : 'border-varistor-border focus:border-varistor-lime'}`;
 
-// ─── Departments ─────────────────────────────────────────────────────────────
-
-const DEPARTMENTS: Department[] = [
-  'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech', 'Digital Marketing',
-];
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type FormErrors = Partial<Record<keyof CreateEmployeeInput, string>>;
 
 const EMPTY_FORM: CreateEmployeeInput = {
@@ -45,13 +37,12 @@ const EMPTY_FORM: CreateEmployeeInput = {
   username: '',
   personalEmail: '',
   phone: '',
-  department: '' as Department,
+  department: '',
   reportingManager: '',
   role: 'Employee',
   is_field_employee: false,
   avatarUrl: '',
-  shiftStart: '09:30',
-  shiftEnd: '18:30',
+  dateOfJoining: new Date().toISOString().split('T')[0],
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -62,6 +53,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   const [form, setForm] = useState<CreateEmployeeInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [deps, setDeps] = useState<string[]>(getDepartments());
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
@@ -97,13 +89,27 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   const handleDepartmentChange = (d: Department) => {
     // A department head is defined as an employee with the 'Reporting Manager' role in that department.
     const head = employees.find(e => e.department === d && e.role === 'Reporting Manager');
-    
+
     setForm(prev => ({
       ...prev,
       department: d,
       reportingManager: head ? head.fullName : ''
     }));
     setErrors(prev => ({ ...prev, department: undefined, reportingManager: undefined }));
+  };
+
+  const handleDepartmentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === '___ADD_NEW___') {
+      const newDept = window.prompt('Enter new department name:');
+      if (newDept && newDept.trim()) {
+        addDepartment(newDept.trim());
+        setDeps(getDepartments());
+        handleDepartmentChange(newDept.trim());
+      }
+    } else {
+      handleDepartmentChange(val);
+    }
   };
 
   const validate = (): boolean => {
@@ -113,9 +119,14 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!form.username.trim()) errs.username = 'Username is required.';
     if (!form.personalEmail.trim()) errs.personalEmail = 'Email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.personalEmail)) errs.personalEmail = 'Enter a valid email.';
-    if (!form.phone.trim()) errs.phone = 'Phone number is required.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
-    if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
+    if (!form.dateOfJoining) errs.dateOfJoining = 'Date of joining is required.';
+    if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
+      errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
+    }
+    // Reporting manager is now optional (can be null/None)
     if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -256,9 +267,39 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               <input
                 type="tel"
                 className={inputCls(!!errors.phone)}
-                placeholder="+91 98765 43210"
+                placeholder="9876543210"
                 value={form.phone}
                 onChange={set('phone')}
+              />
+            </Field>
+
+            {/* Date of Joining */}
+            <Field label="Date of Joining" required error={errors.dateOfJoining}>
+              <input
+                type="date"
+                className={inputCls(!!errors.dateOfJoining)}
+                value={form.dateOfJoining}
+                onChange={set('dateOfJoining')}
+              />
+            </Field>
+
+            {/* Date of Birth */}
+            <Field label="Date of Birth" error={errors.dateOfBirth}>
+              <input
+                type="date"
+                className={inputCls(!!errors.dateOfBirth)}
+                value={form.dateOfBirth ?? ''}
+                onChange={set('dateOfBirth')}
+              />
+            </Field>
+
+            {/* UAN Number */}
+            <Field label="UAN Number" error={errors.uanNumber}>
+              <input
+                className={inputCls(!!errors.uanNumber)}
+                placeholder="e.g. 100000000000 or NA"
+                value={form.uanNumber ?? ''}
+                onChange={set('uanNumber')}
               />
             </Field>
 
@@ -286,25 +327,25 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               <select
                 className={inputCls(!!errors.department)}
                 value={form.department}
-                onChange={e => handleDepartmentChange(e.target.value as Department)}
+                onChange={handleDepartmentSelect}
               >
                 <option value="">Select department…</option>
-                {DEPARTMENTS.map(d => (
+                {deps.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
+                <option value="___ADD_NEW___" className="font-bold text-varistor-limeText">+ Add Department</option>
               </select>
               {/* Dept chips */}
               <div className="flex flex-wrap gap-1.5 mt-1">
-                {DEPARTMENTS.map(d => (
+                {deps.map(d => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => handleDepartmentChange(d)}
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${
-                      form.department === d
-                        ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'
-                        : 'bg-varistor-limeLight border-varistor-border text-varistor-muted hover:border-varistor-lime'
-                    }`}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${form.department === d
+                      ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'
+                      : 'bg-varistor-limeLight border-varistor-border text-varistor-muted hover:border-varistor-lime'
+                      }`}
                   >
                     {d}
                   </button>
@@ -313,14 +354,21 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
             </Field>
 
             {/* Reporting Manager */}
-            <Field label="Reporting Manager" required error={errors.reportingManager}>
-              <input
-                type="text"
+            <Field label="Reporting Manager" error={errors.reportingManager}>
+              <select
                 className={inputCls(!!errors.reportingManager)}
-                placeholder="Manager name..."
                 value={form.reportingManager}
                 onChange={set('reportingManager')}
-              />
+              >
+                <option value="">None</option>
+                {employees
+                  .filter(e => e.role === 'Reporting Manager' || e.role === 'Admin')
+                  .map(m => (
+                    <option key={m.id} value={m.fullName}>
+                      {m.fullName} ({m.department})
+                    </option>
+                  ))}
+              </select>
             </Field>
 
             {/* System Role */}
@@ -365,7 +413,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 onChange={set('shiftStart')}
               />
             </Field>
-            
+
             <Field label="Shift End Time">
               <input
                 type="time"
@@ -426,15 +474,13 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
 
       {/* ── Toast notification ── */}
       <div
-        className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${
-          toast.show ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
-        }`}
+        className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${toast.show ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+          }`}
       >
-        <div className={`flex items-start gap-3 px-4 py-3.5 rounded-varistor shadow-lg border max-w-sm ${
-          toast.type === 'success'
-            ? 'bg-varistor-limeTint border-[#c3f0a0]'
-            : 'bg-red-50 border-red-200'
-        }`}>
+        <div className={`flex items-start gap-3 px-4 py-3.5 rounded-varistor shadow-lg border max-w-sm ${toast.type === 'success'
+          ? 'bg-varistor-limeTint border-[#c3f0a0]'
+          : 'bg-red-50 border-red-200'
+          }`}>
           {toast.type === 'success'
             ? <CheckCircle2 size={20} className="text-varistor-limeText flex-shrink-0 mt-0.5" />
             : <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />

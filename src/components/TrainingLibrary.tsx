@@ -194,9 +194,9 @@ const TrainingLibrary: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<TrainingModuleWithStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
 
-  const { currentRole } = useVariPoints();
+  const { currentRole, currentUser } = useVariPoints();
   const isManager = currentRole === 'HR' || currentRole === 'Admin';
-  const employeeId = trainingApi.getCurrentUserId();
+  const employeeId = currentUser?.id ?? '';
 
   const loadModules = useCallback(async () => {
     setLoading(true);

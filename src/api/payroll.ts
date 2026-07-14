@@ -14,9 +14,6 @@
  *  - HR/Admin can SELECT all, INSERT and UPDATE
  *  - Approved rows locked via DB trigger
  */
-import { getEmployees } from './employees';
-
-
 
 export interface SalaryComponents {
   basic: number;
@@ -56,26 +53,6 @@ export interface PayrollRecord {
   clBalance: number;
   pfUan: string;
   monthlySalary: number;
-  /** Whether PF deduction applies to this employee (default true) */
-  hasPf: boolean;
-  /** Whether ESI deduction applies to this employee (default true) */
-  hasEsi: boolean;
-  /** Whether PT deduction applies to this employee (default true) */
-  hasPt: boolean;
-  /** True once HR has dispatched this slip — makes it visible to the employee */
-  slipReleased: boolean;
-  additionHeads?: string[];
-  deductionHeads?: string[];
-  additionValues?: number[];
-  deductionValues?: number[];
-  attendanceBreakdown?: {
-    present: number;
-    weekOff: number;
-    leaves: number;
-    holidays: number;
-    absent: number;
-  };
-  deduction?: number;
 }
 
 export interface PayrollAuditEntry {
@@ -126,7 +103,7 @@ export function numberToWords(num: number): string {
     rupeesStr = 'Zero';
   } else {
     let tempVal = rupeesVal;
-
+    
     // Crores
     const crores = Math.floor(tempVal / 10000000);
     tempVal %= 10000000;
@@ -162,54 +139,8 @@ export function numberToWords(num: number): string {
 }
 
 /** Single source of truth for all payroll calculations. */
-function evaluateFormula(equation: string, context: Record<string, number>): number {
-  try {
-    let sanitized = equation
-      .replace(/\bround\(/g, 'Math.round(')
-      .replace(/\bceil\(/g, 'Math.ceil(')
-      .replace(/\bfloor\(/g, 'Math.floor(')
-      .replace(/%/g, ' * 0.01');
-
-    const sortedKeys = Object.keys(context).sort((a, b) => b.length - a.length);
-    for (const key of sortedKeys) {
-      const val = context[key];
-      const escapedKey = key.replace(/\$/g, '\\$');
-      const regex = new RegExp(escapedKey + '\\b', 'g');
-      sanitized = sanitized.replace(regex, String(val));
-    }
-
-    // Safe eval using Function constructor
-     
-    const result = new Function(`return (${sanitized});`)();
-    return typeof result === 'number' && !isNaN(result) ? Math.round(result) : 0;
-  } catch (e) {
-    console.error('Error evaluating formula:', equation, e);
-    return 0;
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPTAmount(gross: number, ranges: any[]): number {
-  for (const range of ranges) {
-    if (gross >= range.min && gross <= range.max) {
-      return range.amount;
-    }
-  }
-  return 0;
-}
-
-/** Single source of truth for all payroll calculations. */
-export function getDaysInMonth(monthStr: string): number {
-  if (!monthStr) return 30;
-  const d = new Date(monthStr);
-  if (isNaN(d.getTime())) return 30;
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-}
-
 export function computeNet(params: {
   monthlySalary: number;
-  month?: string;
-  monthlyCtc?: number;
   totalDays?: number;
   payDays?: number;
   medical?: number;
@@ -220,210 +151,34 @@ export function computeNet(params: {
   overtime?: number;
   tds?: number;
   otherDeductions?: number;
-  /** Number of Loss-of-Pay days to deduct (excess over CL entitlement) */
-  lopDays?: number;
-  /** Whether PF deduction applies (default true) */
-  hasPf?: boolean;
-  /** Whether ESI deduction applies (default true) */
-  hasEsi?: boolean;
-  /** Whether PT deduction applies (default true) */
-  hasPt?: boolean;
-  employeeId?: string;
-  attendanceBreakdown?: {
-    present: number;
-    weekOff: number;
-    leaves: number;
-    holidays: number;
-    absent: number;
-  };
+  monthlyCtc?: number;
 }) {
-  const totalDays = params.totalDays ?? getDaysInMonth(params.month || 'June 2026');
+  const totalDays = params.totalDays ?? 30;
   const payDays = params.payDays ?? 30;
+  const medical = params.medical ?? 1250;
+  const ta = params.ta ?? 2500;
+  const lta = params.lta ?? 3500;
+  const reimbursement = params.reimbursement ?? 0;
+  const incentives = params.incentives ?? 0;
+  const overtime = params.overtime ?? 0;
+  const tds = params.tds ?? 0;
+  const otherDeductions = params.otherDeductions ?? 0;
   const monthlySalary = params.monthlySalary;
-  const ctc = params.monthlyCtc ?? monthlySalary;
-
-  // 1. Load custom settings from localStorage if they exist
-  let addHeads = [
-    "Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""
-  ];
-  let dedHeads = [
-    "PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""
-  ];
-  let ptRanges = [
-    { min: 0, max: 2999, amount: 0 },
-    { min: 3000, max: 5999, amount: 20 },
-    { min: 6000, max: 8999, amount: 80 },
-    { min: 9000, max: 11999, amount: 150 },
-    { min: 12000, max: 500000, amount: 200 }
-  ];
-  let pfPct = 12;
-  let esiPct = 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let formulas: any[] = [];
-  let employeeDetails: Record<string, number> = {};
-
-  try {
-    const headsRaw = localStorage.getItem('eopms_salary_heads');
-    if (headsRaw) {
-      const parsed = JSON.parse(headsRaw);
-      if (parsed.additions) addHeads = parsed.additions;
-      if (parsed.deductions) dedHeads = parsed.deductions;
-      if (parsed.ptRanges) ptRanges = parsed.ptRanges;
-      if (parsed.pfPercentage !== undefined) pfPct = parsed.pfPercentage;
-      if (parsed.esiPercentage !== undefined) esiPct = parsed.esiPercentage;
-    }
-    const formulasRaw = localStorage.getItem('eopms_salary_formulas');
-    const defaultFormulas = [
-      { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
-      { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
-      { code: "F3", name: "MEDICAL ALLOWANCE", equation: "1250" },
-      { code: "F4", name: "TA", equation: "2500" },
-      { code: "F5", name: "LTA", equation: "3500" },
-      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, (($BS / $DIM) * ($SP + $SW + $SL + $SH)) - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
-      { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
-      { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
-      { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
-    ];
-    formulas = formulasRaw ? JSON.parse(formulasRaw) : [];
-    if (formulas.length < 9) {
-      formulas = defaultFormulas;
-      localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaultFormulas));
-    }
-    const detailsRaw = localStorage.getItem('eopms_employee_salary_details');
-    if (detailsRaw) {
-      employeeDetails = JSON.parse(detailsRaw);
-    }
-  } catch (e) {
-    console.error('Error loading custom payroll settings', e);
-  }
-
-  // 2. Determine $BS (Base/Reference Amount)
-  let refAmt = monthlySalary;
-  if (params.employeeId && employeeDetails[params.employeeId] !== undefined) {
-    refAmt = employeeDetails[params.employeeId];
-  }
-
-  // 3. Determine attendance values
-  const present = params.attendanceBreakdown?.present ?? payDays;
-  const weekOff = params.attendanceBreakdown?.weekOff ?? 0;
-  const leaves = params.attendanceBreakdown?.leaves ?? 0;
-  const holidays = params.attendanceBreakdown?.holidays ?? 0;
-
-  // 4. Construct evaluation context
-  const context: Record<string, number> = {
-    '$BS': refAmt,
-    '$DIM': totalDays,
-    '$SP': present,
-    '$SW': weekOff,
-    '$SL': leaves,
-    '$SH': holidays
-  };
-
-  const additionValues = Array(10).fill(0);
-  const deductionValues = Array(10).fill(0);
 
   const prorata = Math.round((monthlySalary / totalDays) * payDays);
+  const basic = Math.round(prorata * 0.5);
+  const hra = Math.round(basic * 0.5);
+  const specialAllowance = prorata - (basic + hra + medical + ta + lta);
+  const pfEmployee = basic >= 15000 ? 1800 : Math.round(basic * 0.12);
+  const pfEmployer = pfEmployee; // matches PF Employee
 
-  // 5. Evaluate Additions
-  for (let i = 0; i < 10; i++) {
-    const headName = addHeads[i]?.trim();
-    if (!headName) continue;
+  const gross = prorata;
+  const monthlyCtc = params.monthlyCtc ?? monthlySalary;
+  const esi = monthlyCtc > 21000 ? 0 : Math.ceil(gross * 0.0325);
+  const pt = gross >= 15001 ? 200 : 0;
 
-    const formula = formulas.find(f => f.name?.trim().toLowerCase() === headName.toLowerCase());
-    if (formula?.equation) {
-      additionValues[i] = evaluateFormula(formula.equation, context);
-    } else {
-      // Fallback
-      if (headName.toLowerCase() === 'basic') {
-        additionValues[i] = Math.round(prorata * 0.5);
-      } else if (headName.toLowerCase() === 'hra') {
-        const basicVal = context['$basic'] ?? Math.round(prorata * 0.5);
-        additionValues[i] = Math.round(basicVal * 0.5);
-      } else if (['medical', 'medical allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.medical ?? 1250;
-      } else if (['ta', 'travel allowance', 'transport allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.ta ?? 2500;
-      } else if (headName.toLowerCase() === 'lta') {
-        additionValues[i] = params.lta ?? 3500;
-      } else if (['special allowance', 'special'].includes(headName.toLowerCase())) {
-        const basicVal = context['$basic'] ?? Math.round(prorata * 0.5);
-        const hraVal = context['$hra'] ?? Math.round(basicVal * 0.5);
-        const medVal = params.medical ?? 1250;
-        const taVal = params.ta ?? 2500;
-        const ltaVal = params.lta ?? 3500;
-        additionValues[i] = Math.max(0, prorata - (basicVal + hraVal + medVal + taVal + ltaVal));
-      } else {
-        additionValues[i] = 0;
-      }
-    }
-
-    // Populate context
-    const cleanName = headName.replace(/[^a-zA-Z0-9]/g, '');
-    context['$' + cleanName] = additionValues[i];
-    context['$' + cleanName.toLowerCase()] = additionValues[i];
-    context['$' + cleanName.toUpperCase()] = additionValues[i];
-    context['$' + headName.replace(/\s+/g, '_')] = additionValues[i];
-    context['$add_head_' + (i + 1)] = additionValues[i];
-  }
-
-  const gross = additionValues.reduce((a, b) => a + b, 0);
-  context['$Gross'] = gross;
-  context['$gross'] = gross;
-  context['$Prorata'] = gross;
-  context['$prorata'] = gross;
-
-  const basic = context['$basic'] ?? Math.round(prorata * 0.5);
-
-  // 6. Evaluate Deductions
-  for (let i = 0; i < 10; i++) {
-    const headName = dedHeads[i]?.trim();
-    if (!headName) continue;
-
-    const formula = formulas.find(f => f.name?.trim().toLowerCase() === headName.toLowerCase());
-    if (formula?.equation) {
-      deductionValues[i] = evaluateFormula(formula.equation, context);
-    } else {
-      // Fallback
-      if (headName.toLowerCase() === 'pf') {
-        const rawPf = basic >= 15000 ? 1800 : Math.round(basic * (pfPct / 100));
-        deductionValues[i] = (params.hasPf !== false) ? rawPf : 0;
-      } else if (headName.toLowerCase() === 'esi') {
-        const rawEsi = ctc > 21000 ? 0 : Math.ceil(gross * (esiPct / 100 || 0.0325));
-        deductionValues[i] = (params.hasEsi !== false) ? rawEsi : 0;
-      } else if (headName.toLowerCase() === 'pt') {
-        const rawPt = getPTAmount(gross, ptRanges);
-        deductionValues[i] = (params.hasPt !== false) ? rawPt : 0;
-      } else if (headName.toLowerCase() === 'tds') {
-        deductionValues[i] = params.tds ?? 0;
-      } else if (['other deductions', 'advance salary adjut'].includes(headName.toLowerCase())) {
-        deductionValues[i] = params.otherDeductions ?? 0;
-      } else {
-        deductionValues[i] = 0;
-      }
-    }
-
-    // Populate context
-    const cleanName = headName.replace(/[^a-zA-Z0-9]/g, '');
-    context['$' + cleanName] = deductionValues[i];
-    context['$' + cleanName.toLowerCase()] = deductionValues[i];
-    context['$' + cleanName.toUpperCase()] = deductionValues[i];
-    context['$' + headName.replace(/\s+/g, '_')] = deductionValues[i];
-    context['$ded_head_' + (i + 1)] = deductionValues[i];
-  }
-
-  // 7. LOP deduction
-  const lopDays = Math.max(0, params.lopDays ?? 0);
-  const dailyRate = Math.round(monthlySalary / totalDays);
-  const lopDeduction = lopDays * dailyRate;
-
-  const totalDeductions = deductionValues.reduce((a, b) => a + b, 0) + lopDeduction;
-  const netPay = gross - totalDeductions + (params.reimbursement ?? 0) + (params.incentives ?? 0) + (params.overtime ?? 0);
-
-  // Return standard fields for compatibility
-  const medical = context['$medical'] ?? context['$medicalallowance'] ?? 1250;
-  const ta = context['$ta'] ?? context['$travelallowance'] ?? 2500;
-  const lta = context['$lta'] ?? 3500;
-  const specialAllowance = context['$specialallowance'] ?? (prorata - (basic + (context['$hra'] ?? 0) + medical + ta + lta));
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  const netPay = gross - totalDeductions + reimbursement + incentives + overtime;
 
   return {
     monthlySalary,
@@ -431,29 +186,23 @@ export function computeNet(params: {
     payDays,
     prorata,
     basic,
-    hra: context['$hra'] ?? Math.round(basic * 0.5),
+    hra,
     medical,
     ta,
     lta,
     specialAllowance,
-    pfEmployee: deductionValues[0],
-    pfEmployer: deductionValues[0],
-    esi: deductionValues[2] ?? deductionValues[1],
-    pt: deductionValues[3] ?? deductionValues[2],
-    tds: params.tds ?? 0,
-    otherDeductions: params.otherDeductions ?? 0,
+    pfEmployee,
+    pfEmployer,
+    esi,
+    pt,
+    tds,
+    otherDeductions,
     totalDeductions,
-    reimbursement: params.reimbursement ?? 0,
-    incentives: params.incentives ?? 0,
-    overtime: params.overtime ?? 0,
-    lopDays,
-    lopDeduction,
+    reimbursement,
+    incentives,
+    overtime,
     netPay,
-    gross,
-    additionHeads: addHeads,
-    deductionHeads: dedHeads,
-    additionValues,
-    deductionValues
+    gross
   };
 }
 
@@ -463,174 +212,13 @@ export const payrollAuditLog: PayrollAuditEntry[] = [];
 
 const PAYROLL_KEY = 'eopms_payroll_records';
 
-const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
-  {
-    id: 'pay-VAR-001-Jun-2026',
-    employeeId: 'VAR-001',
-    employeeName: 'Admin User',
-    department: 'Ops Heads',
-    designation: 'Admin',
-    month: 'Jun 2026',
-    ctc: 150000,
-    monthlySalary: 150000,
-    netPay: 148000,
-    status: 'draft',
-    revision: 1,
-    autoFormula: true,
-    totalDays: getDaysInMonth('June 2026'),
-    payDays: 30,
-    clBalance: 12,
-    pfUan: '100987654321',
-    hasPf: true,
-    hasEsi: false,
-    hasPt: true,
-    slipReleased: false,
-    components: {
-      basic: 75000,
-      hra: 37500,
-      pfEmployee: 1800,
-      pfEmployer: 1800,
-      esi: 0,
-      pt: 200,
-      tds: 0,
-      specialAllowance: 27750,
-      medical: 1250,
-      ta: 2500,
-      lta: 3500,
-      reimbursement: 0,
-      incentives: 0,
-      overtime: 0,
-      otherDeductions: 0,
-    }
-  },
-  {
-    id: 'pay-VAR-002-Jun-2026',
-    employeeId: 'VAR-002',
-    employeeName: 'Priya Sharma',
-    department: 'Operations',
-    designation: 'HR',
-    month: 'Jun 2026',
-    ctc: 50000,
-    monthlySalary: 50000,
-    netPay: 46200,
-    status: 'draft',
-    revision: 1,
-    autoFormula: true,
-    totalDays: getDaysInMonth('June 2026'),
-    payDays: 30,
-    clBalance: 12,
-    pfUan: '100987654322',
-    hasPf: true,
-    hasEsi: false,
-    hasPt: true,
-    slipReleased: false,
-    components: {
-      basic: 25000,
-      hra: 12500,
-      pfEmployee: 1800,
-      pfEmployer: 1800,
-      esi: 0,
-      pt: 200,
-      tds: 0,
-      specialAllowance: 2750,
-      medical: 1250,
-      ta: 2500,
-      lta: 3500,
-      reimbursement: 0,
-      incentives: 0,
-      overtime: 0,
-      otherDeductions: 0,
-    }
-  },
-  {
-    id: 'pay-VAR-003-Jun-2026',
-    employeeId: 'VAR-003',
-    employeeName: 'Aarav Patel',
-    department: 'Operations',
-    designation: 'Employee',
-    month: 'Jun 2026',
-    ctc: 35000,
-    monthlySalary: 35000,
-    netPay: 31200,
-    status: 'draft',
-    revision: 1,
-    autoFormula: true,
-    totalDays: getDaysInMonth('June 2026'),
-    payDays: 30,
-    clBalance: 12,
-    pfUan: '100987654323',
-    hasPf: true,
-    hasEsi: false,
-    hasPt: true,
-    slipReleased: false,
-    components: {
-      basic: 17500,
-      hra: 8750,
-      pfEmployee: 1800,
-      pfEmployer: 1800,
-      esi: 0,
-      pt: 200,
-      tds: 0,
-      specialAllowance: -1250,
-      medical: 1250,
-      ta: 2500,
-      lta: 3500,
-      reimbursement: 0,
-      incentives: 0,
-      overtime: 0,
-      otherDeductions: 0,
-    }
-  },
-  {
-    id: 'pay-VAR-004-Jun-2026',
-    employeeId: 'VAR-004',
-    employeeName: 'Akash Kumar',
-    department: 'Finance',
-    designation: 'Admin',
-    month: 'Jun 2026',
-    ctc: 45000,
-    monthlySalary: 45000,
-    netPay: 41200,
-    status: 'draft',
-    revision: 1,
-    autoFormula: true,
-    totalDays: getDaysInMonth('June 2026'),
-    payDays: 30,
-    clBalance: 12,
-    pfUan: '100987654324',
-    hasPf: true,
-    hasEsi: false,
-    hasPt: true,
-    slipReleased: false,
-    components: {
-      basic: 22500,
-      hra: 11250,
-      pfEmployee: 1800,
-      pfEmployer: 1800,
-      esi: 0,
-      pt: 200,
-      tds: 0,
-      specialAllowance: 250,
-      medical: 1250,
-      ta: 2500,
-      lta: 3500,
-      reimbursement: 0,
-      incentives: 0,
-      overtime: 0,
-      otherDeductions: 0,
-    }
-  }
-];
-
 function loadPayrollRecords(): PayrollRecord[] {
   try {
     const raw = localStorage.getItem(PAYROLL_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
+    if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-  localStorage.setItem(PAYROLL_KEY, JSON.stringify(DEFAULT_SEED_RECORDS));
-  return DEFAULT_SEED_RECORDS;
+  localStorage.setItem(PAYROLL_KEY, JSON.stringify([]));
+  return [];
 }
 
 function savePayrollRecords(records: PayrollRecord[]) {
@@ -644,89 +232,66 @@ let _records: PayrollRecord[] = loadPayrollRecords();
 
 export async function getPayrollRecords(employeeId?: string): Promise<PayrollRecord[]> {
   await delay(180);
+  _records = loadPayrollRecords();
+  
+  // Auto-seed missing payroll records from active employees
+  const { getEmployees } = await import('./employees');
+  const emps = await getEmployees();
+  let updated = false;
 
-  try {
-    const employees = await getEmployees();
-    _records = loadPayrollRecords();
-
-    const targetMonth = 'Jun 2026';
-    let modified = false;
-
-    for (const emp of employees) {
-      const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
-      if (!exists) {
-        const defaultCtc = 30000;
-        const comp = computeNet({
-          monthlySalary: defaultCtc,
-          totalDays: getDaysInMonth('June 2026'),
-          payDays: 30,
-          medical: 1250,
-          ta: 2500,
-          lta: 3500,
-          reimbursement: 0,
-          incentives: 0,
-          overtime: 0,
-          tds: 0,
-          otherDeductions: 0,
-          hasPf: true,
-          hasEsi: true,
-          hasPt: true,
-          employeeId: emp.employeeId,
-        });
-
-        const newRec: PayrollRecord = {
-          id: `pay-${emp.employeeId}-${targetMonth.replace(/\s+/g, '-')}`,
-          employeeId: emp.employeeId,
-          employeeName: emp.fullName,
-          department: emp.department,
-          designation: emp.role === 'Employee' ? 'EMPLOYEE' : emp.role.toUpperCase(),
-          month: targetMonth,
-          ctc: defaultCtc,
-          monthlySalary: defaultCtc,
-          components: {
-            basic: comp.basic,
-            hra: comp.hra,
-            pfEmployee: comp.pfEmployee,
-            pfEmployer: comp.pfEmployer,
-            esi: comp.esi,
-            pt: comp.pt,
-            tds: comp.tds,
-            specialAllowance: comp.specialAllowance,
-            medical: comp.medical,
-            ta: comp.ta,
-            lta: comp.lta,
-            reimbursement: comp.reimbursement,
-            incentives: comp.incentives,
-            overtime: comp.overtime,
-            otherDeductions: comp.otherDeductions,
-          },
-          netPay: comp.netPay,
-          status: 'draft',
-          revision: 0,
-          autoFormula: true,
-          totalDays: getDaysInMonth('June 2026'),
-          payDays: 30,
-          clBalance: 12,
-          pfUan: '—',
-          hasPf: true,
-          hasEsi: true,
-          hasPt: true,
-          slipReleased: false,
-          additionHeads: comp.additionHeads,
-          deductionHeads: comp.deductionHeads,
-          additionValues: comp.additionValues,
-          deductionValues: comp.deductionValues,
-        };
-        _records.push(newRec);
-        modified = true;
-      }
+  for (const emp of emps) {
+    if (emp.status === 'Active' && !_records.find(r => r.employeeId === emp.id)) {
+      const rec: PayrollRecord = {
+        id: 'PAY-' + Math.random().toString(36).substring(2, 9),
+        employeeId: emp.id,
+        employeeName: emp.fullName,
+        department: emp.department,
+        designation: emp.role,
+        month: 'Jun 2026',
+        ctc: 30000,
+        monthlySalary: 30000,
+        totalDays: 30,
+        payDays: 30,
+        clBalance: 0,
+        pfUan: '',
+        autoFormula: true,
+        status: 'draft',
+        revision: 1,
+        components: { basic: 15000, hra: 7500, pfEmployee: 1800, pfEmployer: 1800, esi: 0, pt: 0, tds: 0, specialAllowance: 0, medical: 1250, ta: 2500, lta: 3500, reimbursement: 0, incentives: 0, overtime: 0, otherDeductions: 0 },
+        netPay: 30000
+      };
+      
+      const comp = computeNet({
+         monthlySalary: rec.monthlySalary,
+         totalDays: 30,
+         payDays: 30,
+      });
+      rec.components = {
+         basic: comp.basic,
+         hra: comp.hra,
+         pfEmployee: comp.pfEmployee,
+         pfEmployer: comp.pfEmployer,
+         esi: comp.esi,
+         pt: comp.pt,
+         tds: comp.tds,
+         specialAllowance: comp.specialAllowance,
+         medical: comp.medical,
+         ta: comp.ta,
+         lta: comp.lta,
+         reimbursement: comp.reimbursement,
+         incentives: comp.incentives,
+         overtime: comp.overtime,
+         otherDeductions: comp.otherDeductions
+      };
+      rec.netPay = comp.netPay;
+      
+      _records.push(rec);
+      updated = true;
     }
+  }
 
-    if (modified) {
-      savePayrollRecords(_records);
-    }
-  } catch (err) {
-    console.error('Error syncing payroll records with employees list:', err);
+  if (updated) {
+    savePayrollRecords(_records);
   }
 
   if (employeeId) {
@@ -747,18 +312,7 @@ export async function updatePayrollRecord(
   if (rec.status === 'approved') return null; // Locked
 
   const updated: PayrollRecord = { ...rec, ...patch };
-  const needsRecompute =
-    patch.autoFormula ||
-    (updated.autoFormula && (
-      patch.monthlySalary !== undefined ||
-      patch.ctc !== undefined ||
-      patch.payDays !== undefined ||
-      patch.totalDays !== undefined ||
-      patch.hasPf !== undefined ||
-      patch.hasEsi !== undefined ||
-      patch.hasPt !== undefined
-    ));
-  if (needsRecompute) {
+  if (patch.autoFormula || (patch.monthlySalary !== undefined && updated.autoFormula) || (patch.ctc !== undefined && updated.autoFormula) || (patch.payDays !== undefined && updated.autoFormula) || (patch.totalDays !== undefined && updated.autoFormula)) {
     if (patch.ctc !== undefined) {
       updated.monthlySalary = patch.ctc;
     } else if (patch.monthlySalary !== undefined) {
@@ -776,11 +330,6 @@ export async function updatePayrollRecord(
       overtime: updated.components.overtime,
       tds: updated.components.tds,
       otherDeductions: updated.components.otherDeductions,
-      hasPf: updated.hasPf,
-      hasEsi: updated.hasEsi,
-      hasPt: updated.hasPt,
-      employeeId: updated.employeeId,
-      attendanceBreakdown: updated.attendanceBreakdown,
     });
     updated.components = {
       basic: comp.basic,
@@ -800,10 +349,6 @@ export async function updatePayrollRecord(
       otherDeductions: comp.otherDeductions,
     };
     updated.netPay = comp.netPay;
-    updated.additionHeads = comp.additionHeads;
-    updated.deductionHeads = comp.deductionHeads;
-    updated.additionValues = comp.additionValues;
-    updated.deductionValues = comp.deductionValues;
   } else if (patch.components) {
     const c = updated.components;
     const gross = c.basic + c.hra + c.medical + c.ta + c.lta + c.specialAllowance;
@@ -885,8 +430,6 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
       overtime: r.components.overtime,
       tds: r.components.tds,
       otherDeductions: r.components.otherDeductions,
-      employeeId: r.employeeId,
-      attendanceBreakdown: r.attendanceBreakdown,
     });
     return {
       ...r,
@@ -911,292 +454,12 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
         otherDeductions: comp.otherDeductions,
       },
       netPay: comp.netPay,
-      additionHeads: comp.additionHeads,
-      deductionHeads: comp.deductionHeads,
-      additionValues: comp.additionValues,
-      deductionValues: comp.deductionValues,
     };
   });
-}
-
-/**
- * Marks slips as released so employees can view them.
- * Called after HR successfully dispatches bulk salary slips.
- * Accepts either employeeIds or payroll record ids.
- */
-export async function releaseSlips(employeeIds: string[]): Promise<void> {
-  await delay(50);
-  _records = _records.map(r =>
-    employeeIds.includes(r.employeeId) ? { ...r, slipReleased: true } : r
-  );
-  savePayrollRecords(_records);
-  syncPayrollToServer(_records);
-}
-
-/**
- * Synchronizes the exact calculated slips (from Excel/Attendance) into the central payroll records.
- * Marks them as released and syncs to the server.
- */
-export async function releaseAndSyncSlips(sentRows: SlipRow[]): Promise<void> {
-  await delay(50);
-  
-  sentRows.forEach(row => {
-    if (!row.employeeId || !row.month) return;
-    const existingIdx = _records.findIndex(r => r.employeeId === row.employeeId && r.month === row.month);
-    
-    const newRecord: PayrollRecord = {
-      id: existingIdx !== -1 ? _records[existingIdx].id : `pay-${row.employeeId}-${row.month.replace(/\\s+/g, '-')}`,
-      employeeId: row.employeeId,
-      employeeName: row.name,
-      department: row.department || 'Operation',
-      designation: row.designation || 'EMPLOYEE',
-      month: row.month,
-      ctc: row.ctc,
-      monthlySalary: row.monthlySalary,
-      components: {
-        basic: row.basic || 0,
-        hra: row.hra || 0,
-        pfEmployee: row.pfEmployee || 0,
-        pfEmployer: row.pfEmployer || 0,
-        esi: row.esi || 0,
-        pt: row.pt || 0,
-        tds: row.tds || 0,
-        specialAllowance: row.specialAllowance || 0,
-        medical: row.medical || 1250,
-        ta: row.ta || 2500,
-        lta: row.lta || 3500,
-        reimbursement: row.reimbursement || 0,
-        incentives: row.incentives || 0,
-        overtime: row.overtime || 0,
-        otherDeductions: row.otherDeductions || 0
-      },
-      netPay: row.netPay,
-      status: 'approved',
-      revision: existingIdx !== -1 ? _records[existingIdx].revision + 1 : 1,
-      autoFormula: true,
-      totalDays: row.totalDays,
-      payDays: row.payDays,
-      clBalance: row.clBalance || 0,
-      pfUan: row.pfUan || '—',
-      hasPf: true,
-      hasEsi: true,
-      hasPt: true,
-      slipReleased: true,
-      additionHeads: row.additionHeads || [],
-      deductionHeads: row.deductionHeads || [],
-      additionValues: row.additionValues || [],
-      deductionValues: row.deductionValues || [],
-    };
-    
-    if (existingIdx !== -1) {
-      _records[existingIdx] = newRecord;
-    } else {
-      _records.push(newRecord);
-    }
-  });
-
-  savePayrollRecords(_records);
-  syncPayrollToServer(_records);
 }
 
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/** Format YYYY-MM to MMM YYYY, e.g. 2026-07 -> Jul 2026 */
-export function formatMonthToMMMYear(monthStr: string): string {
-  const [year, month] = monthStr.split('-');
-  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-/** Generates or updates draft payroll records based on attendance monthly report */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
-  await delay(200);
-  _records = loadPayrollRecords();
-
-  const displayMonth = formatMonthToMMMYear(monthStr);
-
-  // Load employees to fetch role/designation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let employees: any[] = [];
-  try {
-    const res = await fetch('http://localhost:3001/api/employees');
-    if (res.ok) {
-      employees = await res.json();
-    }
-  } catch (e) {
-    console.error('Failed to fetch employees for sync', e);
-  }
-
-  // Fetch CL balances
-  let clBalances: Record<string, ClBalance> = {};
-  try {
-    const res = await fetch('http://localhost:3001/api/cl-balances');
-    if (res.ok) {
-      clBalances = await res.json();
-    }
-  } catch (e) {
-    console.error('Failed to fetch CL balances for sync', e);
-  }
-
-  reportRows.forEach(row => {
-    const emp = employees.find(e => e.employeeId === row.employee_id || e.id === row.employee_id);
-    const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
-    const lopDays = Math.max(0, clBal.used - clBal.total);
-
-    const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
-
-    const monthlySalary = existingIdx !== -1 ? _records[existingIdx].monthlySalary : 30000;
-    const totalDays = getDaysInMonth(displayMonth);
-    const payDays = Math.min(row.payableDays, totalDays);
-
-    const medical = existingIdx !== -1 ? _records[existingIdx].components.medical : 1250;
-    const ta = existingIdx !== -1 ? _records[existingIdx].components.ta : 2500;
-    const lta = existingIdx !== -1 ? _records[existingIdx].components.lta : 3500;
-    const reimbursement = existingIdx !== -1 ? _records[existingIdx].components.reimbursement : 0;
-    const incentives = existingIdx !== -1 ? _records[existingIdx].components.incentives : 0;
-    const overtime = existingIdx !== -1 ? _records[existingIdx].components.overtime : 0;
-    const tds = existingIdx !== -1 ? _records[existingIdx].components.tds : 0;
-    const otherDeductions = existingIdx !== -1 ? _records[existingIdx].components.otherDeductions : 0;
-
-    const hasPf = existingIdx !== -1 ? _records[existingIdx].hasPf : true;
-    const hasEsi = existingIdx !== -1 ? _records[existingIdx].hasEsi : true;
-    const hasPt = existingIdx !== -1 ? _records[existingIdx].hasPt : true;
-
-    const attendanceBreakdown = {
-      present: row.present || 0,
-      weekOff: row.weekOff || 0,
-      leaves: row.leaves || 0,
-      holidays: row.holidays || 0,
-      absent: row.absent || 0,
-    };
-
-    const comp = computeNet({
-      monthlySalary,
-      totalDays,
-      payDays,
-      medical,
-      ta,
-      lta,
-      reimbursement,
-      incentives,
-      overtime,
-      tds,
-      otherDeductions,
-      lopDays,
-      hasPf,
-      hasEsi,
-      hasPt,
-      employeeId: row.employee_id,
-      attendanceBreakdown,
-    });
-
-    const payrollRec: PayrollRecord = {
-      id: existingIdx !== -1 ? _records[existingIdx].id : `pay-${row.employee_id}-${monthStr}`,
-      employeeId: row.employee_id,
-      employeeName: row.employeeName,
-      department: row.department,
-      designation: emp?.role || 'Employee',
-      month: displayMonth,
-      ctc: monthlySalary,
-      monthlySalary,
-      netPay: comp.netPay,
-      status: existingIdx !== -1 ? _records[existingIdx].status : 'draft',
-      revision: existingIdx !== -1 ? _records[existingIdx].revision : 1,
-      autoFormula: true,
-      totalDays,
-      payDays,
-      clBalance: clBal.total,
-      pfUan: existingIdx !== -1 ? _records[existingIdx].pfUan : '—',
-      hasPf,
-      hasEsi,
-      hasPt,
-      slipReleased: existingIdx !== -1 ? _records[existingIdx].slipReleased : false,
-      additionHeads: comp.additionHeads,
-      deductionHeads: comp.deductionHeads,
-      additionValues: comp.additionValues,
-      deductionValues: comp.deductionValues,
-      attendanceBreakdown,
-      components: {
-        basic: comp.basic,
-        hra: comp.hra,
-        pfEmployee: comp.pfEmployee,
-        pfEmployer: comp.pfEmployer,
-        esi: comp.esi,
-        pt: comp.pt,
-        tds: comp.tds,
-        specialAllowance: comp.specialAllowance,
-        medical: comp.medical,
-        ta: comp.ta,
-        lta: comp.lta,
-        reimbursement: comp.reimbursement,
-        incentives: comp.incentives,
-        overtime: comp.overtime,
-        otherDeductions: comp.otherDeductions,
-      }
-    };
-
-    if (existingIdx !== -1) {
-      if (_records[existingIdx].status === 'draft') {
-        _records[existingIdx] = payrollRec;
-      }
-    } else {
-      _records.push(payrollRec);
-    }
-  });
-
-  savePayrollRecords(_records);
-}
-
-// ─── CL Balance helpers ────────────────────────────────────────────────────────
-
-export interface ClBalance {
-  total: number;
-  used: number;
-}
-
-/** Fetch one employee's CL balance from the server */
-export async function fetchClBalance(employeeId: string): Promise<ClBalance> {
-  try {
-    const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`);
-    if (!res.ok) return { total: 12, used: 0 };
-    return res.json();
-  } catch {
-    return { total: 12, used: 0 };
-  }
-}
-
-/** Fetch all CL balances (HR view) */
-export async function fetchAllClBalances(): Promise<Record<string, ClBalance>> {
-  try {
-    const res = await fetch('http://localhost:3001/api/cl-balances');
-    if (!res.ok) return {};
-    return res.json();
-  } catch {
-    return {};
-  }
-}
-
-/** Update an employee's CL total via the server */
-export async function updateClBalance(employeeId: string, total: number): Promise<ClBalance> {
-  const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ total }),
-  });
-  if (!res.ok) throw new Error('Failed to update CL balance');
-  const data = await res.json();
-  return data.balance;
-}
-
-/**
- * Given an employee's CL balance and approved leave records for the month,
- * returns how many excess (LOP) days they have.
- */
-export function computeLopDays(clBalance: ClBalance): number {
-  return Math.max(0, clBalance.used - clBalance.total);
 }
 
 // ─── Bulk Slip Email types & API ─────────────────────────────────────────────
@@ -1232,17 +495,11 @@ export interface SlipRow {
   ctc: number;
   deductions: number;
   netPay: number;
-  additionHeads?: string[];
-  deductionHeads?: string[];
-  additionValues?: number[];
-  deductionValues?: number[];
-  deduction?: number;
 }
 
 export interface BulkSendResult {
   sent: number;
   failed: { email: string; name: string; error: string }[];
-  skipped?: boolean;
 }
 
 /**
@@ -1250,7 +507,7 @@ export interface BulkSendResult {
  * Calls the Express backend at /api/payroll/send-slips.
  */
 export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
-  const res = await fetch('http://localhost:3001/api/payroll/send-slips', {
+  const res = await fetch('/api/payroll/send-slips', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slips: rows }),
@@ -1260,68 +517,4 @@ export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
     throw new Error(err.error || `Server returned ${res.status}`);
   }
   return res.json();
-}
-
-// ─── Payslip Schedule API ─────────────────────────────────────────────────────
-
-export interface PayslipSchedule {
-  day: number;
-  hour: number;
-  minute: number;
-  enabled: boolean;
-  lastRun: string | null;
-}
-
-/** Fetch the current payslip auto-send schedule from the server. */
-export async function getPayslipSchedule(): Promise<PayslipSchedule> {
-  try {
-    const res = await fetch('http://localhost:3001/api/payroll/schedule');
-    if (!res.ok) throw new Error('Server error');
-    return res.json();
-  } catch {
-    return { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null };
-  }
-}
-
-/** Update the payslip auto-send schedule on the server. */
-export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'lastRun'>): Promise<PayslipSchedule> {
-  const res = await fetch('http://localhost:3001/api/payroll/schedule', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(schedule),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
-    throw new Error(err.error || `Server returned ${res.status}`);
-  }
-  const data = await res.json();
-  return data.schedule;
-}
-
-/** Manually trigger payslip dispatch immediately (uses server-stored records). */
-export async function triggerManualSend(): Promise<BulkSendResult> {
-  const res = await fetch('http://localhost:3001/api/payroll/trigger-send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
-    throw new Error(err.error || `Server returned ${res.status}`);
-  }
-  return res.json();
-}
-
-/** Sync the latest payroll records from client localStorage to the server db.json.
- *  Called whenever HR saves/approves payroll so the cron job has up-to-date data.
- */
-export async function syncPayrollToServer(records: PayrollRecord[]): Promise<void> {
-  try {
-    await fetch('http://localhost:3001/api/payroll/records', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ records }),
-    });
-  } catch (err) {
-    console.warn('[Payroll] Failed to sync records to server:', err);
-  }
 }

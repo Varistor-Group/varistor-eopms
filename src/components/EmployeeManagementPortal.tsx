@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees, deleteEmployee, sendRecoveryEmail, updateEmployee } from '../api/employees';
 import { mockEmployeeStore } from '../api/employees';
-import { vpAuditApi, type VpAuditLog } from '../api/vpAudit';
 import { AdminCreateEmployee } from './AdminCreateEmployee';
 import { AdminEditEmployee } from './AdminEditEmployee';
 import { Users, UserPlus, ShieldAlert, BadgeCheck, XCircle, Pencil, Trash2, Award, ChevronDown, Mail, PowerOff, Power } from 'lucide-react';
@@ -10,11 +9,14 @@ import type { Employee } from '../api/employees';
 import { Button } from './shared/Button';
 
 export const EmployeeManagementPortal: React.FC = () => {
-  const { currentRole, assertAdministrativeTransaction, addToast } = useVariPoints();
-  const [view, setView] = useState<'list' | 'create' | 'edit' | 'audit'>('list');
+  const { currentRole, assertAdministrativePenalty, addToast } = useVariPoints();
+  const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [vpAuditLogs, setVpAuditLogs] = useState<VpAuditLog[]>([]);
+
+  type SortField = 'employeeId' | 'fullName' | 'department' | 'variPoints' | 'status' | 'dateOfJoining';
+  const [sortField, setSortField] = useState<SortField>('employeeId');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // HR Vari Points management state (Admin only)
   const [hrPointsSection, setHrPointsSection] = useState(false);
@@ -28,22 +30,8 @@ export const EmployeeManagementPortal: React.FC = () => {
   const hrUsers = mockEmployeeStore.filter(e => e.role === 'HR');
 
   useEffect(() => {
-    if (view === 'list') {
-      getEmployees().then(setEmployees);
-    } else if (view === 'audit') {
-      vpAuditApi.getLogs().then(setVpAuditLogs);
-      getEmployees().then(setEmployees);
-    }
+    getEmployees().then(setEmployees);
   }, [view]);
-
-  const getEmployeeName = (id?: string) => {
-    if (!id) return 'Global';
-    const emp = employees.find(e => e.id === id);
-    if (emp) return emp.fullName;
-    const hr = hrUsers.find(h => h.id === id);
-    if (hr) return hr.fullName;
-    return id;
-  };
 
   // Role Gate
   if (currentRole !== 'Admin' && currentRole !== 'HR') {
@@ -125,11 +113,25 @@ export const EmployeeManagementPortal: React.FC = () => {
             Manage your team, roles, and onboarding.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setView('audit')} variant="secondary" className="flex items-center gap-2">
-            <ShieldAlert size={16} />
-            <span>VP Audit Logs</span>
-          </Button>
+        <div className="flex items-center gap-3">
+          <select
+            className="text-sm border border-varistor-border rounded-lg px-3 py-2 bg-white text-varistor-dark outline-none focus:ring-1 focus:ring-varistor-lime"
+            value={`${sortField}-${sortOrder}`}
+            onChange={(e) => {
+              const [field, order] = e.target.value.split('-');
+              setSortField(field as SortField);
+              setSortOrder(order as 'asc' | 'desc');
+            }}
+          >
+            <option value="employeeId-asc">Emp ID (Asc)</option>
+            <option value="employeeId-desc">Emp ID (Desc)</option>
+            <option value="fullName-asc">Name (A-Z)</option>
+            <option value="fullName-desc">Name (Z-A)</option>
+            <option value="department-asc">Department (A-Z)</option>
+            <option value="variPoints-desc">Points (High to Low)</option>
+            <option value="dateOfJoining-desc">DOJ (Newest first)</option>
+            <option value="dateOfJoining-asc">DOJ (Oldest first)</option>
+          </select>
           <Button onClick={() => setView('create')} className="flex items-center gap-2">
             <UserPlus size={16} />
             <span>Add Employee</span>
@@ -137,48 +139,6 @@ export const EmployeeManagementPortal: React.FC = () => {
         </div>
       </div>
 
-      {view === 'audit' && (
-        <div className="bg-white rounded-varistor border border-varistor-border p-6 shadow-sm mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-varistor-dark">VariPoints Audit Trail</h3>
-            <button onClick={() => setView('list')} className="text-sm font-bold text-varistor-muted hover:text-varistor-dark transition-colors">
-              Close &times;
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-varistor-pageBg border-b border-varistor-border">
-                <tr>
-                  <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Timestamp</th>
-                  <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Admin ID</th>
-                  <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Recipient ID</th>
-                  <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Action</th>
-                  <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Reason</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-varistor-border">
-                {vpAuditLogs.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-varistor-muted italic">No audit logs found.</td></tr>
-                ) : vpAuditLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-varistor-pageBg/50 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="px-6 py-4 font-bold">{getEmployeeName(log.admin_id)}</td>
-                    <td className="px-6 py-4 font-mono text-xs text-varistor-muted">{getEmployeeName(log.recipient_id)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${log.type === 'credit' ? 'bg-varistor-limeLight text-varistor-limeText' : 'bg-red-100 text-red-600'}`}>
-                        {log.type === 'credit' ? '+' : '-'}{log.points} VP
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs max-w-xs truncate">{log.reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {view === 'list' && (
       <div className="bg-white rounded-varistor border border-varistor-border overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
@@ -194,9 +154,29 @@ export const EmployeeManagementPortal: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-varistor-border">
               {[...employees].sort((a, b) => {
-                if (a.status === 'Active' && b.status === 'Inactive') return -1;
-                if (a.status === 'Inactive' && b.status === 'Active') return 1;
-                return 0;
+                let comparison = 0;
+                switch (sortField) {
+                  case 'fullName':
+                    comparison = a.fullName.localeCompare(b.fullName);
+                    break;
+                  case 'department':
+                    comparison = a.department.localeCompare(b.department);
+                    break;
+                  case 'variPoints':
+                    comparison = a.variPoints - b.variPoints;
+                    break;
+                  case 'status':
+                    comparison = a.status.localeCompare(b.status);
+                    break;
+                  case 'dateOfJoining':
+                    comparison = (a.dateOfJoining || '').localeCompare(b.dateOfJoining || '');
+                    break;
+                  case 'employeeId':
+                  default:
+                    comparison = a.employeeId.localeCompare(b.employeeId);
+                    break;
+                }
+                return sortOrder === 'asc' ? comparison : -comparison;
               }).map((emp) => (
                 <tr key={emp.id} className={`hover:bg-varistor-pageBg/50 transition-colors ${emp.status === 'Inactive' ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4">
@@ -243,7 +223,7 @@ export const EmployeeManagementPortal: React.FC = () => {
                         Inactive
                       </span>
                     )}
-                   </td>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
                       <button
@@ -260,11 +240,10 @@ export const EmployeeManagementPortal: React.FC = () => {
                             }
                           }
                         }}
-                        className={`p-1.5 rounded-md transition-colors ${
-                          emp.status === 'Active'
+                        className={`p-1.5 rounded-md transition-colors ${emp.status === 'Active'
                             ? 'text-varistor-muted hover:text-red-600 hover:bg-red-50'
                             : 'text-varistor-muted hover:text-green-600 hover:bg-green-50'
-                        }`}
+                          }`}
                         title={emp.status === 'Active' ? 'Deactivate Employee' : 'Activate Employee'}
                       >
                         {emp.status === 'Active' ? <PowerOff size={16} /> : <Power size={16} />}
@@ -324,7 +303,6 @@ export const EmployeeManagementPortal: React.FC = () => {
           )}
         </div>
       </div>
-      )}
 
       {/* ── HR Vari Points Management (Admin only) ─────────────────────────────── */}
       {currentRole === 'Admin' && (

@@ -25,12 +25,10 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-10 md:space-y-8">
       {renderDashboard()}
       
-      {currentRole !== 'Employee' && currentRole !== 'Field Employee' && (
-        <div className="px-2 md:px-0">
-          <h3 className="text-xl font-bold text-varistor-dark mb-6 md:mb-4">Organization Leaderboard</h3>
-          <Leaderboard />
-        </div>
-      )}
+      <div className="px-2 md:px-0">
+        <h3 className="text-xl font-bold text-varistor-dark mb-6 md:mb-4">Organization Leaderboard</h3>
+        <Leaderboard />
+      </div>
     </div>
   );
 };
