@@ -252,7 +252,7 @@ const PolicyCard: React.FC<PolicyCardProps> = ({ policy, index, canEdit, onEdit,
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export const PolicyPage: React.FC = () => {
-  const { currentRole, addToast } = useVariPoints();
+  const { currentRole, addToast, addAnnouncement } = useVariPoints();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -283,7 +283,7 @@ export const PolicyPage: React.FC = () => {
       const result = await addPolicy(data);
       if (result.success && result.policy) {
         setPolicies(prev => [...prev, result.policy!]);
-        addToast('Policy added successfully.', 0, 'credit');
+        addAnnouncement(data.title, 'A new policy has been published for your review.', 'Policy');
       } else {
         addToast(`Failed: ${result.error}`, 0, 'debit');
       }

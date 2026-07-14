@@ -1,10 +1,11 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 import { API_URL } from '../config/api';
+import { supabase } from '../lib/supabase';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -55,6 +56,10 @@ interface EopmsContextType {
   submitLeave: (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => void;
   approveLeave: (leaveId: string) => void;
   rejectLeave: (leaveId: string, comment: string) => void;
+
+  // Realtime Policy Notifications
+  policyNotification: { show: boolean; title: string };
+  setPolicyNotification: (state: { show: boolean; title: string }) => void;
 }
 
   // eslint-disable-next-line react-refresh/only-export-components
@@ -259,6 +264,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
 
+  // ── Realtime Notifications state ──────────────────────────────────────────
+  const [policyNotification, setPolicyNotification] = useState({ show: false, title: '' });
+
   useEffect(() => {
     // Load async states for leaves
     const empId = currentUser?.id ?? MOCK_USER_ID;
@@ -307,17 +315,68 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const activeUserId = currentUser?.id ?? MOCK_USER_ID;
 
+  const knownAnnouncementsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    const loadAnnouncements = async () => {
+    const loadAnnouncements = async (isPolling = false) => {
       try {
         const data = await announcementsApi.fetchAnnouncements(activeUserId);
+        
+        const unnotifiedPolicies = data.filter(ann => {
+          if (ann.type !== 'Policy') return false;
+          if (isPolling) {
+            return !knownAnnouncementsRef.current.has(ann.id);
+          } else {
+            return !ann.isRead && !knownAnnouncementsRef.current.has(ann.id);
+          }
+        });
+
+        if (unnotifiedPolicies.length > 0) {
+          const latest = unnotifiedPolicies[0];
+          setPolicyNotification({ show: true, title: latest.title || 'New Policy' });
+          setTimeout(() => {
+            setPolicyNotification(prev => ({ ...prev, show: false }));
+          }, 8000);
+        }
+        
+        knownAnnouncementsRef.current = new Set(data.map(a => a.id));
         setAnnouncements(data);
       } catch (err) {
         console.error('Failed to load announcements:', err);
       }
     };
     loadAnnouncements();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Polling fallback every 10 seconds for real-time updates without WebSockets
+    const pollInterval = setInterval(() => loadAnnouncements(true), 10000);
+
+    // ── Realtime Subscription for New Announcements ──
+    const channel = supabase.channel('public:announcements')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'announcements' },
+        (payload) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const newRow = payload.new as any;
+          if (newRow.type === 'Policy') {
+            setPolicyNotification({ show: true, title: newRow.title || 'New Policy' });
+
+            // Auto-dismiss toast after 5s
+            setTimeout(() => {
+              setPolicyNotification(prev => ({ ...prev, show: false }));
+            }, 5000);
+          }
+
+          // Refresh announcements to get the new one and increment bell badge
+          loadAnnouncements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+    };
   }, [activeUserId]);
 
   const reactToAnnouncement = async (announcementId: string, emojiType: string) => {
@@ -351,7 +410,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         activeUserId
       );
       setAnnouncements(updated);
-      addToast(`New announcement posted: "${title}"`, 0, 'credit');
+      if (type === 'Policy') {
+        addToast(`A new policy has been uploaded: "${title}"`, 0, 'credit');
+      } else {
+        addToast(`New announcement posted: "${title}"`, 0, 'credit');
+      }
     } catch (err) {
       console.error('Failed to create announcement:', err);
     }
@@ -759,7 +822,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         leaveBalance,
         submitLeave,
         approveLeave,
-        rejectLeave
+        rejectLeave,
+        policyNotification,
+        setPolicyNotification
       }}
     >
       {children}
