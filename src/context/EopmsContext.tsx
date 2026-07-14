@@ -18,6 +18,7 @@ export interface CurrentUser {
   department: string;
   avatarUrl: string;
   role: UserRole;
+  dob?: string;
 }
 
 interface EopmsContextType {

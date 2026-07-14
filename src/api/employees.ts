@@ -18,6 +18,7 @@ export interface Employee {
   role: UserRole;
   tempPassword: string;
   createdAt: string;
+  dob?: string;
   status: 'Active' | 'Inactive';
   variPoints: number;
   is_field_employee?: boolean;

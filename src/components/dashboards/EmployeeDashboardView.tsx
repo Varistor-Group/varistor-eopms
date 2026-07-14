@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Camera } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { PerformanceMeter } from '../PerformanceMeter';
 import { PointsBalance } from '../PointsBalance';
 import { TaskSummary } from '../TaskSummary';
@@ -57,11 +58,34 @@ export const EmployeeDashboardView: React.FC = () => {
     return `${diffDays}d ago`;
   };
 
+  const isBirthday = () => {
+    const dob = currentUser?.dob;
+    if (!dob) return false;
+    const today = new Date();
+    const dobDate = new Date(dob);
+    return today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate();
+  };
+
+  useEffect(() => {
+    if (isBirthday()) {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#84CC16', '#3b82f6', '#f59e0b', '#ec4899', '#a855f7'],
+        zIndex: 9999
+      });
+    }
+  }, [currentUser?.dob]);
+
   const getGreeting = () => {
+    if (isBirthday()) {
+      return "Happy Birthday, ";
+    }
     const currentHour = new Date().getHours();
-    if (currentHour >= 5 && currentHour < 12) return "Good morning";
-    if (currentHour >= 12 && currentHour < 17) return "Good afternoon";
-    return "Good evening";
+    if (currentHour >= 5 && currentHour < 12) return "Good morning, ";
+    if (currentHour >= 12 && currentHour < 17) return "Good afternoon, ";
+    return "Good evening, ";
   };
 
   return (
@@ -85,7 +109,7 @@ export const EmployeeDashboardView: React.FC = () => {
             </button>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()}, {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}</h1>
+            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()} {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}{isBirthday() ? '! 🎉' : ''}</h1>
             <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser?.department ?? 'General'} Team · {currentUser?.role ?? mockStoreUser?.role ?? 'Employee'}</p>
             <div className="mt-2 flex items-center">
             {isTracking ? (

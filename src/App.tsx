@@ -38,12 +38,31 @@ const FieldTrackerBackground: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification, addAnnouncement, announcements } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('eopms_current_user'));
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.dob) {
+      const today = new Date();
+      const dobDate = new Date(currentUser.dob);
+      if (today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate()) {
+        const title = `Today is ${currentUser.name}'s birthday! Wish them a great day! 🎂`;
+        // Prevent duplicate posts today
+        const hasAnnounced = announcements.some(a => 
+          a.type === 'Birthday' && 
+          a.title === title && 
+          new Date(a.created_at).toDateString() === today.toDateString()
+        );
+        if (!hasAnnounced) {
+           addAnnouncement(title, 'Join us in wishing them the happiest of birthdays!', 'Birthday', 'Admin');
+        }
+      }
+    }
+  }, [currentUser?.dob, currentUser?.name, announcements.length]);
 
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
