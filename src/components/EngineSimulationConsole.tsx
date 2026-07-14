@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, ShieldAlert, History } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { mockEmployeeStore } from '../api/employees';
+import { mockEmployeeStore, getEmployees, type Employee } from '../api/employees';
+import { vpAuditApi, type VpAuditLog } from '../api/vpAudit';
 
 export const EngineSimulationConsole: React.FC = () => {
   const { currentRole, assertAdministrativePenalty } = useVariPoints();
@@ -9,8 +10,47 @@ export const EngineSimulationConsole: React.FC = () => {
   const [penaltyReason, setPenaltyReason] = useState('');
   const [customPoints, setCustomPoints] = useState<number | ''>('');
   const [employeeId, setEmployeeId] = useState('');
+  const [logs, setLogs] = useState<VpAuditLog[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployeeStore);
 
   const hasAccess = currentRole === 'Admin' || currentRole === 'HR';
+
+  const fetchLogsAndEmployees = async () => {
+    try {
+      const [logsData, empsData] = await Promise.all([
+        vpAuditApi.getLogs(),
+        getEmployees()
+      ]);
+      setLogs(logsData);
+      setEmployees(empsData.length > 0 ? empsData : mockEmployeeStore);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (hasAccess) {
+      fetchLogsAndEmployees();
+    }
+  }, [hasAccess]);
+
+  const getEmployeeName = (id?: string) => {
+    if (!id) return 'Unknown';
+    const emp = employees.find(e => e.id === id || e.employeeId === id);
+    return emp ? emp.fullName : 'Unknown User';
+  };
+
+  const getActionByDisplay = (id?: string) => {
+    if (!id) return 'System';
+    if (id === 'VAR-001') return 'System Admin (Admin)';
+    
+    const emp = employees.find(e => e.id === id || e.employeeId === id);
+    if (emp) {
+      return `${emp.fullName} (${emp.role})`;
+    }
+    return `Unknown User (${id})`;
+  };
+
 
   const handleAssertPenalty = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +63,10 @@ export const EngineSimulationConsole: React.FC = () => {
     setPenaltyReason('');
     setCustomPoints('');
     setEmployeeId('');
+
+    setTimeout(() => {
+      fetchLogsAndEmployees();
+    }, 1000);
   };
 
   if (!hasAccess) {
@@ -125,6 +169,55 @@ export const EngineSimulationConsole: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor max-w-3xl overflow-hidden mt-6">
+        <div className="px-6 py-5 border-b border-varistor-border flex items-center gap-2">
+          <History size={18} className="text-varistor-dark" />
+          <h3 className="text-sm font-bold text-varistor-dark uppercase tracking-wider">Transaction Log</h3>
+        </div>
+        <div className="p-0">
+          {logs.length === 0 ? (
+            <p className="text-xs text-varistor-muted p-6 text-center">No transaction logs available.</p>
+          ) : (
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-varistor-surface z-10">
+                  <tr className="bg-varistor-surfaceMuted border-b border-varistor-border">
+                    <th className="p-3 text-[10px] font-bold text-varistor-muted uppercase">Date</th>
+                    <th className="p-3 text-[10px] font-bold text-varistor-muted uppercase">Points</th>
+                    <th className="p-3 text-[10px] font-bold text-varistor-muted uppercase">Employee</th>
+                    <th className="p-3 text-[10px] font-bold text-varistor-muted uppercase">Reason</th>
+                    <th className="p-3 text-[10px] font-bold text-varistor-muted uppercase">Action By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(log => (
+                    <tr key={log.id} className="border-b border-varistor-border last:border-b-0 hover:bg-varistor-surfaceMuted/50 transition-colors">
+                      <td className="p-3 text-xs text-varistor-dark whitespace-nowrap">
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-xs font-bold">
+                        <span className={log.type === 'debit' ? 'text-red-500' : 'text-green-500'}>
+                          {log.type === 'debit' ? '-' : '+'}{log.points} VP
+                        </span>
+                      </td>
+                      <td className="p-3 text-xs text-varistor-dark font-medium">
+                        {getEmployeeName(log.recipient_id)}
+                      </td>
+                      <td className="p-3 text-xs text-varistor-muted max-w-[200px] truncate" title={log.reason}>
+                        {log.reason}
+                      </td>
+                      <td className="p-3 text-xs text-varistor-muted">
+                        {getActionByDisplay(log.admin_id)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

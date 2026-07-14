@@ -10,7 +10,7 @@ import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { Menu, X, LogOut, Sun, Moon } from 'lucide-react';
+import { Bell, Menu, X, LogOut, Sun, Moon } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
@@ -26,7 +26,6 @@ import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
-import { PolicyBanner } from './components/PolicyBanner';
 import { mockEmployeeStore } from './api/employees';
 
 const FieldTrackerBackground: React.FC = () => {
@@ -39,7 +38,7 @@ const FieldTrackerBackground: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, currentUser, setCurrentUser, setCurrentRole } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -202,7 +201,6 @@ const AppContent: React.FC = () => {
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col lg:pl-[220px] min-w-0">
-        <PolicyBanner />
 
         {/* Top Header bar */}
         <header className="h-16 bg-varistor-surface border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
@@ -330,6 +328,26 @@ const AppContent: React.FC = () => {
               <p className="text-xs text-varistor-muted mt-1">You have been assigned: <span className="font-semibold text-varistor-dark">{taskNotification.title}</span></p>
             </div>
             <button onClick={() => setTaskNotification({ ...taskNotification, show: false })} className="text-varistor-muted hover:text-varistor-dark transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Policy Notification Pop-up */}
+      {policyNotification && policyNotification.show && (
+        <div className="fixed top-20 right-4 z-[60] w-80 bg-varistor-surface border-l-4 border-blue-500 shadow-xl rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
+          <div className="flex justify-between items-start">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
+                <Bell size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-varistor-dark">New Policy Uploaded</h3>
+                <p className="text-xs text-varistor-muted mt-1 font-semibold">{policyNotification.title}</p>
+              </div>
+            </div>
+            <button onClick={() => setPolicyNotification({ show: false, title: '' })} className="text-varistor-muted hover:text-varistor-dark transition-colors">
               <X size={16} />
             </button>
           </div>

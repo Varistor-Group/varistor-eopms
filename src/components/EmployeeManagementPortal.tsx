@@ -32,8 +32,18 @@ export const EmployeeManagementPortal: React.FC = () => {
       getEmployees().then(setEmployees);
     } else if (view === 'audit') {
       vpAuditApi.getLogs().then(setVpAuditLogs);
+      getEmployees().then(setEmployees);
     }
   }, [view]);
+
+  const getEmployeeName = (id?: string) => {
+    if (!id) return 'Global';
+    const emp = employees.find(e => e.id === id);
+    if (emp) return emp.fullName;
+    const hr = hrUsers.find(h => h.id === id);
+    if (hr) return hr.fullName;
+    return id;
+  };
 
   // Role Gate
   if (currentRole !== 'Admin' && currentRole !== 'HR') {
@@ -157,8 +167,8 @@ export const EmployeeManagementPortal: React.FC = () => {
                 ) : vpAuditLogs.map(log => (
                   <tr key={log.id} className="hover:bg-varistor-pageBg/50 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs">{new Date(log.created_at).toLocaleString()}</td>
-                    <td className="px-6 py-4 font-bold">{log.admin_id}</td>
-                    <td className="px-6 py-4 font-mono text-xs text-varistor-muted">{log.recipient_id || 'Global'}</td>
+                    <td className="px-6 py-4 font-bold">{getEmployeeName(log.admin_id)}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-varistor-muted">{getEmployeeName(log.recipient_id)}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${log.type === 'credit' ? 'bg-varistor-limeLight text-varistor-limeText' : 'bg-red-100 text-red-600'}`}>
                         {log.type === 'credit' ? '+' : '-'}{log.points} VP
