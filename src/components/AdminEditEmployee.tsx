@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, UserCog } from 'lucide-react';
-import { updateEmployee } from '../api/employees';
-import type { Employee, Department } from '../api/employees';
+import { updateEmployee, getDepartments } from '../api/employees';
+import type { Employee } from '../api/employees';
 import type { UserRole } from '../types';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -27,10 +27,6 @@ const inputCls = (hasError?: boolean) =>
   `px-3 py-2 border rounded-varistor text-sm outline-none transition-all duration-150 bg-white
   focus:ring-2 focus:ring-varistor-lime/40
   ${hasError ? 'border-red-400 focus:border-red-400' : 'border-varistor-border focus:border-varistor-lime'}`;
-
-const DEPARTMENTS: Department[] = [
-  'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech', 'Digital Marketing',
-];
 
 const ROLES: UserRole[] = ['Employee', 'Field Employee', 'Reporting Manager', 'HR', 'Admin'];
 
@@ -61,7 +57,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
-    if (!form.phone.trim()) errs.phone = 'Phone number is required.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
     if (!form.role) errs.role = 'System role is required.';
@@ -150,7 +146,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
 
             <Field label="Department" required error={errors.department}>
               <select className={inputCls(!!errors.department)} value={form.department} onChange={set('department')}>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                {getDepartments().map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </Field>
 

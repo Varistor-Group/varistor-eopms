@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -6,12 +6,13 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
-
+import { RoleSwitcher } from './components/RoleSwitcher';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { Menu, X, LogOut, Sun, Moon } from 'lucide-react';
+import { Menu, X, LogOut, Sun, Moon, BookOpen } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
+import { useTrainingGate } from './hooks/useTrainingGate';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
@@ -26,14 +27,14 @@ import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
-import { PolicyBanner } from './components/PolicyBanner';
 import { mockEmployeeStore } from './api/employees';
+import { FieldPunch } from './components/FieldPunch';
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
   const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
   const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
-
+  
   useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
   return null;
 };
@@ -41,73 +42,15 @@ const FieldTrackerBackground: React.FC = () => {
 const AppContent: React.FC = () => {
   const { currentRole, currentUser, setCurrentUser, setCurrentRole } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
+  const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('eopms_current_user'));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
-
+  
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
-
-  // Refs for back button handler to avoid stale closures
-  const activeTabRef = useRef(activeTab);
-  const isOpenMobileRef = useRef(isOpenMobile);
-  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
-  useEffect(() => { isOpenMobileRef.current = isOpenMobile; }, [isOpenMobile]);
-
-  // Handle hardware back button globally
-  useEffect(() => {
-    // We must dynamically import to avoid breaking the web build if Capacitor is missing
-    let listener: { remove: () => void } | null = null;
-    
-    // Hide native status bar if on mobile
-    import('@capacitor/status-bar').then(({ StatusBar }) => {
-      StatusBar.hide().catch(console.warn);
-    }).catch(console.warn);
-
-    import('@capacitor/app').then(async ({ App: CapApp }) => {
-      listener = await CapApp.addListener('backButton', () => {
-        // First check if any inner component (like Chat sidebar) wants to consume this
-        const event = new CustomEvent('app_back_button', { cancelable: true });
-        window.dispatchEvent(event);
-        if (event.defaultPrevented) return;
-
-        if (isOpenMobileRef.current) {
-          setIsOpenMobile(false);
-        } else if (activeTabRef.current === 'dashboard') {
-          CapApp.exitApp();
-        } else {
-          setIsOpenMobile(true);
-        }
-      });
-    }).catch(console.warn);
-
-    return () => {
-      if (listener && typeof listener.remove === 'function') {
-        listener.remove();
-      }
-    };
-  }, []);
-
-  // ── Fix #7: Auto-restore session from localStorage on app mount ──────
-  useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('eopms_current_user');
-      const savedRole = localStorage.getItem('eopms_role');
-      if (savedUser && savedRole) {
-        const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-        setCurrentRole(savedRole as import('./types').UserRole);
-        setIsLoggedIn(true);
-      }
-    } catch {
-      // Corrupted data – clear and force re-login
-      localStorage.removeItem('eopms_current_user');
-      localStorage.removeItem('eopms_role');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
@@ -142,6 +85,19 @@ const AppContent: React.FC = () => {
     window.addEventListener('navigateTab', handleNavigate);
     return () => window.removeEventListener('navigateTab', handleNavigate);
   }, []);
+
+  // Re-check training completion whenever the user changes tabs (e.g. right after finishing a module).
+  useEffect(() => {
+    refreshTrainingGate();
+  }, [activeTab, refreshTrainingGate]);
+
+  // Confine employees/managers with incomplete required training to the Training tab.
+  useEffect(() => {
+    if (trainingLocked && activeTab !== 'training') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab('training');
+    }
+  }, [trainingLocked, activeTab]);
 
   useEffect(() => {
     const channel = new BroadcastChannel('eopms_notifications');
@@ -198,11 +154,12 @@ const AppContent: React.FC = () => {
         setActiveTab={setActiveTab}
         isOpenMobile={isOpenMobile}
         setIsOpenMobile={setIsOpenMobile}
+        onLogout={handleLogout}
+        trainingLocked={trainingLocked}
       />
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col lg:pl-[220px] min-w-0">
-        <PolicyBanner />
 
         {/* Top Header bar */}
         <header className="h-16 bg-varistor-surface border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
@@ -219,11 +176,13 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Live Role Switcher */}
+            <RoleSwitcher currentRole={currentRole} setCurrentRole={setCurrentRole} />
 
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full border border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface transition-colors cursor-pointer text-varistor-dark"
+              className="p-2 rounded-full hover:bg-varistor-surfaceMuted transition-colors cursor-pointer text-varistor-dark"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
@@ -248,7 +207,7 @@ const AppContent: React.FC = () => {
                   <span className="text-[10px] text-varistor-muted leading-tight">{currentUser?.department ?? ''}</span>
                 </div>
               </button>
-
+              
               <button
                 onClick={handleLogout}
                 title="Logout"
@@ -274,19 +233,29 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 // All employee tabs (minus vault & attendance) + task-management
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                const tabs = ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                if (currentRole === 'Field Employee') {
+                  tabs.push('field-punch');
+                }
+                return tabs;
               }
             };
 
-            const allowedTabs = getAllowedTabs();
+            const allowedTabs = trainingLocked ? ['training'] : getAllowedTabs();
             if (!allowedTabs.includes(activeTab)) {
-              return (
+              return trainingLocked ? (
+                <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-border shadow-sm animate-[fadeInPage_250ms_ease-out]">
+                  <BookOpen size={40} strokeWidth={1.5} className="text-varistor-lime mb-4" />
+                  <h2 className="text-xl font-bold text-varistor-dark">Complete Your Training First</h2>
+                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You need to finish your assigned training modules before you can access the rest of the app.</p>
+                </div>
+              ) : (
                 <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>
                   <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
@@ -306,6 +275,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'field-tracker' && <FieldTracker />}
+                {activeTab === 'field-punch' && <FieldPunch />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
@@ -323,7 +293,7 @@ const AppContent: React.FC = () => {
 
       {/* Real-time Task Notification Pop-up */}
       {taskNotification && taskNotification.show && (
-        <div className="fixed top-[calc(1rem+env(safe-area-inset-top))] left-4 right-4 z-50 max-w-sm mx-auto bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
+        <div className="fixed top-6 right-6 z-50 bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>

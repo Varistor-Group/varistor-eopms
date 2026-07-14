@@ -21,6 +21,7 @@ import {
   linkDocumentToSlot,
   seedEmployeeSlots,
   syncTemplateSlotsRequirement,
+  getEmployeesWithPendingDocuments,
 } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees } from '../api/employees';
@@ -280,6 +281,10 @@ const SlotCard: React.FC<SlotCardProps> = ({
   const docStatus: DocumentStatus = slot.status in STATUS_CONFIG ? slot.status : 'Pending';
 
   const handleStatusChange = async (newStatus: DocumentStatus) => {
+    if (newStatus === 'Verified' && !slot.filename) {
+      addToast('Cannot verify an empty slot', 0, 'debit');
+      return;
+    }
     setIsUpdating(true);
     const res = await updateSlotStatus(slot.id, newStatus);
     setIsUpdating(false);
@@ -366,7 +371,11 @@ const SlotCard: React.FC<SlotCardProps> = ({
           {canManage ? (
             <div className="relative">
               <select value={docStatus} onChange={e => handleStatusChange(e.target.value as DocumentStatus)} disabled={isUpdating} className={`appearance-none text-[10px] font-bold uppercase tracking-wide pr-6 pl-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-varistor-lime ${STATUS_CONFIG[docStatus]?.className ?? 'bg-gray-100 text-gray-500 border-gray-200'} ${isUpdating ? 'opacity-60 cursor-not-allowed' : ''}`} title="Change status">
-                {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                {ALL_STATUSES.map(s => (
+                  <option key={s} value={s} disabled={!hasFile && s === 'Verified'}>
+                    {s}
+                  </option>
+                ))}
               </select>
               <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-current opacity-60">&#9660;</span>
             </div>
@@ -420,15 +429,18 @@ const SlotCard: React.FC<SlotCardProps> = ({
 };
 
 export const DocumentVault: React.FC = () => {
-  const { currentRole, addToast } = useVariPoints();
+  const { currentRole, currentUser, addToast } = useVariPoints();
   const [slots, setSlots] = useState<EmployeeDocumentSlot[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddSlot, setShowAddSlot] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [pendingEmployees, setPendingEmployees] = useState<Set<string>>(new Set());
+  const [seededEmployees, setSeededEmployees] = useState<Set<string>>(new Set());
 
-  const loggedInEmployeeId = 'VAR-024';
+  // Fallback to VAR-024 only if somehow both ID and employeeId are missing
+  const loggedInEmployeeId = (currentUser as any)?.employeeId || currentUser?.id || 'VAR-024';
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
 
   const canManage = currentRole === 'Admin' || currentRole === 'HR';
@@ -436,12 +448,18 @@ export const DocumentVault: React.FC = () => {
 
   useEffect(() => {
     getEmployees().then(setEmployees);
-    if (canManage) getDocumentTemplates().then(setTemplates);
+    if (canManage) {
+      getDocumentTemplates().then(setTemplates);
+      getEmployeesWithPendingDocuments().then(res => {
+        setPendingEmployees(res.pending);
+        setSeededEmployees(res.seeded);
+      });
+    }
   }, [canManage]);
 
   useEffect(() => {
     if (!canManage) setSelectedEmployeeId(loggedInEmployeeId);
-  }, [currentRole, canManage]);
+  }, [currentRole, canManage, loggedInEmployeeId]);
 
   const loadSlots = useCallback(async () => {
     setIsLoading(true);
@@ -453,10 +471,25 @@ export const DocumentVault: React.FC = () => {
 
   useEffect(() => { loadSlots(); }, [loadSlots]);
 
-  const filteredEmployees = employees.filter(e => 
-    e.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || 
-    e.employeeId.toLowerCase().includes(employeeSearch.toLowerCase())
-  );
+  const requiredTemplatesCount = templates.filter(t => t.isRequired).length;
+  const isEmployeePending = (empId: string) => {
+    const isSeeded = seededEmployees.has(empId);
+    if (!isSeeded) return requiredTemplatesCount > 0;
+    return pendingEmployees.has(empId);
+  };
+
+  const filteredEmployees = employees
+    .filter(e => 
+      e.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || 
+      e.employeeId.toLowerCase().includes(employeeSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aPending = isEmployeePending(a.id);
+      const bPending = isEmployeePending(b.id);
+      if (aPending && !bPending) return -1;
+      if (!aPending && bPending) return 1;
+      return a.fullName.localeCompare(b.fullName);
+    });
 
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
   const isOwnEmployee = selectedEmployeeId === loggedInEmployeeId || !canSelectEmployee;
@@ -477,7 +510,19 @@ export const DocumentVault: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <Users size={18} className="text-varistor-lime shrink-0" />
                   <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="bg-varistor-pageBg border border-varistor-border text-brand-ink text-sm rounded-xl focus:ring-varistor-lime focus:border-varistor-lime block w-full sm:w-64 p-2.5 font-semibold">
-                    {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.fullName} ({emp.employeeId})</option>)}
+                    {filteredEmployees.map(emp => {
+                      const isPending = isEmployeePending(emp.id);
+                      return (
+                        <option 
+                          key={emp.id} 
+                          value={emp.id}
+                          style={{ color: isPending ? '#dc2626' : '#059669', fontWeight: 600 }}
+                          className={isPending ? 'text-red-600 font-semibold' : 'text-emerald-600 font-semibold'}
+                        >
+                          {isPending ? '🔴' : '🟢'} {emp.fullName} ({emp.employeeId})
+                        </option>
+                      );
+                    })}
                     {filteredEmployees.length === 0 && <option disabled>No matches</option>}
                   </select>
                 </div>

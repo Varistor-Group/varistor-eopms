@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Megaphone, Camera } from 'lucide-react';
 import { PerformanceMeter } from '../PerformanceMeter';
 import { PointsBalance } from '../PointsBalance';
@@ -25,28 +25,12 @@ export const EmployeeDashboardView: React.FC = () => {
 
   const { isTracking } = useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
 
-  // State for Employee viewing live CL balance
-  const [ownClBalance, setOwnClBalance] = useState<{ total: number; used: number } | null>(null);
-
-  useEffect(() => {
-    const empId = currentUser?.id ?? 'VAR-003';
-    if (empId) {
-      fetch(`http://localhost:3001/api/cl-balances/${empId}`)
-        .then(res => {
-          if (!res.ok) throw new Error();
-          return res.json();
-        })
-        .then(setOwnClBalance)
-        .catch(() => setOwnClBalance({ total: 12, used: 0 }));
-    }
-  }, [currentUser?.id]);
-
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'done').length;
   const performanceScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const formatRelativeTime = (dateString: string) => {
-   
+  // eslint-disable-next-line react-hooks/purity
     const diffMs = Date.now() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
@@ -246,24 +230,24 @@ export const EmployeeDashboardView: React.FC = () => {
           >
             <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark">Casual leaves</h3>
-              <span className="text-xs font-extrabold text-varistor-dark">{ownClBalance ? ownClBalance.used : 0} / {ownClBalance ? ownClBalance.total : 12} Taken</span>
+              <span className="text-xs font-extrabold text-varistor-dark">7 / 12</span>
             </div>
 
             <div className="space-y-4 my-2">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Casual Leaves taken</span>
-                  <span className="font-semibold text-varistor-dark">{ownClBalance ? (ownClBalance.total - ownClBalance.used) : 12} left</span>
+                  <span className="font-semibold text-varistor-dark">5 left</span>
                 </div>
                 <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-varistor-lime h-full transition-all duration-500" style={{ width: `${Math.min(100, (((ownClBalance?.used ?? 0) / (ownClBalance?.total ?? 12)) * 100))}%` }} />
+                  <div className="bg-varistor-lime h-full w-[58%]" /> {/* 7 / 12 = 58% */}
                 </div>
               </div>
 
-              <div className="space-y-1.5 opacity-50">
+              <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Sick Leaves taken</span>
-                  <span className="font-semibold text-varistor-dark">10 left (0/10 taken)</span>
+                  <span className="font-semibold text-varistor-dark">2 left (4/6 taken)</span>
                 </div>
                 <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
                   <div className="bg-amber-400 h-full w-[66%]" />

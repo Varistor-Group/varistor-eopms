@@ -266,7 +266,7 @@ export const PolicyPage: React.FC = () => {
     getPolicies().then(data => { setPolicies(data); setIsLoading(false); });
   }, []);
 
-   
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (data: Omit<Policy, 'id' | 'createdAt' | 'updatedAt'>) => {

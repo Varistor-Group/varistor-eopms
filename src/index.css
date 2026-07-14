@@ -181,20 +181,10 @@
     @apply bg-varistor-pageBg text-varistor-dark font-sans antialiased;
     font-size: 14px;
     margin: 0;
+    /* Safe area insets for mobile (notches, navbars) */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     transition: background-color 200ms ease-out, color 200ms ease-out;
   }
-}
-
-@layer utilities {
-  .pt-safe { padding-top: env(safe-area-inset-top); }
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-  .pl-safe { padding-left: env(safe-area-inset-left); }
-  .pr-safe { padding-right: env(safe-area-inset-right); }
-  
-  .top-safe { top: env(safe-area-inset-top); }
-  .bottom-safe { bottom: env(safe-area-inset-bottom); }
-  
-  .min-h-safe-screen { min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 }
 
 /* Clean UI components scrollbars */

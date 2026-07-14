@@ -81,11 +81,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           role: user.role,
         };
         setCurrentUser(loggedInUser);
-
-        // Persist session to localStorage for auto-restore on app restart
-        localStorage.setItem('eopms_current_user', JSON.stringify(loggedInUser));
-        localStorage.setItem('eopms_role', user.role);
-
         const isFirstLogin = !localStorage.getItem('eopms_first_login_done');
         if (isFirstLogin) {
           localStorage.setItem('eopms_first_login_done', 'true');

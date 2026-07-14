@@ -4,7 +4,7 @@ import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriorit
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
-import { vpAuditApi } from '../api/vpAudit';
+import { API_URL } from '../config/api';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -57,7 +57,7 @@ interface EopmsContextType {
   rejectLeave: (leaveId: string, comment: string) => void;
 }
 
-   
+  // eslint-disable-next-line react-refresh/only-export-components
 export const EopmsContext = createContext<EopmsContextType | undefined>(undefined);
 
 // Priority configuration matrix
@@ -240,14 +240,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [currentRole, setCurrentRole] = useState<UserRole>(() => (localStorage.getItem('eopms_role') as UserRole) || 'Employee');
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const saved = localStorage.getItem('eopms_role');
+    return (saved as UserRole) || 'Admin'; // Default role is Admin
+  });
+
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
     try {
-      const savedUser = localStorage.getItem('eopms_current_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
+      const saved = localStorage.getItem('eopms_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
   });
 
   const MOCK_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
@@ -270,7 +272,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast('Leave request submitted successfully', 0, 'credit');
 
     // Fire-and-forget manager notification email (same pattern as createEmployee)
-    fetch('http://localhost:3001/api/leave/notify-manager', {
+    fetch(`${API_URL}/api/leave/notify-manager`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -315,7 +317,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     };
     loadAnnouncements();
-   
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
 
   const reactToAnnouncement = async (announcementId: string, emojiType: string) => {
@@ -365,9 +367,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     const ruleConfig = POINT_MATRIX[task.priority];
     
-   
+  // eslint-disable-next-line no-useless-assignment
     let netPoints = 0;
-   
+  // eslint-disable-next-line no-useless-assignment
     let reasonMessage = '';
 
     if (completedOnTime) {
@@ -438,7 +440,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Toast Management
   const addToast = (message: string, points: number, type: 'credit' | 'debit') => {
-   
+  // eslint-disable-next-line react-hooks/purity
     const id = `toast-${Date.now()}-${Math.random()}`;
     const newToast: ToastMessage = { id, message, points, type };
     setToasts((prev) => [...prev, newToast]);
@@ -724,10 +726,6 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
     addToast(`${ruleTitle} applied: "${reason}"`, penaltyPoints, 'debit');
-
-    // Async log to VP Audit Trail (Supabase)
-    const adminId = currentUser?.id ?? 'VAR-001'; // Fallback to an admin ID
-    vpAuditApi.logTransaction(adminId, penaltyPoints, 'debit', reason, employeeId).catch(console.error);
   };
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, ShieldAlert, UserPlus } from 'lucide-react';
-import { createEmployee, getEmployees } from '../api/employees';
+import { createEmployee, getEmployees, getDepartments, addDepartment } from '../api/employees';
 import type { CreateEmployeeInput, Department, Employee } from '../api/employees';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -29,14 +29,6 @@ const inputCls = (hasError?: boolean) =>
   focus:ring-2 focus:ring-varistor-lime/40
   ${hasError ? 'border-red-400 focus:border-red-400' : 'border-varistor-border focus:border-varistor-lime'}`;
 
-// ─── Departments ─────────────────────────────────────────────────────────────
-
-const DEPARTMENTS: Department[] = [
-  'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech', 'Digital Marketing',
-];
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type FormErrors = Partial<Record<keyof CreateEmployeeInput, string>>;
 
 const EMPTY_FORM: CreateEmployeeInput = {
@@ -45,11 +37,12 @@ const EMPTY_FORM: CreateEmployeeInput = {
   username: '',
   personalEmail: '',
   phone: '',
-  department: '' as Department,
+  department: '',
   reportingManager: '',
   role: 'Employee',
   is_field_employee: false,
   avatarUrl: '',
+  dateOfJoining: new Date().toISOString().split('T')[0],
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -60,6 +53,7 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
   const [form, setForm] = useState<CreateEmployeeInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [deps, setDeps] = useState<string[]>(getDepartments());
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
@@ -104,6 +98,20 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     setErrors(prev => ({ ...prev, department: undefined, reportingManager: undefined }));
   };
 
+  const handleDepartmentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === '___ADD_NEW___') {
+      const newDept = window.prompt('Enter new department name:');
+      if (newDept && newDept.trim()) {
+        addDepartment(newDept.trim());
+        setDeps(getDepartments());
+        handleDepartmentChange(newDept.trim());
+      }
+    } else {
+      handleDepartmentChange(val);
+    }
+  };
+
   const validate = (): boolean => {
     const errs: FormErrors = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
@@ -111,9 +119,10 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!form.username.trim()) errs.username = 'Username is required.';
     if (!form.personalEmail.trim()) errs.personalEmail = 'Email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.personalEmail)) errs.personalEmail = 'Enter a valid email.';
-    if (!form.phone.trim()) errs.phone = 'Phone number is required.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
-    if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
+    if (!form.dateOfJoining) errs.dateOfJoining = 'Date of joining is required.';
+    // Reporting manager is now optional (can be null/None)
     if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -254,9 +263,19 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               <input
                 type="tel"
                 className={inputCls(!!errors.phone)}
-                placeholder="+91 98765 43210"
+                placeholder="9876543210"
                 value={form.phone}
                 onChange={set('phone')}
+              />
+            </Field>
+
+            {/* Date of Joining */}
+            <Field label="Date of Joining" required error={errors.dateOfJoining}>
+              <input
+                type="date"
+                className={inputCls(!!errors.dateOfJoining)}
+                value={form.dateOfJoining}
+                onChange={set('dateOfJoining')}
               />
             </Field>
 
@@ -284,16 +303,17 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               <select
                 className={inputCls(!!errors.department)}
                 value={form.department}
-                onChange={e => handleDepartmentChange(e.target.value as Department)}
+                onChange={handleDepartmentSelect}
               >
                 <option value="">Select department…</option>
-                {DEPARTMENTS.map(d => (
+                {deps.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
+                <option value="___ADD_NEW___" className="font-bold text-varistor-limeText">+ Add Department</option>
               </select>
               {/* Dept chips */}
               <div className="flex flex-wrap gap-1.5 mt-1">
-                {DEPARTMENTS.map(d => (
+                {deps.map(d => (
                   <button
                     key={d}
                     type="button"
@@ -311,14 +331,21 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
             </Field>
 
             {/* Reporting Manager */}
-            <Field label="Reporting Manager" required error={errors.reportingManager}>
-              <input
-                type="text"
+            <Field label="Reporting Manager" error={errors.reportingManager}>
+              <select
                 className={inputCls(!!errors.reportingManager)}
-                placeholder="Manager name..."
                 value={form.reportingManager}
                 onChange={set('reportingManager')}
-              />
+              >
+                <option value="">None</option>
+                {employees
+                  .filter(e => e.role === 'Reporting Manager' || e.role === 'Admin')
+                  .map(m => (
+                    <option key={m.id} value={m.fullName}>
+                      {m.fullName} ({m.department})
+                    </option>
+                  ))}
+              </select>
             </Field>
 
             {/* System Role */}

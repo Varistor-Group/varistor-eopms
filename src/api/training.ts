@@ -108,10 +108,6 @@ function writeSavedAnswers(data: Record<string, Record<string, number>>) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export const trainingApi = {
-  getCurrentUserId(): string {
-    return 'user-session'; // resolved from auth session in callers
-  },
-
   async fetchModulesWithStatus(employeeId: string, role?: UserRole): Promise<TrainingModuleWithStatus[]> {
     const [{ data: modulesData }, { data: progressData }, { data: attemptsData }] = await Promise.all([
       supabase.from('training_modules').select('*').order('order', { ascending: true }),

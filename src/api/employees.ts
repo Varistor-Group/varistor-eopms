@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
+import { API_URL } from '../config/api';
 
 export interface Employee {
   id: string;
@@ -22,17 +23,34 @@ export interface Employee {
   variPoints: number;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
 }
 
-export type Department =
-  | 'Finance'
-  | 'Sales'
-  | 'Operations'
-  | 'Ops Heads'
-  | 'Tech'
-  | 'Digital Marketing'
-  | 'Management'
-  | 'Human Resources';
+export type Department = string;
+
+const DEFAULT_DEPARTMENTS = [
+  'Finance',
+  'Sales',
+  'Operations',
+  'Ops Heads',
+  'Tech',
+  'Digital Marketing',
+  'Management',
+  'Human Resources'
+];
+
+export function getDepartments(): string[] {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  return Array.from(new Set([...DEFAULT_DEPARTMENTS, ...custom]));
+}
+
+export function addDepartment(name: string) {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  if (!custom.includes(name) && !DEFAULT_DEPARTMENTS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('eopms_custom_departments', JSON.stringify(custom));
+  }
+}
 
 export interface CreateEmployeeInput {
   fullName: string;
@@ -45,6 +63,7 @@ export interface CreateEmployeeInput {
   role: UserRole;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -66,6 +85,7 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     variPoints: (row.vari_points as number) ?? 0,
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
+    dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
   };
 }
 
@@ -128,6 +148,11 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
   }
 
+  // Update date of joining via a direct update since RPC doesn't handle it
+  if (input.dateOfJoining) {
+    await supabase.from('employees').update({ date_of_joining: input.dateOfJoining }).eq('employee_id', input.employeeId);
+  }
+
   // Fetch the newly created employee row to return it
   const { data: empRow } = await supabase
     .from('employees')
@@ -147,7 +172,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 
   let emailErrorMsg: string | null = null;
   try {
-    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
+    const emailRes = await fetch(`${API_URL}/api/send-credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -162,7 +187,6 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       emailErrorMsg = result?.error || 'Failed to send welcome email.';
       console.error('[Email]', emailErrorMsg);
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     emailErrorMsg = e.message;
     console.error('[Email Exception]', e);
@@ -197,7 +221,7 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { data, error } = await supabase.rpc('delete_employee_with_auth', { p_employee_id: id });
+  const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
   
   if (error) {
     return { success: false, error: error.message };
@@ -300,13 +324,13 @@ export async function getFieldEmployees(): Promise<Employee[]> {
 
 export const mockActivityLog: { timestamp: string; action: string; by: string; details: string }[] = [];
 // Kept for backwards compatibility — writes now go to Supabase activity_log table
-export const mockEmployeeStore: Employee[] = [];
+export let mockEmployeeStore: Employee[] = [];
 // Lazy sync: populate on first access
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
 export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {
   try {
-    const emailRes = await fetch('http://localhost:3001/api/send-credentials', {
+    const emailRes = await fetch(`${API_URL}/api/send-credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -321,7 +345,6 @@ export async function sendRecoveryEmail(employee: Employee): Promise<{ success: 
       return { success: false, error: result?.error || 'Failed to send recovery email.' };
     }
     return { success: true, error: null };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     console.error('[Email Exception]', e);
     return { success: false, error: e.message };
