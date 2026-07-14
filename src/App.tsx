@@ -42,7 +42,7 @@ const AppContent: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('eopms_current_user'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
 
   useEffect(() => {
