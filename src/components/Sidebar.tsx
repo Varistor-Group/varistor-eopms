@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             <div className="lg:flex flex-col hidden">
               <span className="text-[10px] font-bold text-varistor-muted mt-0.5 tracking-widest uppercase">EOPMS v1.0</span>
             </div>
@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block" />
+            <img src="/logo.png" alt="Varistor Logo" className="h-8 w-auto object-contain block bg-black dark:bg-transparent rounded p-1" />
             <div>
               <span className="font-semibold text-varistor-dark">Varistor EOPMS</span>
             </div>

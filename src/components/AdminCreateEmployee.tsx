@@ -122,6 +122,9 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.dateOfJoining) errs.dateOfJoining = 'Date of joining is required.';
+    if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
+      errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
+    }
     // Reporting manager is now optional (can be null/None)
     if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
@@ -276,6 +279,26 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 className={inputCls(!!errors.dateOfJoining)}
                 value={form.dateOfJoining}
                 onChange={set('dateOfJoining')}
+              />
+            </Field>
+
+            {/* Date of Birth */}
+            <Field label="Date of Birth" error={errors.dateOfBirth}>
+              <input
+                type="date"
+                className={inputCls(!!errors.dateOfBirth)}
+                value={form.dateOfBirth ?? ''}
+                onChange={set('dateOfBirth')}
+              />
+            </Field>
+
+            {/* UAN Number */}
+            <Field label="UAN Number" error={errors.uanNumber}>
+              <input
+                className={inputCls(!!errors.uanNumber)}
+                placeholder="e.g. 100000000000 or NA"
+                value={form.uanNumber ?? ''}
+                onChange={set('uanNumber')}
               />
             </Field>
 

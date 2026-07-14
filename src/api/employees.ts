@@ -24,6 +24,8 @@ export interface Employee {
   is_field_employee?: boolean;
   avatarUrl?: string;
   dateOfJoining: string;
+  dateOfBirth?: string;
+  uanNumber?: string;
 }
 
 export type Department = string;
@@ -64,6 +66,8 @@ export interface CreateEmployeeInput {
   is_field_employee?: boolean;
   avatarUrl?: string;
   dateOfJoining: string;
+  dateOfBirth?: string;
+  uanNumber?: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -86,6 +90,8 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
     dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
+    dateOfBirth: (row.date_of_birth as string) ?? undefined,
+    uanNumber: (row.uan_number as string) ?? undefined,
   };
 }
 
@@ -148,9 +154,14 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
   }
 
-  // Update date of joining via a direct update since RPC doesn't handle it
-  if (input.dateOfJoining) {
-    await supabase.from('employees').update({ date_of_joining: input.dateOfJoining }).eq('employee_id', input.employeeId);
+  // Update additional fields via a direct update since RPC doesn't handle them
+  const extraUpdates: any = {};
+  if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
+  if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
+  if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
+  
+  if (Object.keys(extraUpdates).length > 0) {
+    await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
   }
 
   // Fetch the newly created employee row to return it
@@ -211,6 +222,9 @@ export async function updateEmployee(
       ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
       ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
+      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
+      ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
+      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),
     })
     .eq('id', id)
     .select()
