@@ -10,7 +10,9 @@ import { encryptFile, decryptFile, getMasterKey } from '../utils/crypto';
 
 const BUCKET = 'employee-documents';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const slotsDb = () => (supabase as any).from('employee_document_slots');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const templatesDb = () => (supabase as any).from('document_templates');
 
 export interface VaultDocument {
@@ -295,6 +297,7 @@ export async function getEmployeeDocumentSlots(
 export async function seedEmployeeSlots(
   employeeId: string
 ): Promise<{ success: boolean; error: string | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).rpc('seed_employee_document_slots', { p_employee_id: employeeId });
   if (error) return { success: false, error: error.message };
   return { success: true, error: null };

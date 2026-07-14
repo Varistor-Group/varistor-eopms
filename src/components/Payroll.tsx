@@ -103,6 +103,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const finalPay = record.netPay - (record.deduction ?? 0);
   const netPayWords = numberToWords(finalPay);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c: any = record.components || {};
   const basic = c.basic ?? 0;
   const hra = c.hra ?? 0;
@@ -1148,7 +1149,7 @@ const SalaryHeadMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         const parsed = JSON.parse(saved);
         if (parsed.additions) setAdditions(parsed.additions);
         if (parsed.deductions) {
-          let updatedDeductions = [...parsed.deductions];
+          const updatedDeductions = [...parsed.deductions];
           if (!updatedDeductions.includes('ESI')) {
             const emptyIdx = updatedDeductions.findIndex(d => d === '');
             if (emptyIdx !== -1) updatedDeductions[emptyIdx] = 'ESI';
@@ -1646,12 +1647,14 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   );
 };
 
-const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+export const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [search, setSearch] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
   const [salaryDetails, setSalaryDetails] = useState<Record<string, number>>({});
@@ -1906,7 +1909,7 @@ const SalaryEngine: React.FC = () => {
     await syncPayrollToServer(data);
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => { load(); }, [load]);
 
   const monthRecords = records.filter(r => r.month === MONTH);
@@ -2114,6 +2117,7 @@ const SalaryEngine: React.FC = () => {
         ].map(tab => (
           <button
             key={tab.id}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center gap-1.5 pb-2 text-xs font-bold border-b-2 transition-all ${activeTab === tab.id
                 ? 'border-varistor-lime text-varistor-limeText'
@@ -2454,6 +2458,7 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   const finalPay = record.netPay - (record.deduction ?? 0);
   const netPayWords = numberToWords(finalPay);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c: any = record.components || {};
   const basic = c.basic ?? 0;
   const hra = c.hra ?? 0;

@@ -374,9 +374,9 @@ export const Attendance: React.FC = () => {
 
   async function exportPDF(type: 'daily' | 'monthly', singleEmployeeId?: string) {
     try {
-      let rows: any[] = type === 'daily' ? dailyData : monthlyReport;
+      let rows: unknown[] = type === 'daily' ? dailyData : monthlyReport;
       if (singleEmployeeId) {
-        rows = rows.filter(r => r.employee_id === singleEmployeeId);
+        rows = rows.filter(r => (r as { employee_id: string }).employee_id === singleEmployeeId);
       }
       const res = await fetch('http://localhost:3001/api/attendance/export-pdf', {
         method: 'POST',

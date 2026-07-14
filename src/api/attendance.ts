@@ -303,7 +303,7 @@ function getDatesInMonth(month: string): string[] {
 // ─── In-memory stores ──────────────────────────────────────────────────────
 
 /** National holidays for 2026 */
-let _holidays: Holiday[] = [
+const _holidays: Holiday[] = [
   { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day',       type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
   { id: 'hol-2', date: '2026-03-28', occasion: 'Holi',               type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
   { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti',type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
@@ -317,10 +317,10 @@ let _holidays: Holiday[] = [
 
 const _holidayDates = () => _holidays.map(h => h.date);
 
-let _attendanceEdits: AttendanceEdit[] = [];
+const _attendanceEdits: AttendanceEdit[] = [];
 
 /** Dynamic field photos array */
-let _fieldPhotos: FieldPhotoEntry[] = [];
+const _fieldPhotos: FieldPhotoEntry[] = [];
 
 // Override store: HR-edited entries (stored by id for quick lookup)
 const _overrides = new Map<string, Partial<AttendanceLedgerEntry>>();
@@ -898,7 +898,7 @@ export async function getYearlyAttendanceReport(
   let remainingBalance = totalBalance;
 
   const months: EmployeeYearlyReport['months'] = [];
-  let totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
+  const totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
 
   for (let m = 0; m < 12; m++) {
     const monthStr = `${year}-${String(m + 1).padStart(2, '0')}`;

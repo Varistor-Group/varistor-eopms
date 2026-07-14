@@ -111,13 +111,13 @@ export const Chat: React.FC = () => {
   };
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     loadChannelMessages(activeChannelId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannelId]);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     refreshUnread();
     const handler = () => {
       refreshUnread();
@@ -126,6 +126,7 @@ export const Chat: React.FC = () => {
     window.addEventListener(chatApi.CHAT_EVENT, handler);
     getEmployees().then(setEmployees);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   // If the active channel was deleted (by this tab or another), fall back to whatever remains.
@@ -593,7 +594,7 @@ export const Chat: React.FC = () => {
             <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Who can access?</label>
             <select
               value={newChannelType}
-              onChange={e => setNewChannelType(e.target.value as any)}
+              onChange={e => setNewChannelType(e.target.value as 'All' | 'Department' | 'Custom')}
               className="w-full text-sm bg-varistor-surface text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
             >
               <option value="All">All Employees</option>

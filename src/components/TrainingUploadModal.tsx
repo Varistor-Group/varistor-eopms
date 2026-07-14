@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactPlayer from 'react-player';
 
-const Player = ReactPlayer as any;
+const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';

@@ -7,11 +7,17 @@ import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
 import cron from 'node-cron';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
 const app = express();
 const port = 3001;
+
+// Initialize Supabase Client for backend tasks
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(express.json());
 
@@ -1698,4 +1704,38 @@ app.post('/api/activity', async (req, res) => {
 
 app.listen(port, () => {
   console.log(`[Email Server] running on http://localhost:${port}`);
+});
+
+// ─── Annual Leave Balance Reset Job (April 1st Midnight) ───────────────────
+cron.schedule('0 0 1 4 *', async () => {
+  console.log('[CRON] Starting Annual Leave Balance Reset (April 1st)...');
+  try {
+    const { error } = await supabase
+      .from('leave_balances')
+      .update({
+        casual_used: 0,
+        sick_used: 0,
+        earned_used: 0,
+        unpaid_taken: 0
+      })
+      .not('employee_id', 'is', null);
+
+    if (error) throw error;
+    console.log('[CRON] Successfully reset all leave balances to 0.');
+    
+    // Log the action to local activity log
+    const db = await readDB();
+    if (!db.activity_log) db.activity_log = [];
+    db.activity_log.push({
+      id: Date.now().toString(),
+      type: 'system',
+      message: 'Annual leave balances reset successfully',
+      timestamp: new Date().toISOString()
+    });
+    await writeDB(db);
+  } catch (err) {
+    console.error('[CRON] Failed to reset leave balances:', err.message);
+  }
+}, {
+  timezone: "Asia/Kolkata"
 });

@@ -179,7 +179,7 @@ function evaluateFormula(equation: string, context: Record<string, number>): num
     }
 
     // Safe eval using Function constructor
-    // eslint-disable-next-line no-new-func
+     
     const result = new Function(`return (${sanitized});`)();
     return typeof result === 'number' && !isNaN(result) ? Math.round(result) : 0;
   } catch (e) {
@@ -188,6 +188,7 @@ function evaluateFormula(equation: string, context: Record<string, number>): num
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPTAmount(gross: number, ranges: any[]): number {
   for (const range of ranges) {
     if (gross >= range.min && gross <= range.max) {
@@ -257,6 +258,7 @@ export function computeNet(params: {
   ];
   let pfPct = 12;
   let esiPct = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let formulas: any[] = [];
   let employeeDetails: Record<string, number> = {};
 
@@ -1009,6 +1011,7 @@ export function formatMonthToMMMYear(monthStr: string): string {
 }
 
 /** Generates or updates draft payroll records based on attendance monthly report */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function syncPayrollFromAttendance(monthStr: string, reportRows: any[]): Promise<void> {
   await delay(200);
   _records = loadPayrollRecords();
@@ -1016,6 +1019,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   const displayMonth = formatMonthToMMMYear(monthStr);
 
   // Load employees to fetch role/designation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let employees: any[] = [];
   try {
     const res = await fetch('http://localhost:3001/api/employees');

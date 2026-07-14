@@ -194,7 +194,7 @@ const TrainingLibrary: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<TrainingModuleWithStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
 
-  const { currentRole, currentUser } = useVariPoints();
+  const { currentRole } = useVariPoints();
   const isManager = currentRole === 'HR' || currentRole === 'Admin';
   const employeeId = trainingApi.getCurrentUserId();
 
@@ -206,10 +206,10 @@ const TrainingLibrary: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [employeeId, currentRole, currentUser]);
+  }, [employeeId, currentRole]);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
     loadModules();
   }, [loadModules]);
 

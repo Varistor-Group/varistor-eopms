@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 
-const Player = ReactPlayer as any;
+const Player = ReactPlayer as unknown as React.ElementType;
 import {
   ArrowLeft,
   Play,
@@ -29,6 +29,7 @@ function formatTime(seconds: number): string {
 }
 
 const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playerRef = useRef<any>(null);
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

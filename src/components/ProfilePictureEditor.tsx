@@ -21,16 +21,6 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState('');
 
-  // Start camera when switching to camera tab
-  useEffect(() => {
-    if (activeTab === 'camera') {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [activeTab]);
-
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
     activeTabRef.current = activeTab;
@@ -48,7 +38,7 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err) {
+    } catch {
       if (activeTabRef.current === 'camera') {
         setCameraError('Camera access denied or unavailable.');
       }
@@ -69,9 +59,19 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
     });
   };
 
+  // Start camera when switching to camera tab
+  useEffect(() => {
+    if (activeTab === 'camera') {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [activeTab]);
+
   useEffect(() => {
     return () => {
-      activeTabRef.current = 'none' as any; // Force stop if unmounted
+      activeTabRef.current = 'none' as unknown as 'camera' | 'url' | 'upload'; // Force stop if unmounted
       stopCamera();
     };
   }, []);

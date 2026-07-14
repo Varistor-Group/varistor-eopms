@@ -162,6 +162,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       emailErrorMsg = result?.error || 'Failed to send welcome email.';
       console.error('[Email]', emailErrorMsg);
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     emailErrorMsg = e.message;
     console.error('[Email Exception]', e);
@@ -299,7 +300,7 @@ export async function getFieldEmployees(): Promise<Employee[]> {
 
 export const mockActivityLog: { timestamp: string; action: string; by: string; details: string }[] = [];
 // Kept for backwards compatibility — writes now go to Supabase activity_log table
-export let mockEmployeeStore: Employee[] = [];
+export const mockEmployeeStore: Employee[] = [];
 // Lazy sync: populate on first access
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
@@ -320,6 +321,7 @@ export async function sendRecoveryEmail(employee: Employee): Promise<{ success: 
       return { success: false, error: result?.error || 'Failed to send recovery email.' };
     }
     return { success: true, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     console.error('[Email Exception]', e);
     return { success: false, error: e.message };

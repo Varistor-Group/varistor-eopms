@@ -116,13 +116,13 @@ const Leaves: React.FC = () => {
         days,
         reason,
         department: LOGGED_IN_DEPT
-      } as any);
+      } as unknown as import('../types').LeaveRequest);
 
       setSuccessMsg('Leave request submitted successfully!');
       setStartDate('');
       setEndDate('');
       setReason('');
-    } catch (err) {
+    } catch {
       setErrorMsg('Failed to submit.');
     }
     setSubmitting(false);

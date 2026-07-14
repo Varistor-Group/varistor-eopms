@@ -143,7 +143,7 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
       return { success: false, error: data.error || 'Failed to send reset link.' };
     }
     return { success: true, message: 'Reset link sent — check your inbox.' };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'Could not reach the server. Make sure the backend is running.' };
   }
 }

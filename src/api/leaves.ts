@@ -169,7 +169,7 @@ export function approveLeaveRequest(leaveId: string, reviewerName: string): void
         const newVal = (data[balanceCol] as number) + request.days;
         const updates: Record<string, number> = {};
         updates[balanceCol] = newVal;
-        supabase.from('leave_balances').update(updates as any).eq('employee_id', request.employeeId)
+        supabase.from('leave_balances').update(updates as never).eq('employee_id', request.employeeId)
           .then(({ error }) => { 
             if (error) console.error(error); 
             else if (balanceCol === 'casual_used') {
@@ -209,5 +209,5 @@ export function rejectLeaveRequest(leaveId: string, reviewerName: string, commen
 }
 
 // In-memory cache (populated on first load)
-export let mockLeaveRequests: LeaveRequest[] = [];
-export let mockLeaveBalances: LeaveBalance[] = [];
+export const mockLeaveRequests: LeaveRequest[] = [];
+export const mockLeaveBalances: LeaveBalance[] = [];
