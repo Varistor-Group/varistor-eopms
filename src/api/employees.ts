@@ -19,6 +19,7 @@ export interface Employee {
   role: UserRole;
   tempPassword: string;
   createdAt: string;
+  dob?: string;
   status: 'Active' | 'Inactive';
   variPoints: number;
   is_field_employee?: boolean;
@@ -26,6 +27,8 @@ export interface Employee {
   dateOfJoining: string;
   dateOfBirth?: string;
   uanNumber?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 export type Department = string;
@@ -68,6 +71,8 @@ export interface CreateEmployeeInput {
   dateOfJoining: string;
   dateOfBirth?: string;
   uanNumber?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -89,6 +94,8 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     variPoints: (row.vari_points as number) ?? 0,
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
+    shiftStart: (row.shift_start as string) ?? undefined,
+    shiftEnd: (row.shift_end as string) ?? undefined,
     dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
     dateOfBirth: (row.date_of_birth as string) ?? undefined,
     uanNumber: (row.uan_number as string) ?? undefined,
@@ -140,7 +147,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     p_role: input.role,
     p_temp_password: tempPassword,
     p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: input.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=84CC16&color=fff&size=200&bold=true`,
+    p_avatar_url: input.avatarUrl ?? undefined,
   });
 
   if (rpcError) {
@@ -159,6 +166,8 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
   if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
   if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
+  if (input.shiftStart) extraUpdates.shift_start = input.shiftStart;
+  if (input.shiftEnd) extraUpdates.shift_end = input.shiftEnd;
 
   if (Object.keys(extraUpdates).length > 0) {
     await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
@@ -168,7 +177,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   const { data: empRow } = await supabase
     .from('employees')
     .select('*')
-    .eq('id', input.employeeId)
+    .eq('employee_id', input.employeeId)
     .single();
 
   // Create leave balance entry
@@ -222,6 +231,8 @@ export async function updateEmployee(
       ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
       ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
+      ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
+      ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
       ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
       ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
       ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),

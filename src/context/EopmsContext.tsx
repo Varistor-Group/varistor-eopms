@@ -18,6 +18,7 @@ export interface CurrentUser {
   department: string;
   avatarUrl: string;
   role: UserRole;
+  dob?: string;
 }
 
 interface EopmsContextType {
@@ -42,7 +43,13 @@ interface EopmsContextType {
   addAttachment: (taskId: string, name: string, size: string, type: string) => void;
 
   // Points System Actions
-  assertAdministrativePenalty: (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number, employeeId?: string) => void;
+  assertAdministrativeTransaction: (
+    type: 'misconduct' | 'late_entry' | 'custom_debit' | 'custom_credit',
+    reason: string,
+    customPoints?: number,
+    employeeId?: string,
+    isAutomated?: boolean
+  ) => void;
   addToast: (message: string, points: number, type: 'credit' | 'debit') => void;
   dismissToast: (toastId: string) => void;
   announcements: AnnouncementDTO[];
@@ -764,31 +771,45 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     );
   };
 
-  // Manual Administrative Penalty (Office Misconduct: -50, Late Entry: -25)
+  // Manual Administrative Transaction
   // Restricted to Admin and HR roles
-  const assertAdministrativePenalty = (type: 'misconduct' | 'late_entry' | 'custom', reason: string, customPoints?: number, employeeId?: string) => {
-    if (currentRole !== 'Admin' && currentRole !== 'HR') {
-      addToast('Access Denied: Only Admin and HR can manually debit points.', 0, 'debit');
+  const assertAdministrativeTransaction = (
+    type: 'misconduct' | 'late_entry' | 'custom_debit' | 'custom_credit',
+    reason: string,
+    customPoints?: number,
+    employeeId?: string,
+    isAutomated?: boolean
+  ) => {
+    if (!isAutomated && currentRole !== 'Admin' && currentRole !== 'HR') {
+      addToast('Access Denied: Only Admin and HR can manually process points.', 0, 'debit');
       return;
     }
 
     const isMisconduct = type === 'misconduct';
     const isLateEntry = type === 'late_entry';
-    const penaltyPoints = isMisconduct ? 50 : (isLateEntry ? 25 : (customPoints || 0));
-    const ruleTitle = isMisconduct ? 'Office Misconduct Penalty' : (isLateEntry ? 'Late Entry Penalty' : 'Custom Penalty');
+    const isCredit = type === 'custom_credit';
+    const pointsAmount = isMisconduct ? 50 : (isLateEntry ? 25 : (customPoints || 0));
+
+    let ruleTitle = 'Custom Transaction';
+    if (isMisconduct) ruleTitle = 'Office Misconduct Penalty';
+    if (isLateEntry) ruleTitle = 'Late Entry Penalty';
+    if (type === 'custom_debit') ruleTitle = 'Custom Penalty';
+    if (isCredit) ruleTitle = 'Custom Credit';
+
+    const transactionType = isCredit ? 'credit' : 'debit';
 
     const newLedgerEntry: LedgerEntry = {
       id: `led-admin-${Date.now()}`,
       taskTitle: ruleTitle,
-      points: penaltyPoints,
-      type: 'debit',
+      points: pointsAmount,
+      type: transactionType,
       reason: reason,
       timestamp: new Date().toISOString(),
       employeeId
     };
 
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
-    addToast(`${ruleTitle} applied: "${reason}"`, penaltyPoints, 'debit');
+    addToast(`${ruleTitle} applied: "${reason}"`, pointsAmount, transactionType);
   };
 
   return (
@@ -811,7 +832,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         toggleChecklistItem,
         addChecklistItem,
         addAttachment,
-        assertAdministrativePenalty,
+        assertAdministrativeTransaction,
         addToast,
         dismissToast,
         announcements,

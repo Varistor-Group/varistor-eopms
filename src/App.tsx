@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -6,6 +6,7 @@ import { PointsLedger } from './components/PointsLedger';
 import { AnnouncementsFeed } from './components/AnnouncementsFeed';
 import { Chat } from './components/Chat';
 import { NotificationBell } from './components/NotificationBell';
+
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -39,7 +40,7 @@ const FieldTrackerBackground: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, currentUser, setCurrentUser, policyNotification, setPolicyNotification } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification, addAnnouncement, announcements } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole, currentUser?.department);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -47,9 +48,91 @@ const AppContent: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
 
+  useEffect(() => {
+    if (currentUser?.dob) {
+      const today = new Date();
+      const dobDate = new Date(currentUser.dob);
+      if (today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate()) {
+        const title = `Today is ${currentUser.name}'s birthday! Wish them a great day! 🎂`;
+        const storageKey = `bday_posted_${currentUser.id}_${today.getFullYear()}_${today.getMonth()}_${today.getDate()}`;
+
+        // Prevent duplicate posts today
+        const hasAnnounced = announcements.some(a =>
+          a.type === 'Birthday' &&
+          a.title === title &&
+          new Date(a.created_at).toDateString() === today.toDateString()
+        );
+
+        if (!hasAnnounced && !localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, 'true');
+          addAnnouncement(title, 'Join us in wishing them the happiest of birthdays!', 'Birthday', 'Admin');
+        }
+      }
+    }
+  }, [currentUser?.dob, currentUser?.name, currentUser?.id, announcements]);
+
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+
+  // Refs for back button handler to avoid stale closures
+  const activeTabRef = useRef(activeTab);
+  const isOpenMobileRef = useRef(isOpenMobile);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { isOpenMobileRef.current = isOpenMobile; }, [isOpenMobile]);
+
+  // Handle hardware back button globally
+  useEffect(() => {
+    // We must dynamically import to avoid breaking the web build if Capacitor is missing
+    let listener: { remove: () => void } | null = null;
+
+    // Hide native status bar if on mobile
+    import('@capacitor/status-bar').then(({ StatusBar }) => {
+      StatusBar.hide().catch(console.warn);
+    }).catch(console.warn);
+
+    import('@capacitor/app').then(async ({ App: CapApp }) => {
+      listener = await CapApp.addListener('backButton', () => {
+        // First check if any inner component (like Chat sidebar) wants to consume this
+        const event = new CustomEvent('app_back_button', { cancelable: true });
+        window.dispatchEvent(event);
+        if (event.defaultPrevented) return;
+
+        if (isOpenMobileRef.current) {
+          setIsOpenMobile(false);
+        } else if (activeTabRef.current === 'dashboard') {
+          CapApp.exitApp();
+        } else {
+          setIsOpenMobile(true);
+        }
+      });
+    }).catch(console.warn);
+
+    return () => {
+      if (listener && typeof listener.remove === 'function') {
+        listener.remove();
+      }
+    };
+  }, []);
+
+  // ── Fix #7: Auto-restore session from localStorage on app mount ──────
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem('eopms_current_user');
+      const savedRole = localStorage.getItem('eopms_role');
+      if (savedUser && savedRole) {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+        setCurrentRole(savedRole as import('./types').UserRole);
+        setIsLoggedIn(true);
+      }
+    } catch {
+      // Corrupted data – clear and force re-login
+      localStorage.removeItem('eopms_current_user');
+      localStorage.removeItem('eopms_role');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
@@ -127,6 +210,7 @@ const AppContent: React.FC = () => {
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
       case 'field-tracker': return 'Field Tracker';
+      case 'field-punch': return 'Field Punch';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
       case 'leaves': return 'Leave Management';
@@ -175,10 +259,11 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-varistor-surfaceMuted transition-colors cursor-pointer text-varistor-dark"
+              className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full border border-varistor-border bg-varistor-surfaceMuted hover:bg-varistor-surface transition-colors cursor-pointer text-varistor-dark"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
@@ -226,20 +311,16 @@ const AppContent: React.FC = () => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {
                 // Admin has access to everything
-                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 // All employee tabs (minus vault & attendance) + task-management
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                const tabs = ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
-                if (currentRole === 'Field Employee') {
-                  tabs.push('field-punch');
-                }
-                return tabs;
+                return ['dashboard', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 
@@ -255,7 +336,7 @@ const AppContent: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>
                   <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
-                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions to view this page.</p>
+                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have permission to view the <span className="font-bold">{activeTab}</span> page.</p>
                 </div>
               );
             }
@@ -289,7 +370,7 @@ const AppContent: React.FC = () => {
 
       {/* Real-time Task Notification Pop-up */}
       {taskNotification && taskNotification.show && (
-        <div className="fixed top-6 right-6 z-50 bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 w-80 animate-[slideInRight_0.3s_ease-out]">
+        <div className="fixed top-[calc(1rem+env(safe-area-inset-top))] left-4 right-4 z-50 max-w-sm mx-auto bg-varistor-surface border-l-4 border-varistor-lime shadow-lg rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-sm text-varistor-dark">New Task Assigned!</h3>

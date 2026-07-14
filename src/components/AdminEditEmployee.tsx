@@ -41,10 +41,12 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
     variPoints: (employee.variPoints ?? 0).toString(),
+    shiftStart: employee.shiftStart ?? '09:30',
+    shiftEnd: employee.shiftEnd ?? '18:30',
     dateOfBirth: employee.dateOfBirth || '',
     uanNumber: employee.uanNumber || '',
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
@@ -67,7 +69,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
       errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
     }
-    
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -90,8 +92,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       role: form.role,
       status: form.status,
       variPoints: Number(form.variPoints),
-      dateOfBirth: form.dateOfBirth,
-      uanNumber: form.uanNumber,
     });
 
     if (!success || error) {
@@ -131,7 +131,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 lg:p-8">
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-            
+
             {/* Read Only Fields */}
             <Field label="Employee ID">
               <input className={`${inputCls()} bg-varistor-pageBg text-varistor-muted cursor-not-allowed`} value={employee.employeeId} disabled readOnly />
@@ -146,7 +146,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             <Field label="Full name" required error={errors.fullName}>
               <input className={inputCls(!!errors.fullName)} value={form.fullName} onChange={set('fullName')} />
             </Field>
-            
+
             <Field label="Phone" required error={errors.phone}>
               <input className={inputCls(!!errors.phone)} value={form.phone} onChange={set('phone')} />
             </Field>
@@ -177,14 +177,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             <Field label="Reporting Manager" required error={errors.reportingManager}>
               <input className={inputCls(!!errors.reportingManager)} value={form.reportingManager} onChange={set('reportingManager')} />
             </Field>
-
-            <Field label="Date of Birth" error={errors.dateOfBirth}>
-              <input type="date" className={inputCls(!!errors.dateOfBirth)} value={form.dateOfBirth} onChange={set('dateOfBirth')} />
-            </Field>
-
-            <Field label="UAN Number" error={errors.uanNumber}>
-              <input className={inputCls(!!errors.uanNumber)} placeholder="e.g. 100000000000 or NA" value={form.uanNumber} onChange={set('uanNumber')} />
-            </Field>
           </div>
 
           <div className="mt-8 flex items-center justify-end gap-3 pt-6 border-t border-varistor-border">
@@ -193,7 +185,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
                 {toast.message}
               </span>
             )}
-            
+
             <button
               type="button"
               onClick={onCancel}

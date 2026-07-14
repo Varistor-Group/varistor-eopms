@@ -126,7 +126,7 @@ function currentMonth(): string {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const Attendance: React.FC = () => {
-  const { currentRole, addToast } = useVariPoints();
+  const { currentRole, currentUser, addToast, assertAdministrativeTransaction } = useVariPoints();
   const isHR = currentRole === 'HR' || currentRole === 'Admin';
   const isAdmin = currentRole === 'Admin';
   const isManager = currentRole === 'Reporting Manager';
@@ -418,10 +418,10 @@ export const Attendance: React.FC = () => {
   }
 
   async function handlePhotoUpload() {
-    if (!photoFile) return;
+    if (!photoFile || !currentUser) return;
     setUploading(true);
     const result = await uploadFieldPhoto(
-      MOCK_SELF_ID,
+      currentUser.id,
       todayISO(),
       punchType,
       photoFile,
@@ -431,6 +431,46 @@ export const Attendance: React.FC = () => {
     setUploading(false);
     if (result.success) {
       addToast(`Punch ${punchType.toUpperCase()} uploaded · Location ${geoLocation ? `${geoLocation.lat.toFixed(5)}, ${geoLocation.lng.toFixed(5)}` : 'unavailable'} · Pending HR verification.`, 0, 'credit');
+      
+      // Fetch latest ledger entry to evaluate Late Penalty
+      const ledger = await getAttendanceByDate(todayISO());
+      const myEntry = ledger.find(e => e.employee_id === currentUser.id);
+      
+      if (myEntry) {
+        const punchInIso = myEntry.punch_in;
+        const shiftStartStr = (currentUser as any).shiftStart || '09:30'; // fallback
+        
+        if (punchInIso) {
+          const punchInTime = new Date(punchInIso);
+          
+          // Parse shift start time (e.g. "09:30")
+          const [sHr, sMin] = shiftStartStr.split(':').map(Number);
+          const shiftStartTime = new Date(punchInIso);
+          shiftStartTime.setHours(sHr, sMin, 0, 0);
+          
+          // 30 mins grace period
+          const lateThreshold = new Date(shiftStartTime.getTime() + 30 * 60000);
+          
+          const isLate = punchInTime > lateThreshold;
+          
+          // If punching out, evaluate total hours and apply penalty if needed
+          if (punchType === 'out' && isLate && myEntry.work_hours !== undefined) {
+             if (myEntry.work_hours < 9) {
+               assertAdministrativeTransaction(
+                 'late_entry', 
+                 `Automated deduction: Late punch-in (${fmtTime(punchInIso)}) and worked < 9 hrs (${myEntry.work_hours.toFixed(1)} hrs)`, 
+                 25, 
+                 currentUser.id, 
+                 true
+               );
+             }
+          } else if (punchType === 'in' && isLate) {
+             // Let them know they are late
+             addToast(`You punched in late! (After ${shiftStartStr} + 30m). -25 VP will be deducted if you work less than 9 hours today.`, 0, 'debit');
+          }
+        }
+      }
+
       setPhotoFile(null); setPhotoPreview(null); setFaceConfidence(null);
       setGeoLocation(null); setPunchTime(null);
       if (fileInputRef.current) fileInputRef.current.value = '';

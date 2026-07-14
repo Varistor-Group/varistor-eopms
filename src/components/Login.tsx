@@ -79,6 +79,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           department: user.department,
           avatarUrl: user.avatarUrl,
           role: user.role,
+          dob: user.role === 'Admin' ? new Date().toISOString().split('T')[0] : undefined, // Test DOB for Admin
         };
         setCurrentUser(loggedInUser);
         const isFirstLogin = !localStorage.getItem('eopms_first_login_done');

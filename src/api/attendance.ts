@@ -153,6 +153,8 @@ export interface RosterEmployee {
   name: string;
   dept: string;
   isField: boolean;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 let _cachedRoster: RosterEmployee[] | null = null;
@@ -166,7 +168,9 @@ export async function fetchAttendanceRoster(): Promise<RosterEmployee[]> {
         id: e.employeeId,
         name: e.fullName,
         dept: e.department,
-        isField: e.is_field_employee || false
+        isField: !!e.is_field_employee,
+        shiftStart: e.shiftStart,
+        shiftEnd: e.shiftEnd
       }));
   }
   return _cachedRoster;

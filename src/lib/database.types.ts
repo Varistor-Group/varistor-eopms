@@ -414,6 +414,8 @@ export type Database = {
           temp_password: string | null
           username: string
           vari_points: number
+          shift_start: string | null
+          shift_end: string | null
         }
         Insert: {
           auth_id?: string | null
@@ -435,6 +437,8 @@ export type Database = {
           temp_password?: string | null
           username: string
           vari_points?: number
+          shift_start?: string | null
+          shift_end?: string | null
         }
         Update: {
           auth_id?: string | null
@@ -456,6 +460,8 @@ export type Database = {
           temp_password?: string | null
           username?: string
           vari_points?: number
+          shift_start?: string | null
+          shift_end?: string | null
         }
         Relationships: []
       }

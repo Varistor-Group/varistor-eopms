@@ -41,6 +41,8 @@ const EMPTY_FORM: CreateEmployeeInput = {
   reportingManager: '',
   role: 'Employee',
   is_field_employee: false,
+  shiftStart: '09:30',
+  shiftEnd: '18:30',
   avatarUrl: '',
   dateOfJoining: new Date().toISOString().split('T')[0],
 };
@@ -343,8 +345,8 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                     type="button"
                     onClick={() => handleDepartmentChange(d)}
                     className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all ${form.department === d
-                        ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'
-                        : 'bg-varistor-limeLight border-varistor-border text-varistor-muted hover:border-varistor-lime'
+                      ? 'bg-varistor-lime border-varistor-lime text-varistor-limeText'
+                      : 'bg-varistor-limeLight border-varistor-border text-varistor-muted hover:border-varistor-lime'
                       }`}
                   >
                     {d}
@@ -403,6 +405,25 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 </div>
               </label>
             </div>
+
+            {/* Shift Timings */}
+            <Field label="Shift Start Time">
+              <input
+                type="time"
+                className={inputCls()}
+                value={form.shiftStart ?? ''}
+                onChange={set('shiftStart')}
+              />
+            </Field>
+
+            <Field label="Shift End Time">
+              <input
+                type="time"
+                className={inputCls()}
+                value={form.shiftEnd ?? ''}
+                onChange={set('shiftEnd')}
+              />
+            </Field>
           </div>
 
           {/* Actions */}
@@ -459,8 +480,8 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
           }`}
       >
         <div className={`flex items-start gap-3 px-4 py-3.5 rounded-varistor shadow-lg border max-w-sm ${toast.type === 'success'
-            ? 'bg-varistor-limeTint border-[#c3f0a0]'
-            : 'bg-red-50 border-red-200'
+          ? 'bg-varistor-limeTint border-[#c3f0a0]'
+          : 'bg-red-50 border-red-200'
           }`}>
           {toast.type === 'success'
             ? <CheckCircle2 size={20} className="text-varistor-limeText flex-shrink-0 mt-0.5" />
