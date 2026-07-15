@@ -216,7 +216,7 @@ export const chatApi = {
     const messages = loadMessages();
     const index = messages.findIndex(m => m.id === messageId);
     if (index === -1) return;
-    
+
     messages[index] = { ...messages[index], text: newText, edited: true };
     saveMessages(messages);
     notifyUpdated();

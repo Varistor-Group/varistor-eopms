@@ -11,6 +11,7 @@
  */
 
 import { API_URL } from '../config/api';
+import { getPayrollRecords, createRevision, updatePayrollRecord } from './payroll';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -302,15 +303,15 @@ function getDatesInMonth(month: string): string[] {
 
 /** National holidays for 2026 */
 let _holidays: Holiday[] = [
-  { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day',       type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-2', date: '2026-03-28', occasion: 'Holi',               type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti',type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-4', date: '2026-04-10', occasion: 'Good Friday',        type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-5', date: '2026-08-15', occasion: 'Independence Day',   type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-6', date: '2026-10-02', occasion: 'Gandhi Jayanti',     type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-7', date: '2026-11-04', occasion: 'Diwali',             type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-8', date: '2026-11-05', occasion: 'Diwali (2nd day)',   type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-9', date: '2026-12-25', occasion: 'Christmas',          type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-2', date: '2026-03-28', occasion: 'Holi', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-4', date: '2026-04-10', occasion: 'Good Friday', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-5', date: '2026-08-15', occasion: 'Independence Day', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-6', date: '2026-10-02', occasion: 'Gandhi Jayanti', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-7', date: '2026-11-04', occasion: 'Diwali', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-8', date: '2026-11-05', occasion: 'Diwali (2nd day)', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-9', date: '2026-12-25', occasion: 'Christmas', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
 ];
 
 const _holidayDates = () => _holidays.map(h => h.date);
@@ -453,13 +454,13 @@ export async function getMonthlyReport(
       const final = override ? { ...entry, ...override } : entry;
 
       switch (final.status) {
-        case 'Present':  present++;  break;
-        case 'Late':     late++; present++; break;
+        case 'Present': present++; break;
+        case 'Late': late++; present++; break;
         case 'Half-day': halfDay++; break;
-        case 'Holiday':  holidays++; break;
-        case 'W.O':      weekOff++; break;
-        case 'Leave':    leaves++;  break;
-        case 'Absent':   absent++;  break;
+        case 'Holiday': holidays++; break;
+        case 'W.O': weekOff++; break;
+        case 'Leave': leaves++; break;
+        case 'Absent': absent++; break;
       }
       if (final.work_hours) totalHrs += final.work_hours;
     });
@@ -817,7 +818,7 @@ export interface EmployeeYearlySummary {
   halfDay: number;
 }
 
-const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
  * Returns a full-year per-day attendance report for one employee.
@@ -945,7 +946,7 @@ export async function getEmployeeYearlySummaries(year: string): Promise<Employee
 
   return roster.map((emp, empIndex) => {
     let present = 0, paidLeave = 0, unpaidLeave = 0, absent = 0,
-        holidays = 0, weekOff = 0, halfDay = 0, remaining = 12;
+      holidays = 0, weekOff = 0, halfDay = 0, remaining = 12;
 
     for (let m = 0; m < 12; m++) {
       const daysInMonth = new Date(Number(year), m + 1, 0).getDate();

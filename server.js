@@ -252,7 +252,7 @@ app.post('/api/employees', async (req, res) => {
   const db = await readDB();
   const employee = req.body;
   if (!db.employees) db.employees = [];
-  
+
   const duplicate = db.employees.find(
     e => e.employeeId === employee.employeeId || e.personalEmail === employee.personalEmail
   );
@@ -261,7 +261,7 @@ app.post('/api/employees', async (req, res) => {
   }
 
   db.employees.push(employee);
-  
+
   if (!db.activity_log) db.activity_log = [];
   db.activity_log.push({
     id: Date.now().toString(),
@@ -352,7 +352,7 @@ const numberToWords = (num) => {
     rupeesStr = 'Zero';
   } else {
     let tempVal = rupeesVal;
-    
+
     // Crores
     const crores = Math.floor(tempVal / 10000000);
     tempVal %= 10000000;
@@ -403,23 +403,23 @@ const generateSalarySlipPDF = (slip) => {
       doc.lineWidth(3).strokeColor('#84cc16');
       doc.moveTo(145, 52).lineTo(152, 59).lineTo(167, 43).stroke();
       doc.fillColor('#111111')
-         .fontSize(20)
-         .font('Helvetica-Bold')
-         .text('Varistor Technologies Pvt. Ltd.', 180, 40);
+        .fontSize(20)
+        .font('Helvetica-Bold')
+        .text('Varistor Technologies Pvt. Ltd.', 180, 40);
 
       // Company details
       doc.fillColor('#555555')
-         .fontSize(8)
-         .font('Helvetica')
-         .text('No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048', 40, 70, { align: 'center', width: 515 });
+        .fontSize(8)
+        .font('Helvetica')
+        .text('No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048', 40, 70, { align: 'center', width: 515 });
       doc.text('Email - hr@varistor.in, Telephone - 080 4117 8911', 40, 82, { align: 'center', width: 515 });
 
       // Yellow banner
       doc.rect(40, 96, 515, 18).fill('#fef08a');
       doc.fillColor('#000000')
-         .fontSize(10)
-         .font('Helvetica-Bold')
-         .text(`Pay Slip for the Month of ${slip.month || 'June 2026'}`, 40, 101, { align: 'center', width: 515 });
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text(`Pay Slip for the Month of ${slip.month || 'June 2026'}`, 40, 101, { align: 'center', width: 515 });
 
       // Employee Grid Lines
       doc.lineWidth(1).strokeColor('#cccccc');
@@ -437,7 +437,7 @@ const generateSalarySlipPDF = (slip) => {
 
       // Employee Details Values
       doc.fillColor('#111111').fontSize(9);
-      
+
       // Row 1
       doc.font('Helvetica-Bold').text('Emp ID.', 45, 120);
       doc.font('Helvetica').text(slip.employeeId || '—', 155, 120);
@@ -464,7 +464,7 @@ const generateSalarySlipPDF = (slip) => {
 
       // Table Header Background
       doc.rect(40, 186, 515, 18).fill('#bfdbfe');
-      
+
       // Table Header Text
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
       doc.text('Earnings', 45, 191);
@@ -473,37 +473,56 @@ const generateSalarySlipPDF = (slip) => {
       doc.text('Amount (Rs.)', 470, 191, { align: 'right', width: 80 });
 
       // Table Row Content
-      const earnings = [
-        { label: 'Salary', val: slip.monthlySalary },
-        { label: 'Basic', val: slip.basic },
-        { label: 'HRA', val: slip.hra },
-        { label: 'Medical', val: slip.medical },
-        { label: 'TA', val: slip.ta },
-        { label: 'LTA', val: slip.lta },
-        { label: 'Special Allowance', val: slip.specialAllowance },
-        { label: 'Reimbursement', val: slip.reimbursement },
-        { label: 'Incentives', val: slip.incentives },
-        { label: 'OT Hours', val: slip.overtime },
-      ];
+      let earnings = [];
+      let deductions = [];
 
-      const deductions = [
-        { label: 'PF Employee', val: slip.pfEmployee },
-        { label: 'PF Employer', val: slip.pfEmployer },
-        { label: 'ESI', val: slip.esi },
-        { label: 'PT', val: slip.pt },
-        { label: 'TDS', val: slip.tds },
-        { label: 'Other Deductions', val: slip.otherDeductions },
-        { label: '', val: null },
-        { label: '', val: null },
-        { label: '', val: null },
-        { label: '', val: null },
-      ];
+      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
+        Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues) &&
+        (slip.additionHeads.length > 0 || slip.deductionHeads.length > 0)) {
+        for (let i = 0; i < 10; i++) {
+          earnings.push({
+            label: slip.additionHeads[i] || '',
+            val: (slip.additionHeads[i] && slip.additionValues[i] !== undefined) ? slip.additionValues[i] : null
+          });
+          deductions.push({
+            label: slip.deductionHeads[i] || '',
+            val: (slip.deductionHeads[i] && slip.deductionValues[i] !== undefined) ? slip.deductionValues[i] : null
+          });
+        }
+      } else {
+        earnings = [
+          { label: 'Basic', val: slip.basic },
+          { label: 'HRA', val: slip.hra },
+          { label: 'Medical', val: slip.medical },
+          { label: 'TA', val: slip.ta },
+          { label: 'LTA', val: slip.lta },
+          { label: 'Special Allowance', val: slip.specialAllowance },
+          { label: 'Travel Allowance', val: slip.reimbursement },
+          { label: 'Overtime', val: slip.overtime },
+          { label: 'Incentives', val: slip.incentives },
+          { label: '', val: null },
+        ];
 
+        deductions = [
+          { label: 'PF Employee', val: slip.pfEmployee },
+          { label: 'PF Employer', val: slip.pfEmployer },
+          { label: 'ESI', val: slip.esi },
+          { label: 'PT', val: slip.pt },
+          { label: 'TDS', val: slip.tds },
+          { label: 'Other Deductions', val: slip.otherDeductions },
+          { label: '', val: null },
+          { label: '', val: null },
+          { label: '', val: null },
+          { label: '', val: null },
+        ];
+      }
+
+      // ── Draw earnings / deductions table (runs for both branches) ───────────
       let currentY = 204;
       for (let idx = 0; idx < 10; idx++) {
         const earn = earnings[idx];
         doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
-        if (earn.label) {
+        if (earn && earn.label) {
           doc.text(earn.label, 45, currentY + 3);
           if (earn.val !== null && earn.val !== undefined) {
             doc.text(fmt(earn.val), 210, currentY + 3, { align: 'right', width: 82 });
@@ -511,7 +530,7 @@ const generateSalarySlipPDF = (slip) => {
         }
 
         const deduct = deductions[idx];
-        if (deduct.label) {
+        if (deduct && deduct.label) {
           doc.text(deduct.label, 302, currentY + 3);
           if (deduct.val !== null && deduct.val !== undefined) {
             doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
@@ -534,11 +553,11 @@ const generateSalarySlipPDF = (slip) => {
 
       // Totals Row
       doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
-      
+
       doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
-      doc.text('Total CTC', 45, currentY + 5);
-      doc.text(fmt(slip.ctc), 210, currentY + 5, { align: 'right', width: 82 });
-      
+      doc.text('Total Earnings', 45, currentY + 5);
+      doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
+
       doc.text('Total Deduction', 302, currentY + 5);
       doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
 
@@ -550,16 +569,16 @@ const generateSalarySlipPDF = (slip) => {
       doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 20).stroke();
       doc.moveTo(470, currentY).lineTo(470, currentY + 20).stroke();
       doc.moveTo(555, currentY).lineTo(555, currentY + 20).stroke();
-      
+
       currentY += 20;
 
       // Net Pay Row
       doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
       doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
-      
+
       doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
-      doc.text('NetPay [In-Hand]', 45, currentY + 13);
-      
+      doc.text('Final Pay [In-Hand]', 45, currentY + 13);
+
       doc.fontSize(14).font('Helvetica-Bold');
       doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
 
@@ -573,14 +592,14 @@ const generateSalarySlipPDF = (slip) => {
       doc.moveTo(40, currentY).lineTo(40, currentY + 36).stroke();
       doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 36).stroke();
       doc.moveTo(555, currentY).lineTo(555, currentY + 36).stroke();
-      
+
       currentY += 36;
 
       // Footer
       doc.fillColor('#555555')
-         .fontSize(8.5)
-         .font('Helvetica-Bold')
-         .text('This is a computer generated payslip no signature is required.', 40, currentY + 12, { align: 'center', width: 515 });
+        .fontSize(8.5)
+        .font('Helvetica-Bold')
+        .text('This is a computer generated payslip no signature is required.', 40, currentY + 12, { align: 'center', width: 515 });
 
       doc.end();
     } catch (e) {
@@ -604,7 +623,128 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
     const buildSlipHtml = (slip) => {
       const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const words = numberToWords(slip.netPay);
+      const finalPay = slip.netPay + (slip.reimbursement || 0) + (slip.overtime || 0) + (slip.incentives || 0) - (slip.deduction || 0);
+      const words = numberToWords(finalPay);
+
+      let rowsHtml = '';
+      if (Array.isArray(slip.additionHeads) && Array.isArray(slip.additionValues) &&
+        Array.isArray(slip.deductionHeads) && Array.isArray(slip.deductionValues) &&
+        (slip.additionHeads.length > 0 || slip.deductionHeads.length > 0)) {
+        let maxRows = 0;
+        for (let i = 0; i < 10; i++) {
+          if (slip.additionHeads[i] || slip.deductionHeads[i]) {
+            maxRows = i + 1;
+          }
+        }
+        for (let i = 0; i < maxRows; i++) {
+          const addHead = slip.additionHeads[i] || '';
+          const addVal = addHead ? fmt(slip.additionValues[i]) : '';
+          const dedHead = slip.deductionHeads[i] || '';
+          const dedVal = dedHead ? fmt(slip.deductionValues[i]) : '';
+
+          rowsHtml += `
+            <tr>
+              <td style="border:1px solid #cccccc;">${addHead || '&nbsp;'}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${addVal || '&nbsp;'}</td>
+              <td style="border:1px solid #cccccc;">${dedHead || '&nbsp;'}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${dedVal || '&nbsp;'}</td>
+            </tr>
+          `;
+        }
+
+        // Append post-tax earnings
+        const postEarnings = [];
+        if (slip.reimbursement) postEarnings.push({ label: 'Travel Allowance', val: slip.reimbursement });
+        if (slip.overtime) postEarnings.push({ label: 'Overtime', val: slip.overtime });
+        if (slip.incentives) postEarnings.push({ label: 'Incentives', val: slip.incentives });
+
+        postEarnings.forEach((e) => {
+          rowsHtml += `
+            <tr>
+              <td style="border:1px solid #cccccc;">${e.label}</td>
+              <td style="text-align:right;border:1px solid #cccccc;">${fmt(e.val)}</td>
+              <td style="border:1px solid #cccccc;">&nbsp;</td>
+              <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+            </tr>
+          `;
+        });
+
+        let finalTotalCtc = 0;
+        let finalTotalDeductions = 0;
+        slip.additionValues.forEach(v => { if (v) finalTotalCtc += v; });
+        postEarnings.forEach(e => { finalTotalCtc += e.val; });
+        slip.deductionValues.forEach(v => { if (v) finalTotalDeductions += v; });
+        if (finalTotalCtc === 0 && slip.ctc) finalTotalCtc = slip.ctc;
+        if (finalTotalDeductions === 0 && slip.deductions) finalTotalDeductions = slip.deductions;
+
+        // Save these so we can use them in the rows below
+        slip.finalTotalCtc = finalTotalCtc;
+        slip.finalTotalDeductions = finalTotalDeductions;
+      } else {
+        rowsHtml = `
+              <tr>
+                <td style="border:1px solid #cccccc;">Basic</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.basic)}</td>
+                <td style="border:1px solid #cccccc;">PF Employee</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployee)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">HRA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.hra)}</td>
+                <td style="border:1px solid #cccccc;">PF Employer</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pfEmployer)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Medical</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.medical)}</td>
+                <td style="border:1px solid #cccccc;">ESI</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.esi)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">TA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ta)}</td>
+                <td style="border:1px solid #cccccc;">PT</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.pt)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">LTA</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.lta)}</td>
+                <td style="border:1px solid #cccccc;">TDS</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.tds)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Special Allowance</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.specialAllowance)}</td>
+                <td style="border:1px solid #cccccc;">Other Deductions</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.otherDeductions)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Travel Allowance</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.reimbursement)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Incentives</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.incentives)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #cccccc;">Overtime</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.overtime)}</td>
+                <td style="border:1px solid #cccccc;">&nbsp;</td>
+                <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
+              </tr>
+        `;
+
+        const ctcSum = (slip.basic || 0) + (slip.hra || 0) + (slip.medical || 0) + (slip.ta || 0) + (slip.lta || 0) + (slip.specialAllowance || 0) + (slip.reimbursement || 0) + (slip.incentives || 0) + (slip.overtime || 0);
+        const dedSum = (slip.pfEmployee || 0) + (slip.pfEmployer || 0) + (slip.esi || 0) + (slip.pt || 0) + (slip.tds || 0) + (slip.otherDeductions || 0);
+
+        slip.finalTotalCtc = ctcSum || slip.ctc;
+        slip.finalTotalDeductions = dedSum || slip.deductions;
+      }
+
       return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -725,15 +865,23 @@ app.post('/api/payroll/send-slips', async (req, res) => {
                 <td style="text-align:right;border:1px solid #cccccc;">&nbsp;</td>
               </tr>
               <tr bgcolor="#f1f5f9" style="font-weight:bold;">
-                <td style="border:1px solid #cccccc;">Total CTC</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.ctc)}</td>
+                <td style="border:1px solid #cccccc;">Total Earnings</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalCtc)}</td>
                 <td style="border:1px solid #cccccc;">Total Deduction</td>
-                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.deductions)}</td>
+                <td style="text-align:right;border:1px solid #cccccc;">${fmt(slip.finalTotalDeductions)}</td>
               </tr>
               <tr>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">NetPay [In-Hand]</td>
-                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">${fmt(slip.netPay)}</td>
-                <td bgcolor="#f1f5f9" colspan="2" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">${words}</td>
+                <td bgcolor="#e2e8f0" colspan="3" style="font-weight:bold;font-size:13px;border:1px solid #cccccc;">
+                  Final Pay [In-Hand]
+                </td>
+                <td bgcolor="#e2e8f0" style="font-weight:bold;font-size:14px;text-align:right;border:1px solid #cccccc;">
+                  ${fmt(finalPay)}
+                </td>
+              </tr>
+              <tr>
+                <td bgcolor="#f1f5f9" colspan="4" style="font-weight:bold;font-size:10px;text-align:center;border:1px solid #cccccc;">
+                  ${words}
+                </td>
               </tr>
             </table>
           </td>
@@ -754,9 +902,17 @@ app.post('/api/payroll/send-slips', async (req, res) => {
     const sent = [];
     const failed = [];
 
+    const db = await readDB();
+    const employees = db.employees || [];
+
     for (const slip of slips) {
       if (!slip.email || !slip.name) {
         failed.push({ email: slip.email || '(no email)', name: slip.name || '(no name)', error: 'Missing name or email' });
+        continue;
+      }
+      const emp = employees.find(e => e.personalEmail === slip.email || e.employeeId === slip.employeeId);
+      if (!emp || emp.status !== 'Active') {
+        failed.push({ email: slip.email, name: slip.name, error: 'Employee is inactive or not found' });
         continue;
       }
       try {
@@ -776,7 +932,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
             }
           ],
         });
-        sent.push(slip.email);
+        sent.push({ email: slip.email, name: slip.name });
         console.log(`[Payroll] ✓ Sent to ${slip.name} <${slip.email}>`);
       } catch (err) {
         console.error(`[Payroll] Exception for ${slip.email}:`, err.message);
@@ -786,10 +942,276 @@ app.post('/api/payroll/send-slips', async (req, res) => {
     }
 
     console.log(`[Payroll] Done — ${sent.length} sent, ${failed.length} failed`);
-    return res.json({ success: true, sent: sent.length, failed });
+    return res.json({ success: true, sent: sent.length, sentList: sent, failed });
   } catch (outerErr) {
     console.error('[Payroll] ROUTE CRASHED:', outerErr);
     return res.status(500).json({ success: false, error: outerErr.message || 'Internal server error' });
+  }
+});
+
+// ── Payroll Schedule & Records Routes ────────────────────────────────────────
+
+// In-memory cron task handle (so we can reschedule when config changes)
+let _payslipCronTask = null;
+
+/**
+ * Build slip data for an employee from db records.
+ * Used by the cron auto-send to construct SlipRow objects server-side.
+ */
+async function buildSlipsFromDb() {
+  try {
+    const db = await readDB();
+    const employees = db.employees || [];
+    const payrollRecords = db.payroll_records || [];
+
+    if (payrollRecords.length === 0) {
+      console.log('[Payroll Cron] No payroll records found in db.json — skipping send.');
+      return [];
+    }
+
+    // Keep only the latest revision for each employee to prevent duplicates and stale revisions
+    const latestRecordsMap = {};
+    for (const rec of payrollRecords) {
+      const existing = latestRecordsMap[rec.employeeId];
+      if (!existing || rec.revision > existing.revision) {
+        latestRecordsMap[rec.employeeId] = rec;
+      }
+    }
+    const filteredRecords = Object.values(latestRecordsMap);
+
+    const slips = [];
+    for (const rec of filteredRecords) {
+      if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
+      const emp = employees.find(e => e.employeeId === rec.employeeId);
+      if (!emp || !emp.personalEmail || emp.status !== 'Active') continue;
+
+      const c = rec.components || {};
+      slips.push({
+        name: rec.employeeName,
+        email: emp.personalEmail,
+        employeeId: rec.employeeId,
+        department: rec.department,
+        designation: rec.designation,
+        month: rec.month,
+        monthlySalary: rec.monthlySalary || rec.ctc || 0,
+        ctc: rec.ctc || rec.monthlySalary || 0,
+        totalDays: rec.totalDays || getDaysInMonth(rec.month || 'June 2026'),
+        payDays: rec.payDays || getDaysInMonth(rec.month || 'June 2026'),
+        clBalance: rec.clBalance || 0,
+        pfUan: rec.pfUan || '—',
+        basic: c.basic || 0,
+        hra: c.hra || 0,
+        medical: c.medical || 0,
+        ta: c.ta || 0,
+        lta: c.lta || 0,
+        specialAllowance: c.specialAllowance || 0,
+        pfEmployee: c.pfEmployee || 0,
+        pfEmployer: c.pfEmployer || 0,
+        esi: c.esi || 0,
+        pt: c.pt || 0,
+        tds: c.tds || 0,
+        reimbursement: c.reimbursement || 0,
+        incentives: c.incentives || 0,
+        overtime: c.overtime || 0,
+        otherDeductions: c.otherDeductions || 0,
+        deductions: (c.pfEmployee || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
+        netPay: rec.netPay || 0,
+        deduction: rec.deduction || 0,
+        additionHeads: rec.additionHeads || [],
+        deductionHeads: rec.deductionHeads || [],
+        additionValues: rec.additionValues || [],
+        deductionValues: rec.deductionValues || [],
+      });
+    }
+    return slips;
+  } catch (err) {
+    console.error('[Payroll Cron] Error building slips:', err);
+    return [];
+  }
+}
+
+/**
+ * Core dispatch function — used by both cron and manual trigger.
+ * Builds slips from db, calls send-slips logic, updates lastRun.
+ */
+async function dispatchPayslips() {
+  console.log('[Payroll Cron] Starting auto-dispatch...');
+  const slips = await buildSlipsFromDb();
+  if (slips.length === 0) {
+    console.log('[Payroll Cron] No slips to send.');
+    return { sent: 0, failed: [], skipped: true };
+  }
+
+  // Reuse internal send logic by making an internal HTTP request
+  try {
+    const result = await fetch('http://localhost:3001/api/payroll/send-slips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slips }),
+    });
+    const data = await result.json();
+
+    // Update lastRun in db
+    const db = await readDB();
+    if (!db.payroll_schedule) db.payroll_schedule = {};
+    db.payroll_schedule.lastRun = new Date().toISOString();
+    await writeDB(db);
+
+    console.log(`[Payroll Cron] Done — ${data.sent} sent, ${(data.failed || []).length} failed.`);
+    return data;
+  } catch (err) {
+    console.error('[Payroll Cron] Dispatch error:', err);
+    return { sent: 0, failed: [{ error: err.message }] };
+  }
+}
+
+/**
+ * Schedule or re-schedule the cron job based on the schedule config.
+ */
+function scheduleCronJob(schedule) {
+  if (_payslipCronTask) {
+    _payslipCronTask.stop();
+    _payslipCronTask = null;
+    console.log('[Payroll Cron] Previous cron task stopped.');
+  }
+
+  if (!schedule || !schedule.enabled) {
+    console.log('[Payroll Cron] Scheduling is disabled.');
+    return;
+  }
+
+  const day = Math.min(28, Math.max(1, parseInt(schedule.day) || 10));
+  const hour = Math.min(23, Math.max(0, parseInt(schedule.hour) || 10));
+  const minute = Math.min(59, Math.max(0, parseInt(schedule.minute) || 0));
+
+  const cronExpr = `${minute} ${hour} ${day} * *`;
+  console.log(`[Payroll Cron] Scheduled: '${cronExpr}' (day=${day}, ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')})`);
+
+  _payslipCronTask = cron.schedule(cronExpr, async () => {
+    console.log('[Payroll Cron] Cron triggered — dispatching payslips...');
+    await dispatchPayslips();
+  }, { timezone: 'Asia/Kolkata' });
+}
+
+// Bootstrap cron on server start
+(async () => {
+  try {
+    const db = await readDB();
+    const schedule = db.payroll_schedule;
+    if (schedule) {
+      scheduleCronJob(schedule);
+    }
+  } catch (err) {
+    console.error('[Payroll Cron] Failed to load schedule on startup:', err);
+  }
+})();
+
+// GET /api/payroll/schedule — return current schedule config
+app.get('/api/payroll/schedule', async (req, res) => {
+  try {
+    const db = await readDB();
+    res.json(db.payroll_schedule || { day: 10, hour: 10, minute: 0, enabled: true, lastRun: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/payroll/schedule — update schedule config and reschedule cron
+app.put('/api/payroll/schedule', async (req, res) => {
+  try {
+    const { day, hour, minute, enabled } = req.body;
+    const db = await readDB();
+    const existing = db.payroll_schedule || {};
+    const newSchedule = {
+      ...existing,
+      day: parseInt(day) || 10,
+      hour: parseInt(hour) || 10,
+      minute: parseInt(minute) || 0,
+      enabled: enabled !== false,
+    };
+    db.payroll_schedule = newSchedule;
+    await writeDB(db);
+    scheduleCronJob(newSchedule);
+    console.log('[Payroll Schedule] Updated:', newSchedule);
+    res.json({ success: true, schedule: newSchedule });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/payroll/records — sync latest payroll records from client to server
+app.post('/api/payroll/records', async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!Array.isArray(records)) {
+      return res.status(400).json({ success: false, error: 'records must be an array.' });
+    }
+    const db = await readDB();
+    db.payroll_records = records;
+    await writeDB(db);
+    console.log(`[Payroll Records] Synced ${records.length} records from client.`);
+    res.json({ success: true, count: records.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/payroll/trigger-send — manually trigger payslip dispatch now
+app.post('/api/payroll/trigger-send', async (req, res) => {
+  try {
+    console.log('[Payroll] Manual trigger-send requested');
+    const result = await dispatchPayslips();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── CL Balance Routes ─────────────────────────────────────────────────────────
+
+// GET all CL balances (HR view)
+app.get('/api/cl-balances', async (req, res) => {
+  const db = await readDB();
+  res.json(db.employee_cl_balances || {});
+});
+
+// GET one employee's CL balance
+app.get('/api/cl-balances/:employeeId', async (req, res) => {
+  const db = await readDB();
+  const balances = db.employee_cl_balances || {};
+  const bal = balances[req.params.employeeId];
+  if (!bal) {
+    return res.json({ total: 12, used: 0 }); // default
+  }
+  res.json(bal);
+});
+
+// PUT — HR sets total CL days for an employee
+app.put('/api/cl-balances/:employeeId', async (req, res) => {
+  try {
+    const db = await readDB();
+    if (!db.employee_cl_balances) db.employee_cl_balances = {};
+    const empId = req.params.employeeId;
+    const existing = db.employee_cl_balances[empId] || { total: 12, used: 0 };
+
+    let newTotal = existing.total;
+    let newUsed = existing.used;
+
+    if (req.body.total !== undefined) {
+      newTotal = parseInt(req.body.total, 10);
+      if (isNaN(newTotal) || newTotal < 0) return res.status(400).json({ success: false, error: 'Invalid total value.' });
+    }
+
+    if (req.body.used !== undefined) {
+      newUsed = parseInt(req.body.used, 10);
+      if (isNaN(newUsed) || newUsed < 0) return res.status(400).json({ success: false, error: 'Invalid used value.' });
+    }
+
+    db.employee_cl_balances[empId] = { total: newTotal, used: newUsed };
+    await writeDB(db);
+    res.json({ success: true, balance: db.employee_cl_balances[empId] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -959,356 +1381,356 @@ const MOCK_EMPLOYEE_NAMES = {
   'VAR-002': 'HR User'
 };
 
-  // BIO PARK D-01 DEVICE BRIDGE — Attendance Module
-  // ZKTeco ADMS protocol over TCP port 4370 at 192.168.1.42
-  // Gracefully falls back to mock data when device is offline.
-  // ═══════════════════════════════════════════════════════════════════════
+// BIO PARK D-01 DEVICE BRIDGE — Attendance Module
+// ZKTeco ADMS protocol over TCP port 4370 at 192.168.1.42
+// Gracefully falls back to mock data when device is offline.
+// ═══════════════════════════════════════════════════════════════════════
 
-  // ─── In-memory cache ───────────────────────────────────────────────────────
+// ─── In-memory cache ───────────────────────────────────────────────────────
 
-  const MAX_FEED_EVENTS = 20;
-  const DEVICE_IP = '192.168.1.42';
-  const DEVICE_PORT = 4370;
-  const POLL_INTERVAL_MS = 60000;
+const MAX_FEED_EVENTS = 20;
+const DEVICE_IP = '192.168.1.42';
+const DEVICE_PORT = 4370;
+const POLL_INTERVAL_MS = 60000;
 
-  // Punch dedup: map of employeeId → last punch timestamp (ms)
-  const lastPunchTs = new Map();
-  const DEDUP_WINDOW_MS = 30000; // 30-second guard
+// Punch dedup: map of employeeId → last punch timestamp (ms)
+const lastPunchTs = new Map();
+const DEDUP_WINDOW_MS = 30000; // 30-second guard
 
-  let _liveFeed = [];
-  let _deviceStatus = {
-    ipAddress: DEVICE_IP,
-    enrolledFaces: 40,
-    lastSync: null,
-    firmware: 'ZKTeco v6.60',
-    uptime: '—',
+let _liveFeed = [];
+let _deviceStatus = {
+  ipAddress: DEVICE_IP,
+  enrolledFaces: 40,
+  lastSync: null,
+  firmware: 'ZKTeco v6.60',
+  uptime: '—',
+  online: false,
+};
+
+// ─── Seed mock feed on startup (device offline) ────────────────────────────
+
+async function seedMockFeed() {
+  try {
+    const data = await fs.readFile(path.join(process.cwd(), 'db.json'), 'utf-8');
+    const db = JSON.parse(data);
+    const emps = db.employees || [];
+    const now = Date.now();
+    _liveFeed = emps.slice(0, 15).map((emp, i) => ({
+      id: `pev-seed-${i}`,
+      timestamp: new Date(now - (15 - i) * 13 * 60000).toISOString(),
+      employeeId: emp.employeeId,
+      employeeName: emp.fullName,
+      type: i % 3 === 2 ? 'out' : 'in',
+      confidence: parseFloat((85 + Math.random() * 12).toFixed(1)),
+      success: true,
+    }));
+  } catch (err) {
+    console.warn('[Device Bridge] Could not seed mock feed from db.json:', err.message);
+  }
+}
+
+seedMockFeed();
+
+// ─── ZKTeco ADMS TCP punch pull ────────────────────────────────────────────
+
+/**
+ * ZKTeco ADMS protocol handshake and attendance record pull over TCP.
+ * If the device is unreachable, marks device as offline and logs the error.
+ * TODO: Implement full ZKTeco ADMS command set for production:
+ *   CMD_CONNECT (0x03E8) → CMD_ATTLOG (0x000D) → parse binary attendance records
+ */
+function pollDevice() {
+  const socket = new net.Socket();
+  let connected = false;
+  let buffer = Buffer.alloc(0);
+
+  socket.setTimeout(5000);
+
+  socket.connect(DEVICE_PORT, DEVICE_IP, () => {
+    connected = true;
+    console.log(`[Device Bridge] Connected to Bio Park D-01 at ${DEVICE_IP}:${DEVICE_PORT}`);
+    // TODO: Send ZKTeco CMD_CONNECT handshake packet
+    // TODO: Request attendance log via CMD_ATTLOG
+    // For now: mark device online and update status
+    _deviceStatus = {
+      ipAddress: DEVICE_IP,
+      enrolledFaces: 40,
+      lastSync: new Date().toISOString(),
+      firmware: 'ZKTeco v6.60',
+      uptime: '—',
+      online: true,
+    };
+    socket.end();
+  });
+
+  socket.on('data', (data) => {
+    buffer = Buffer.concat([buffer, data]);
+    // Parse ZKTeco ADMS binary packet format
+    // Format (simplified): 
+    // bytes 0-3: Magic Header
+    // bytes 4-5: Size
+    // bytes 6-7: Command ID
+    // bytes 8-24: Employee ID (String/Null terminated)
+    // byte 25: Punch type (0 = In, 1 = Out)
+    // bytes 26-29: Timestamp
+
+    try {
+      // While we have enough bytes for a complete packet (assume 30 bytes for simplified parser)
+      while (buffer.length >= 30) {
+        const packetData = buffer.slice(0, 30);
+        buffer = buffer.slice(30);
+
+        let empIdRaw = packetData.slice(8, 24).toString('ascii').replace(/\0/g, '').trim();
+        let punchTypeRaw = packetData.readUInt8(25);
+        let type = punchTypeRaw === 0 ? 'in' : 'out';
+
+        let employeeId = empIdRaw;
+        if (/^\d+$/.test(empIdRaw)) {
+          employeeId = `VAR-${empIdRaw.padStart(3, '0')}`;
+        }
+
+        console.log(`[Device Bridge] Parsed Punch Event => Emp: ${employeeId}, Type: ${type}`);
+
+        // Calculate a dummy confidence for the mock/hardware mix
+        const confidence = parseFloat((85 + Math.random() * 12).toFixed(1));
+
+        processPunchEvent(employeeId, type, confidence);
+      }
+    } catch (err) {
+      console.error('[Device Bridge] Packet parsing error:', err.message);
+    }
+  });
+
+  socket.on('timeout', () => {
+    console.warn(`[Device Bridge] TCP timeout — ${DEVICE_IP}:${DEVICE_PORT}`);
+    socket.destroy();
+    markDeviceOffline();
+  });
+
+  socket.on('error', (err) => {
+    if (connected) return;
+    // Expected in dev — device not on this LAN
+    console.warn(`[Device Bridge] ${DEVICE_IP}:${DEVICE_PORT} unreachable — running in mock mode. (${err.code})`);
+    markDeviceOffline();
+  });
+
+  socket.on('close', () => {
+    // nothing
+  });
+}
+
+function markDeviceOffline() {
+  _deviceStatus = {
+    ..._deviceStatus,
     online: false,
+    lastSync: new Date().toISOString(),
+  };
+}
+
+/**
+ * Process a parsed punch event from the device.
+ * Guards against duplicate punches within 30 seconds.
+ */
+function processPunchEvent(employeeId, type, confidence) {
+  const now = Date.now();
+  const lastTs = lastPunchTs.get(employeeId);
+  if (lastTs && now - lastTs < DEDUP_WINDOW_MS) {
+    console.log(`[Device Bridge] Dedup: ignored punch for ${employeeId} (within 30s window)`);
+    return;
+  }
+  lastPunchTs.set(employeeId, now);
+
+  const event = {
+    id: `pev-${now}-${employeeId}`,
+    timestamp: new Date().toISOString(),
+    employeeId,
+    employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
+    type,
+    confidence: parseFloat(confidence.toFixed(1)),
+    success: true,
   };
 
-  // ─── Seed mock feed on startup (device offline) ────────────────────────────
-
-  async function seedMockFeed() {
-    try {
-      const data = await fs.readFile(path.join(process.cwd(), 'db.json'), 'utf-8');
-      const db = JSON.parse(data);
-      const emps = db.employees || [];
-      const now = Date.now();
-      _liveFeed = emps.slice(0, 15).map((emp, i) => ({
-        id: `pev-seed-${i}`,
-        timestamp: new Date(now - (15 - i) * 13 * 60000).toISOString(),
-        employeeId: emp.employeeId,
-        employeeName: emp.fullName,
-        type: i % 3 === 2 ? 'out' : 'in',
-        confidence: parseFloat((85 + Math.random() * 12).toFixed(1)),
-        success: true,
-      }));
-    } catch (err) {
-      console.warn('[Device Bridge] Could not seed mock feed from db.json:', err.message);
-    }
+  _liveFeed.unshift(event);
+  if (_liveFeed.length > MAX_FEED_EVENTS) {
+    _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
   }
 
-  seedMockFeed();
+  console.log(`[Device Bridge] ✓ ${employeeId} ${type.toUpperCase()} confidence=${confidence}%`);
+}
 
-  // ─── ZKTeco ADMS TCP punch pull ────────────────────────────────────────────
+// Start polling on server boot
+pollDevice();
+setInterval(pollDevice, POLL_INTERVAL_MS);
 
-  /**
-   * ZKTeco ADMS protocol handshake and attendance record pull over TCP.
-   * If the device is unreachable, marks device as offline and logs the error.
-   * TODO: Implement full ZKTeco ADMS command set for production:
-   *   CMD_CONNECT (0x03E8) → CMD_ATTLOG (0x000D) → parse binary attendance records
-   */
-  function pollDevice() {
-    const socket = new net.Socket();
-    let connected = false;
-    let buffer = Buffer.alloc(0);
+// ─── Attendance API routes ─────────────────────────────────────────────────
 
-    socket.setTimeout(5000);
+app.get('/api/attendance/live-feed', (req, res) => {
+  res.json(_liveFeed);
+});
 
-    socket.connect(DEVICE_PORT, DEVICE_IP, () => {
-      connected = true;
-      console.log(`[Device Bridge] Connected to Bio Park D-01 at ${DEVICE_IP}:${DEVICE_PORT}`);
-      // TODO: Send ZKTeco CMD_CONNECT handshake packet
-      // TODO: Request attendance log via CMD_ATTLOG
-      // For now: mark device online and update status
-      _deviceStatus = {
-        ipAddress: DEVICE_IP,
-        enrolledFaces: 40,
-        lastSync: new Date().toISOString(),
-        firmware: 'ZKTeco v6.60',
-        uptime: '—',
-        online: true,
-      };
-      socket.end();
-    });
+app.get('/api/attendance/device-status', (req, res) => {
+  res.json(_deviceStatus);
+});
 
-    socket.on('data', (data) => {
-      buffer = Buffer.concat([buffer, data]);
-      // Parse ZKTeco ADMS binary packet format
-      // Format (simplified): 
-      // bytes 0-3: Magic Header
-      // bytes 4-5: Size
-      // bytes 6-7: Command ID
-      // bytes 8-24: Employee ID (String/Null terminated)
-      // byte 25: Punch type (0 = In, 1 = Out)
-      // bytes 26-29: Timestamp
-      
-      try {
-        // While we have enough bytes for a complete packet (assume 30 bytes for simplified parser)
-        while (buffer.length >= 30) {
-          const packetData = buffer.slice(0, 30);
-          buffer = buffer.slice(30);
-
-          let empIdRaw = packetData.slice(8, 24).toString('ascii').replace(/\0/g, '').trim();
-          let punchTypeRaw = packetData.readUInt8(25);
-          let type = punchTypeRaw === 0 ? 'in' : 'out';
-          
-          let employeeId = empIdRaw;
-          if (/^\d+$/.test(empIdRaw)) {
-            employeeId = `VAR-${empIdRaw.padStart(3, '0')}`;
-          }
-
-          console.log(`[Device Bridge] Parsed Punch Event => Emp: ${employeeId}, Type: ${type}`);
-          
-          // Calculate a dummy confidence for the mock/hardware mix
-          const confidence = parseFloat((85 + Math.random() * 12).toFixed(1));
-          
-          processPunchEvent(employeeId, type, confidence);
-        }
-      } catch (err) {
-        console.error('[Device Bridge] Packet parsing error:', err.message);
-      }
-    });
-
-    socket.on('timeout', () => {
-      console.warn(`[Device Bridge] TCP timeout — ${DEVICE_IP}:${DEVICE_PORT}`);
-      socket.destroy();
-      markDeviceOffline();
-    });
-
-    socket.on('error', (err) => {
-      if (connected) return;
-      // Expected in dev — device not on this LAN
-      console.warn(`[Device Bridge] ${DEVICE_IP}:${DEVICE_PORT} unreachable — running in mock mode. (${err.code})`);
-      markDeviceOffline();
-    });
-
-    socket.on('close', () => {
-      // nothing
-    });
-  }
-
-  function markDeviceOffline() {
-    _deviceStatus = {
-      ..._deviceStatus,
-      online: false,
-      lastSync: new Date().toISOString(),
-    };
-  }
-
-  /**
-   * Process a parsed punch event from the device.
-   * Guards against duplicate punches within 30 seconds.
-   */
-  function processPunchEvent(employeeId, type, confidence) {
-    const now = Date.now();
-    const lastTs = lastPunchTs.get(employeeId);
-    if (lastTs && now - lastTs < DEDUP_WINDOW_MS) {
-      console.log(`[Device Bridge] Dedup: ignored punch for ${employeeId} (within 30s window)`);
-      return;
-    }
-    lastPunchTs.set(employeeId, now);
-
-    const event = {
-      id: `pev-${now}-${employeeId}`,
-      timestamp: new Date().toISOString(),
-      employeeId,
-      employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
-      type,
-      confidence: parseFloat(confidence.toFixed(1)),
-      success: true,
-    };
-
-    _liveFeed.unshift(event);
-    if (_liveFeed.length > MAX_FEED_EVENTS) {
-      _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
-    }
-
-    console.log(`[Device Bridge] ✓ ${employeeId} ${type.toUpperCase()} confidence=${confidence}%`);
-  }
-
-  // Start polling on server boot
+app.post('/api/attendance/force-resync', (req, res) => {
+  console.log('[Device Bridge] Force re-sync triggered via API');
   pollDevice();
-  setInterval(pollDevice, POLL_INTERVAL_MS);
+  res.json({ success: true, message: 'Re-sync triggered', timestamp: new Date().toISOString() });
+});
 
-  // ─── Attendance API routes ─────────────────────────────────────────────────
+// ─── Attendance PDF export ─────────────────────────────────────────────────
 
-  app.get('/api/attendance/live-feed', (req, res) => {
-    res.json(_liveFeed);
-  });
+app.post('/api/attendance/export-pdf', (req, res) => {
+  try {
+    const { rows = [], month = 'Report', type = 'monthly' } = req.body;
 
-  app.get('/api/attendance/device-status', (req, res) => {
-    res.json(_deviceStatus);
-  });
+    // ── Page setup: A4 landscape for more column space ──────────────────────
+    const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
+    const bufs = [];
+    doc.on('data', d => bufs.push(d));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(bufs);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance_${month.replace(/\s+/g, '_')}.pdf"`);
+      res.send(pdfBuffer);
+    });
 
-  app.post('/api/attendance/force-resync', (req, res) => {
-    console.log('[Device Bridge] Force re-sync triggered via API');
-    pollDevice();
-    res.json({ success: true, message: 'Re-sync triggered', timestamp: new Date().toISOString() });
-  });
+    const pageW = doc.page.width;
+    const marginL = doc.page.margins.left;
+    const usableW = pageW - marginL - doc.page.margins.right;
 
-  // ─── Attendance PDF export ─────────────────────────────────────────────────
+    // ── Header ──────────────────────────────────────────────────────────────
+    doc.rect(marginL, 36, usableW, 32).fill('#84CC16');
+    doc.fillColor('#1a2e05').fontSize(15).font('Helvetica-Bold')
+      .text('Varistor EOPMS — Attendance Report', marginL + 10, 45, { lineBreak: false });
+    const subtitle = `${type === 'monthly' ? 'Monthly' : 'Daily'}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`;
+    doc.fillColor('#1a2e05').fontSize(9).font('Helvetica')
+      .text(subtitle, 0, 49, { align: 'right', lineBreak: false });
 
-  app.post('/api/attendance/export-pdf', (req, res) => {
-    try {
-      const { rows = [], month = 'Report', type = 'monthly' } = req.body;
+    doc.y = 36 + 32 + 10; // below header bar
 
-      // ── Page setup: A4 landscape for more column space ──────────────────────
-      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
-      const bufs = [];
-      doc.on('data', d => bufs.push(d));
-      doc.on('end', () => {
-        const pdfBuffer = Buffer.concat(bufs);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="attendance_${month.replace(/\s+/g, '_')}.pdf"`);
-        res.send(pdfBuffer);
-      });
+    // ── Column definitions ───────────────────────────────────────────────────
+    const cols = type === 'monthly'
+      ? [
+        { label: 'Emp ID', key: 'employee_id', w: 60 },
+        { label: 'Employee', key: 'employeeName', w: 140 },
+        { label: 'Dept', key: 'department', w: 90 },
+        { label: 'Present', key: 'present', w: 52 },
+        { label: 'Leaves', key: 'leaves', w: 48 },
+        { label: 'W.O', key: 'weekOff', w: 40 },
+        { label: 'Holidays', key: 'holidays', w: 52 },
+        { label: 'Half-day', key: 'halfDay', w: 52 },
+        { label: 'Absent', key: 'absent', w: 48 },
+        { label: 'Total Hrs', key: 'totalHrs', w: 58 },
+        { label: 'Payable Days', key: 'payableDays', w: 70 },
+      ]
+      : [
+        { label: 'Emp ID', key: 'employee_id', w: 60 },
+        { label: 'Employee', key: 'employeeName', w: 150 },
+        { label: 'Dept', key: 'department', w: 100 },
+        { label: 'Date', key: 'date', w: 75 },
+        { label: 'Punch IN', key: 'punch_in', w: 80 },
+        { label: 'Punch OUT', key: 'punch_out', w: 80 },
+        { label: 'Work Hrs', key: 'work_hours', w: 60 },
+        { label: 'Status', key: 'status', w: 65 },
+      ];
 
-      const pageW = doc.page.width;
-      const marginL = doc.page.margins.left;
-      const usableW = pageW - marginL - doc.page.margins.right;
+    // Scale widths to fill exact usable width
+    const totalW = cols.reduce((s, c) => s + c.w, 0);
+    const scale = usableW / totalW;
+    cols.forEach(c => { c.w = Math.floor(c.w * scale); });
 
-      // ── Header ──────────────────────────────────────────────────────────────
-      doc.rect(marginL, 36, usableW, 32).fill('#84CC16');
-      doc.fillColor('#1a2e05').fontSize(15).font('Helvetica-Bold')
-        .text('Varistor EOPMS — Attendance Report', marginL + 10, 45, { lineBreak: false });
-      const subtitle = `${type === 'monthly' ? 'Monthly' : 'Daily'}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`;
-      doc.fillColor('#1a2e05').fontSize(9).font('Helvetica')
-        .text(subtitle, 0, 49, { align: 'right', lineBreak: false });
+    const rowH = 18;
 
-      doc.y = 36 + 32 + 10; // below header bar
-
-      // ── Column definitions ───────────────────────────────────────────────────
-      const cols = type === 'monthly'
-        ? [
-            { label: 'Emp ID',      key: 'employee_id',   w: 60 },
-            { label: 'Employee',    key: 'employeeName',  w: 140 },
-            { label: 'Dept',        key: 'department',    w: 90  },
-            { label: 'Present',     key: 'present',       w: 52  },
-            { label: 'Leaves',      key: 'leaves',        w: 48  },
-            { label: 'W.O',         key: 'weekOff',       w: 40  },
-            { label: 'Holidays',    key: 'holidays',      w: 52  },
-            { label: 'Half-day',    key: 'halfDay',       w: 52  },
-            { label: 'Absent',      key: 'absent',        w: 48  },
-            { label: 'Total Hrs',   key: 'totalHrs',      w: 58  },
-            { label: 'Payable Days',key: 'payableDays',   w: 70  },
-          ]
-        : [
-            { label: 'Emp ID',      key: 'employee_id',   w: 60  },
-            { label: 'Employee',    key: 'employeeName',  w: 150 },
-            { label: 'Dept',        key: 'department',    w: 100 },
-            { label: 'Date',        key: 'date',          w: 75  },
-            { label: 'Punch IN',    key: 'punch_in',      w: 80  },
-            { label: 'Punch OUT',   key: 'punch_out',     w: 80  },
-            { label: 'Work Hrs',    key: 'work_hours',    w: 60  },
-            { label: 'Status',      key: 'status',        w: 65  },
-          ];
-
-      // Scale widths to fill exact usable width
-      const totalW = cols.reduce((s, c) => s + c.w, 0);
-      const scale = usableW / totalW;
-      cols.forEach(c => { c.w = Math.floor(c.w * scale); });
-
-      const rowH = 18;
-
-      function drawRow(y, values, isBg, isHeader) {
-        // Row background
-        if (isHeader) {
-          doc.rect(marginL, y, usableW, rowH).fill('#2d5a00');
-        } else if (isBg) {
-          doc.rect(marginL, y, usableW, rowH).fill('#f0fce4');
-        } else {
-          doc.rect(marginL, y, usableW, rowH).fill('#ffffff');
-        }
-
-        // Cell text + vertical dividers
-        let x = marginL;
-        values.forEach((val, i) => {
-          const w = cols[i].w;
-          const str = String(val ?? '');
-
-          doc
-            .fillColor(isHeader ? '#ffffff' : '#111111')
-            .fontSize(isHeader ? 8 : 7.5)
-            .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
-            .text(str, x + 4, y + (rowH - 8) / 2, {
-              width: w - 8,
-              lineBreak: false,
-              ellipsis: true,
-            });
-
-          // Vertical separator (except after last col)
-          if (i < values.length - 1) {
-            doc.strokeColor(isHeader ? '#4d8a00' : '#d0e8b8')
-              .lineWidth(0.4)
-              .moveTo(x + w, y).lineTo(x + w, y + rowH).stroke();
-          }
-          x += w;
-        });
-
-        // Bottom border for each row
-        doc.strokeColor(isHeader ? '#1a4000' : '#c5e0a0')
-          .lineWidth(0.4)
-          .moveTo(marginL, y + rowH).lineTo(marginL + usableW, y + rowH).stroke();
+    function drawRow(y, values, isBg, isHeader) {
+      // Row background
+      if (isHeader) {
+        doc.rect(marginL, y, usableW, rowH).fill('#2d5a00');
+      } else if (isBg) {
+        doc.rect(marginL, y, usableW, rowH).fill('#f0fce4');
+      } else {
+        doc.rect(marginL, y, usableW, rowH).fill('#ffffff');
       }
 
-      // ── Column header ────────────────────────────────────────────────────────
-      const headerY = doc.y;
-      drawRow(headerY, cols.map(c => c.label), false, true);
-      doc.y = headerY + rowH;
+      // Cell text + vertical dividers
+      let x = marginL;
+      values.forEach((val, i) => {
+        const w = cols[i].w;
+        const str = String(val ?? '');
 
-      // ── Data rows ────────────────────────────────────────────────────────────
-      let pageRowCount = 0;
-      const rowsPerPage = Math.floor((doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 80) / rowH);
+        doc
+          .fillColor(isHeader ? '#ffffff' : '#111111')
+          .fontSize(isHeader ? 8 : 7.5)
+          .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
+          .text(str, x + 4, y + (rowH - 8) / 2, {
+            width: w - 8,
+            lineBreak: false,
+            ellipsis: true,
+          });
 
-      rows.forEach((row, idx) => {
-        if (pageRowCount > 0 && pageRowCount % rowsPerPage === 0) {
-          // Footer on current page
-          doc.fontSize(7).fillColor('#888888').font('Helvetica')
-            .text(`Page ${Math.ceil(idx / rowsPerPage)}`, 0, doc.page.height - 30, { align: 'center', lineBreak: false });
-          doc.addPage();
-          // Reprint column headers on new page
-          const newHeaderY = doc.page.margins.top;
-          doc.y = newHeaderY;
-          drawRow(newHeaderY, cols.map(c => c.label), false, true);
-          doc.y = newHeaderY + rowH;
-          pageRowCount = 0;
+        // Vertical separator (except after last col)
+        if (i < values.length - 1) {
+          doc.strokeColor(isHeader ? '#4d8a00' : '#d0e8b8')
+            .lineWidth(0.4)
+            .moveTo(x + w, y).lineTo(x + w, y + rowH).stroke();
         }
-
-        const rowY = doc.y;
-        const values = type === 'monthly'
-          ? [row.employee_id || '', row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.halfDay ?? 0, row.absent, row.totalHrs, row.payableDays]
-          : [row.employee_id || '', row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
-
-        drawRow(rowY, values, idx % 2 === 1, false);
-        doc.y = rowY + rowH;
-        pageRowCount++;
+        x += w;
       });
 
-      // Footer on last page
-      doc.fontSize(7).fillColor('#888888').font('Helvetica')
-        .text('Varistor EOPMS — Confidential', 0, doc.page.height - 30, { align: 'center', lineBreak: false });
-
-      doc.end();
-    } catch (err) {
-      console.error('[Attendance PDF]', err);
-      res.status(500).json({ success: false, error: err.message });
+      // Bottom border for each row
+      doc.strokeColor(isHeader ? '#1a4000' : '#c5e0a0')
+        .lineWidth(0.4)
+        .moveTo(marginL, y + rowH).lineTo(marginL + usableW, y + rowH).stroke();
     }
-  });
 
-  // ─── Expose processPunchEvent for future device integration ───────────────
-  // When the ZKTeco ADMS parser is complete, call processPunchEvent() with
-  // parsed data from the binary packet stream.
-  app._processPunchEvent = processPunchEvent;
+    // ── Column header ────────────────────────────────────────────────────────
+    const headerY = doc.y;
+    drawRow(headerY, cols.map(c => c.label), false, true);
+    doc.y = headerY + rowH;
+
+    // ── Data rows ────────────────────────────────────────────────────────────
+    let pageRowCount = 0;
+    const rowsPerPage = Math.floor((doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 80) / rowH);
+
+    rows.forEach((row, idx) => {
+      if (pageRowCount > 0 && pageRowCount % rowsPerPage === 0) {
+        // Footer on current page
+        doc.fontSize(7).fillColor('#888888').font('Helvetica')
+          .text(`Page ${Math.ceil(idx / rowsPerPage)}`, 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+        doc.addPage();
+        // Reprint column headers on new page
+        const newHeaderY = doc.page.margins.top;
+        doc.y = newHeaderY;
+        drawRow(newHeaderY, cols.map(c => c.label), false, true);
+        doc.y = newHeaderY + rowH;
+        pageRowCount = 0;
+      }
+
+      const rowY = doc.y;
+      const values = type === 'monthly'
+        ? [row.employee_id || '', row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.halfDay ?? 0, row.absent, row.totalHrs, row.payableDays]
+        : [row.employee_id || '', row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+
+      drawRow(rowY, values, idx % 2 === 1, false);
+      doc.y = rowY + rowH;
+      pageRowCount++;
+    });
+
+    // Footer on last page
+    doc.fontSize(7).fillColor('#888888').font('Helvetica')
+      .text('Varistor EOPMS — Confidential', 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+
+    doc.end();
+  } catch (err) {
+    console.error('[Attendance PDF]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── Expose processPunchEvent for future device integration ───────────────
+// When the ZKTeco ADMS parser is complete, call processPunchEvent() with
+// parsed data from the binary packet stream.
+app._processPunchEvent = processPunchEvent;
 
 
 // Activity
