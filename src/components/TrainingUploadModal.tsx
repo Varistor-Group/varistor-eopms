@@ -4,6 +4,7 @@ import ReactPlayer from 'react-player';
 const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { getDepartments } from '../api/employees';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';
 
 interface Props {
@@ -50,6 +51,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const [durationError, setDurationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const departments = useMemo(() => getDepartments(), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -242,7 +244,13 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
             </div>
             <div>
               <label className={labelCls}>Department <span className="normal-case font-normal">(optional)</span></label>
-              <input className={inputCls} value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Operations" disabled={track !== 'Department'} />
+              <select className={inputCls} value={department} onChange={e => setDepartment(e.target.value)} disabled={track !== 'Department'}>
+                <option value="">All departments</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              {track === 'Department' && department && (
+                <p className="mt-1.5 text-[10px] text-varistor-muted">Only employees in {department} will be able to access this module.</p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Prerequisite</label>

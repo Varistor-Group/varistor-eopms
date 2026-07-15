@@ -12,7 +12,7 @@ interface TrainingGateResult {
 // HR/Admin manage training themselves and must never be locked out of the app by it.
 const EXEMPT_ROLES: UserRole[] = ['HR', 'Admin'];
 
-export function useTrainingGate(employeeId: string | undefined, role: UserRole | undefined): TrainingGateResult {
+export function useTrainingGate(employeeId: string | undefined, role: UserRole | undefined, department?: string): TrainingGateResult {
   const exempt = !role || EXEMPT_ROLES.includes(role);
   // Optimistic default (unlocked) avoids flashing a lockout for already-compliant users while the
   // first fetch is in flight; a genuinely incomplete employee gets redirected the moment it resolves.
@@ -27,13 +27,13 @@ export function useTrainingGate(employeeId: string | undefined, role: UserRole |
     }
     setLoading(true);
     trainingApi
-      .fetchModulesWithStatus(employeeId, role)
+      .fetchModulesWithStatus(employeeId, role, department)
       .then(modules => {
         const allComplete = modules.length === 0 || modules.every(m => m.status === 'completed');
         setLocked(!allComplete);
       })
       .finally(() => setLoading(false));
-  }, [employeeId, role, exempt]);
+  }, [employeeId, role, department, exempt]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

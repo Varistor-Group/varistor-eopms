@@ -201,12 +201,12 @@ const TrainingLibrary: React.FC = () => {
   const loadModules = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole);
+      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole, currentUser?.department);
       setModules(data);
     } finally {
       setLoading(false);
     }
-  }, [employeeId, currentRole]);
+  }, [employeeId, currentRole, currentUser?.department]);
 
   useEffect(() => {
    
