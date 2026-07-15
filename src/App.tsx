@@ -357,7 +357,7 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 // All employee tabs (minus vault & attendance) + task-management
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
