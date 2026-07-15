@@ -1585,8 +1585,12 @@ app.post('/api/attendance/export-pdf', (req, res) => {
   try {
     const { rows = [], month = 'Report', type = 'monthly' } = req.body;
 
-    // ── Page setup: A4 landscape for more column space ──────────────────────
-    const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
+    // Determine report mode
+    const isGroupedDetailed = (type === 'monthly' || type === 'yearly') && rows.length > 0 && Array.isArray(rows[0].dailyRecords);
+    const isDaily = type === 'daily';
+
+    // ── Page setup: A4 landscape ────────────────────────────────────────────
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
     const bufs = [];
     doc.on('data', d => bufs.push(d));
     doc.on('end', () => {
@@ -1596,130 +1600,237 @@ app.post('/api/attendance/export-pdf', (req, res) => {
       res.send(pdfBuffer);
     });
 
-    const pageW = doc.page.width;
     const marginL = doc.page.margins.left;
-    const usableW = pageW - marginL - doc.page.margins.right;
+    const marginR = doc.page.margins.right;
+    const marginT = doc.page.margins.top;
+    const marginB = doc.page.margins.bottom;
+    const usableW = doc.page.width - marginL - marginR;
 
-    // ── Header ──────────────────────────────────────────────────────────────
-    doc.rect(marginL, 36, usableW, 32).fill('#84CC16');
-    doc.fillColor('#1a2e05').fontSize(15).font('Helvetica-Bold')
-      .text('Varistor EOPMS — Attendance Report', marginL + 10, 45, { lineBreak: false });
-    const subtitle = `${type === 'monthly' ? 'Monthly' : 'Daily'}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`;
-    doc.fillColor('#1a2e05').fontSize(9).font('Helvetica')
-      .text(subtitle, 0, 49, { align: 'right', lineBreak: false });
-
-    doc.y = 36 + 32 + 10; // below header bar
-
-    // ── Column definitions ───────────────────────────────────────────────────
-    const cols = type === 'monthly'
-      ? [
-        { label: 'Emp ID', key: 'employee_id', w: 60 },
-        { label: 'Employee', key: 'employeeName', w: 140 },
-        { label: 'Dept', key: 'department', w: 90 },
-        { label: 'Present', key: 'present', w: 52 },
-        { label: 'Leaves', key: 'leaves', w: 48 },
-        { label: 'W.O', key: 'weekOff', w: 40 },
-        { label: 'Holidays', key: 'holidays', w: 52 },
-        { label: 'Half-day', key: 'halfDay', w: 52 },
-        { label: 'Absent', key: 'absent', w: 48 },
-        { label: 'Total Hrs', key: 'totalHrs', w: 58 },
-        { label: 'Payable Days', key: 'payableDays', w: 70 },
-      ]
-      : [
-        { label: 'Emp ID', key: 'employee_id', w: 60 },
-        { label: 'Employee', key: 'employeeName', w: 150 },
-        { label: 'Dept', key: 'department', w: 100 },
-        { label: 'Date', key: 'date', w: 75 },
-        { label: 'Punch IN', key: 'punch_in', w: 80 },
-        { label: 'Punch OUT', key: 'punch_out', w: 80 },
-        { label: 'Work Hrs', key: 'work_hours', w: 60 },
-        { label: 'Status', key: 'status', w: 65 },
-      ];
-
-    // Scale widths to fill exact usable width
-    const totalW = cols.reduce((s, c) => s + c.w, 0);
-    const scale = usableW / totalW;
-    cols.forEach(c => { c.w = Math.floor(c.w * scale); });
-
-    const rowH = 18;
-
-    function drawRow(y, values, isBg, isHeader) {
-      // Row background
-      if (isHeader) {
-        doc.rect(marginL, y, usableW, rowH).fill('#2d5a00');
-      } else if (isBg) {
-        doc.rect(marginL, y, usableW, rowH).fill('#f0fce4');
-      } else {
-        doc.rect(marginL, y, usableW, rowH).fill('#ffffff');
-      }
-
-      // Cell text + vertical dividers
-      let x = marginL;
-      values.forEach((val, i) => {
-        const w = cols[i].w;
-        const str = String(val ?? '');
-
-        doc
-          .fillColor(isHeader ? '#ffffff' : '#111111')
-          .fontSize(isHeader ? 8 : 7.5)
-          .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
-          .text(str, x + 4, y + (rowH - 8) / 2, {
-            width: w - 8,
-            lineBreak: false,
-            ellipsis: true,
-          });
-
-        // Vertical separator (except after last col)
-        if (i < values.length - 1) {
-          doc.strokeColor(isHeader ? '#4d8a00' : '#d0e8b8')
-            .lineWidth(0.4)
-            .moveTo(x + w, y).lineTo(x + w, y + rowH).stroke();
-        }
-        x += w;
-      });
-
-      // Bottom border for each row
-      doc.strokeColor(isHeader ? '#1a4000' : '#c5e0a0')
-        .lineWidth(0.4)
-        .moveTo(marginL, y + rowH).lineTo(marginL + usableW, y + rowH).stroke();
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function fmtTime(isoStr) {
+      if (!isoStr) return '—';
+      try {
+        return new Date(isoStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      } catch { return '—'; }
     }
 
-    // ── Column header ────────────────────────────────────────────────────────
-    const headerY = doc.y;
-    drawRow(headerY, cols.map(c => c.label), false, true);
-    doc.y = headerY + rowH;
+    function safeStr(v) {
+      if (v === undefined || v === null) return '—';
+      return String(v);
+    }
 
-    // ── Data rows ────────────────────────────────────────────────────────────
-    let pageRowCount = 0;
-    const rowsPerPage = Math.floor((doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 80) / rowH);
+    // Draws a table row at absolute y position using an explicit cols array.
+    // Each cell is drawn using exact x + w calculated from cols, no doc.text Y drift.
+    const ROW_H = 18;
 
-    rows.forEach((row, idx) => {
-      if (pageRowCount > 0 && pageRowCount % rowsPerPage === 0) {
-        // Footer on current page
-        doc.fontSize(7).fillColor('#888888').font('Helvetica')
-          .text(`Page ${Math.ceil(idx / rowsPerPage)}`, 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+    function drawRow(y, values, isBg, isHeader, cols) {
+      const bg = isHeader ? '#1e5f2e' : (isBg ? '#f3fbe8' : '#ffffff');
+      doc.rect(marginL, y, usableW, ROW_H).fill(bg);
+
+      let x = marginL;
+      cols.forEach((col, i) => {
+        const cellW = col.w;
+        const str = safeStr(values[i]);
+        doc
+          .fillColor(isHeader ? '#ffffff' : '#1a1a1a')
+          .fontSize(isHeader ? 8 : 7.5)
+          .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
+          .text(str, x + 4, y + 5, { width: cellW - 8, height: ROW_H - 6, lineBreak: false, ellipsis: true });
+
+        if (i < cols.length - 1) {
+          doc.strokeColor(isHeader ? '#2d8a45' : '#c8e6c9')
+            .lineWidth(0.4)
+            .moveTo(x + cellW, y)
+            .lineTo(x + cellW, y + ROW_H)
+            .stroke();
+        }
+        x += cellW;
+      });
+
+      // Bottom border
+      doc.strokeColor(isHeader ? '#0f3d1c' : '#dcedc8')
+        .lineWidth(0.4)
+        .moveTo(marginL, y + ROW_H)
+        .lineTo(marginL + usableW, y + ROW_H)
+        .stroke();
+    }
+
+    function drawPageHeader() {
+      let subtitleType = type === 'monthly' ? 'Monthly' : type === 'yearly' ? 'Yearly' : 'Daily';
+      const headerH = 30;
+      doc.rect(marginL, marginT, usableW, headerH).fill('#4caf50');
+      doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold')
+        .text('Varistor EOPMS — Attendance Report', marginL + 10, marginT + 8, { lineBreak: false });
+      doc.fillColor('#e8f5e9').fontSize(8.5).font('Helvetica')
+        .text(`${subtitleType}: ${month}  ·  Generated: ${new Date().toLocaleDateString('en-IN')}`,
+          marginL, marginT + 10, { width: usableW - 10, align: 'right', lineBreak: false });
+      return marginT + headerH + 8;
+    }
+
+    // Build per-employee columns for detailed reports
+    const detailCols = [
+      { label: 'Date',      w: Math.floor(usableW * 0.18) },
+      { label: 'Punch IN',  w: Math.floor(usableW * 0.20) },
+      { label: 'Punch OUT', w: Math.floor(usableW * 0.20) },
+      { label: 'Work Hrs',  w: Math.floor(usableW * 0.17) },
+      { label: 'Status',    w: 0 },
+    ];
+    // Last column fills remaining space
+    detailCols[detailCols.length - 1].w = usableW - detailCols.slice(0, -1).reduce((s, c) => s + c.w, 0);
+
+    let curY = drawPageHeader();
+
+    function ensureSpace(needed) {
+      if (curY + needed > doc.page.height - marginB - 10) {
         doc.addPage();
-        // Reprint column headers on new page
-        const newHeaderY = doc.page.margins.top;
-        doc.y = newHeaderY;
-        drawRow(newHeaderY, cols.map(c => c.label), false, true);
-        doc.y = newHeaderY + rowH;
-        pageRowCount = 0;
+        curY = drawPageHeader();
       }
+    }
 
-      const rowY = doc.y;
-      const values = type === 'monthly'
-        ? [row.employee_id || '', row.employeeName, row.department, row.present, row.leaves, row.weekOff, row.holidays, row.halfDay ?? 0, row.absent, row.totalHrs, row.payableDays]
-        : [row.employee_id || '', row.employeeName, row.department, row.date, row.punch_in || '—', row.punch_out || '—', row.work_hours || '—', row.status];
+    function drawEmployeeBlock(emp, dailyRows) {
+      // ── Employee Banner ─────────────────────────────────────────────────
+      ensureSpace(26 + 22 + ROW_H + ROW_H);
 
-      drawRow(rowY, values, idx % 2 === 1, false);
-      doc.y = rowY + rowH;
-      pageRowCount++;
-    });
+      const bannerH = 26;
+      doc.rect(marginL, curY, usableW, bannerH).fill('#c8e6c9');
+      doc.fillColor('#1b5e20').fontSize(11).font('Helvetica-Bold')
+        .text(
+          `${emp.employeeName}`,
+          marginL + 10, curY + 7,
+          { lineBreak: false, ellipsis: true, width: usableW * 0.45 }
+        );
+      doc.fillColor('#2e7d32').fontSize(8.5).font('Helvetica')
+        .text(
+          `ID: ${emp.employee_id}   Dept: ${emp.department}`,
+          marginL + usableW * 0.45, curY + 9,
+          { lineBreak: false, width: usableW * 0.30 }
+        );
+      curY += bannerH;
+
+      // ── Summary Stats Bar ────────────────────────────────────────────────
+      const statsH = 22;
+      doc.rect(marginL, curY, usableW, statsH).fill('#e8f5e9');
+
+      const statItems = [
+        ['Present', emp.present ?? '—'],
+        ['Absent', emp.absent ?? '—'],
+        ['Leaves', emp.leaves ?? emp.paidLeave ?? '—'],
+        ['Half-day', emp.halfDay ?? '—'],
+        ['W.O', emp.weekOff ?? '—'],
+        ['Holidays', emp.holidays ?? '—'],
+        ['Total Hrs', emp.totalHrs ?? '—'],
+        ['Payable Days', emp.payableDays ?? '—'],
+      ];
+
+      const statW = usableW / statItems.length;
+      statItems.forEach(([label, val], si) => {
+        const sx = marginL + si * statW;
+        doc.fillColor('#388e3c').fontSize(6.5).font('Helvetica-Bold')
+          .text(label, sx + 4, curY + 3, { width: statW - 8, lineBreak: false });
+        doc.fillColor('#1b5e20').fontSize(9).font('Helvetica-Bold')
+          .text(String(val), sx + 4, curY + 11, { width: statW - 8, lineBreak: false });
+        if (si > 0) {
+          doc.strokeColor('#a5d6a7').lineWidth(0.4)
+            .moveTo(sx, curY).lineTo(sx, curY + statsH).stroke();
+        }
+      });
+      curY += statsH;
+
+      // ── Daily Table ──────────────────────────────────────────────────────
+      drawRow(curY, detailCols.map(c => c.label), false, true, detailCols);
+      curY += ROW_H;
+
+      dailyRows.forEach((dr, i) => {
+        ensureSpace(ROW_H);
+        const vals = [
+          dr.date ?? '—',
+          fmtTime(dr.punch_in),
+          fmtTime(dr.punch_out),
+          dr.work_hours != null ? `${dr.work_hours} hrs` : '—',
+          dr.status ?? dr.code ?? '—',
+        ];
+        drawRow(curY, vals, i % 2 === 1, false, detailCols);
+        curY += ROW_H;
+      });
+
+      curY += 16; // gap between employees
+    }
+
+    // ── RENDER ───────────────────────────────────────────────────────────────
+
+    if (isGroupedDetailed) {
+      // Monthly or Yearly: rows already have dailyRecords
+      rows.forEach(emp => drawEmployeeBlock(emp, emp.dailyRecords));
+
+    } else if (isDaily) {
+      // Daily report: rows are flat AttendanceLedgerEntry[] — one per employee
+      // Group by employee_id preserving order
+      const empMap = new Map();
+      rows.forEach(r => {
+        if (!empMap.has(r.employee_id)) {
+          empMap.set(r.employee_id, { ...r, days: [] });
+        }
+        empMap.get(r.employee_id).days.push(r);
+      });
+
+      empMap.forEach(emp => {
+        const dailyRows = emp.days.map(d => ({
+          date: d.date,
+          punch_in: d.punch_in,
+          punch_out: d.punch_out,
+          work_hours: d.work_hours,
+          status: d.status,
+        }));
+        drawEmployeeBlock({
+          ...emp,
+          present: emp.days.filter(d => d.status === 'Present' || d.status === 'Late').length || undefined,
+          absent:  emp.days.filter(d => d.status === 'Absent').length || undefined,
+          leaves:  emp.days.filter(d => d.status === 'Leave').length || undefined,
+          halfDay: emp.days.filter(d => d.status === 'Half-day').length || undefined,
+          weekOff: emp.days.filter(d => d.status === 'W.O').length || undefined,
+          holidays:emp.days.filter(d => d.status === 'Holiday').length || undefined,
+          totalHrs: emp.days.reduce((s, d) => s + (d.work_hours || 0), 0).toFixed(1),
+        }, dailyRows);
+      });
+
+    } else {
+      // Pure summary (no dailyRecords): flat table
+      const sumCols = [
+        { label: 'Emp ID',       w: Math.floor(usableW * 0.08) },
+        { label: 'Employee',     w: Math.floor(usableW * 0.18) },
+        { label: 'Dept',         w: Math.floor(usableW * 0.12) },
+        { label: 'Present',      w: Math.floor(usableW * 0.07) },
+        { label: 'Leaves',       w: Math.floor(usableW * 0.07) },
+        { label: 'W.O',          w: Math.floor(usableW * 0.06) },
+        { label: 'Holidays',     w: Math.floor(usableW * 0.07) },
+        { label: 'Half-day',     w: Math.floor(usableW * 0.07) },
+        { label: 'Absent',       w: Math.floor(usableW * 0.07) },
+        { label: 'Total Hrs',    w: Math.floor(usableW * 0.08) },
+        { label: 'Payable Days', w: 0 },
+      ];
+      sumCols[sumCols.length - 1].w = usableW - sumCols.slice(0, -1).reduce((s, c) => s + c.w, 0);
+
+      const rowsPerPage = Math.floor((doc.page.height - marginT - marginB - 50) / ROW_H) - 2;
+
+      drawRow(curY, sumCols.map(c => c.label), false, true, sumCols);
+      curY += ROW_H;
+
+      rows.forEach((row, idx) => {
+        ensureSpace(ROW_H);
+        const values = [
+          safeStr(row.employee_id), safeStr(row.employeeName), safeStr(row.department),
+          safeStr(row.present), safeStr(row.leaves), safeStr(row.weekOff),
+          safeStr(row.holidays), safeStr(row.halfDay ?? 0), safeStr(row.absent),
+          safeStr(row.totalHrs), safeStr(row.payableDays),
+        ];
+        drawRow(curY, values, idx % 2 === 1, false, sumCols);
+        curY += ROW_H;
+      });
+    }
 
     // Footer on last page
     doc.fontSize(7).fillColor('#888888').font('Helvetica')
-      .text('Varistor EOPMS — Confidential', 0, doc.page.height - 30, { align: 'center', lineBreak: false });
+      .text('Varistor EOPMS — Confidential', marginL, doc.page.height - marginB + 5, { width: usableW, align: 'center', lineBreak: false });
 
     doc.end();
   } catch (err) {

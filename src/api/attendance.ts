@@ -78,6 +78,7 @@ export interface MonthlyReportRow {
   totalHrs: number;
   payableDays: number;
   workingDays: number;
+  dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[];
 }
 
 export interface Holiday {
@@ -447,11 +448,20 @@ export async function getMonthlyReport(
 
   return roster.map((emp, empIndex) => {
     let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
+    const dailyRecords: { date: string; punch_in?: string; punch_out?: string }[] = [];
 
     dates.forEach((date, di) => {
       const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());
       const override = _overrides.get(entry.id);
       const final = override ? { ...entry, ...override } : entry;
+
+      dailyRecords.push({
+        date: final.date,
+        punch_in: final.punch_in,
+        punch_out: final.punch_out,
+        work_hours: final.work_hours ?? undefined,
+        status: final.status,
+      });
 
       switch (final.status) {
         case 'Present': present++; break;
@@ -482,6 +492,7 @@ export async function getMonthlyReport(
       totalHrs: parseFloat(totalHrs.toFixed(1)),
       payableDays: parseFloat(payableDays.toFixed(1)),
       workingDays,
+      dailyRecords,
     };
   });
 }
