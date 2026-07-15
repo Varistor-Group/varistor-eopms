@@ -5,7 +5,7 @@ import { Modal } from './shared/Modal';
 import { mockLogin, sendPasswordReset } from '../api/auth';
 import { useVariPoints } from '../hooks/useVariPoints';
 import type { CurrentUser } from '../context/EopmsContext';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (isFirstLogin: boolean, user: CurrentUser) => void;
@@ -17,6 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -203,13 +204,23 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
               <Input
                 label="Password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }}
                 error={errors.password}
                 autoComplete="current-password"
                 disabled={lockoutSeconds > 0}
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1 hover:text-gray-700 focus:outline-none transition-colors"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                }
               />
 
               <div className="flex items-center justify-between pt-1">

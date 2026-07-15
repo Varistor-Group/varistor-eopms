@@ -151,11 +151,17 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
       hasEsi: record.hasEsi,
       hasPt: record.hasPt,
     });
-    addHeads = comp.additionHeads;
-    dedHeads = comp.deductionHeads;
-    addValues = comp.additionValues;
-    dedValues = comp.deductionValues;
+    addHeads = comp.additionHeads ?? [];
+    dedHeads = comp.deductionHeads ?? [];
+    addValues = comp.additionValues ?? [];
+    dedValues = comp.deductionValues ?? [];
   }
+
+  // Ensure these are arrays to avoid undefined errors in loops
+  addHeads = addHeads ?? [];
+  dedHeads = dedHeads ?? [];
+  addValues = addValues ?? [];
+  dedValues = dedValues ?? [];
 
   const earnings: { label: string; val: number | null }[] = [];
   const deductions: { label: string; val: number | null }[] = [];
@@ -353,7 +359,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       const attendanceReport = await getMonthlyReport(apiMonth);
 
       const parsed: SlipRow[] = [];
-      attendanceReport.forEach(att => {
+      const clBalancesData = await fetchAllClBalances();
+      for (const att of attendanceReport) {
         const emp = emps.find(e => e.employeeId === att.employee_id);
         const email = emp?.personalEmail || `${att.employee_id.toLowerCase()}@varistor.in`;
         const payRec = payrollRecords.find(r => r.employeeId === att.employee_id);
@@ -386,13 +393,14 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           absent: att.absent || 0
         };
 
-        const clBal = clBalances[att.employee_id] ?? { total: 12, used: 0 };
+        const clBal = clBalancesData[att.employee_id] ?? { total: 12, used: 0 };
         const lopDays = computeLopDays(clBal);
 
         const comp = computeNet({
           monthlySalary,
           totalDays,
           payDays,
+          lopDays,
           medical,
           ta,
           lta,
@@ -403,7 +411,6 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           otherDeductions,
           employeeId: att.employee_id,
           attendanceBreakdown,
-          lopDays,
           hasPf: payRec?.hasPf,
           hasEsi: payRec?.hasEsi,
           hasPt: payRec?.hasPt,
@@ -446,7 +453,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           deductionValues: comp.deductionValues,
           deduction: payRec?.deduction ?? 0,
         });
-      });
+      }
 
       if (parsed.length === 0) {
         setParseError('No employees found in the attendance report.');
@@ -508,6 +515,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       }
 
       const payrollRecords = await getPayrollRecords();
+      const clBalancesData = await fetchAllClBalances();
       const parsed: SlipRow[] = [];
       for (let i = 1; i < raw.length; i++) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -543,7 +551,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const tds = parseNumber(obj.tds ?? 0);
         const otherDeductions = parseNumber(obj.otherDeductions ?? 0);
 
-        const clBal = clBalances[employeeId] ?? { total: 12, used: 0 };
+        const clBal = clBalancesData[employeeId] ?? { total: 12, used: 0 };
         const lopDays = computeLopDays(clBal);
 
         const comp = computeNet({
@@ -2648,7 +2656,7 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   let dedValues = record.deductionValues;
 
   if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
-    const clBal = clBalances[record.employeeId] ?? { total: 12, used: 0 };
+    const clBal = { total: 12, used: 0 }; // Default since this is a synchronous render function (PrintSlip)
     const lopDays = computeLopDays(clBal);
 
     const comp = computeNet({
