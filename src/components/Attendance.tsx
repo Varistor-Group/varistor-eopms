@@ -3,7 +3,7 @@ import {
   ClipboardCheck, Users, Clock, Calendar, TrendingUp,
   Upload, Check, X, AlertCircle, Eye, FileSpreadsheet,
   Camera, RefreshCw, Wifi, WifiOff, Edit2,
-  Shield, CheckCircle2, ArrowRight, Plus, Info, Printer,
+  CheckCircle2, Plus, Info, Printer,
   ToggleLeft, ToggleRight, MapPin
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
@@ -545,7 +545,7 @@ export const Attendance: React.FC = () => {
             Attendance
           </h1>
           <p className="text-xs text-varistor-muted mt-0.5">
-            Bio Park D-01 Face-Punch · Field Photo Verification · Payroll Sync
+            Bio Park D-01 Face-Punch · Field Photo Verification
           </p>
         </div>
         {canDownload && (
@@ -901,57 +901,7 @@ export const Attendance: React.FC = () => {
             </div>
           )}
 
-          {/* ── Section 5: Payroll Auto-Sync (Admin only) ─────────────────── */}
-          {isAdmin && (
-            <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-5">
-              <SectionHeader title="Payroll Auto-Sync Pipeline" subtitle="Read-only snapshot feeds into payroll engine on the 15th" />
 
-              {/* Pipeline visual */}
-              <div className="flex items-center gap-1 flex-wrap justify-center mb-6 mt-4">
-                {[
-                  { label: 'Attendance ledger', icon: <ClipboardCheck size={16} strokeWidth={1.5} /> },
-                  { label: 'Payable days formula', icon: <TrendingUp size={16} strokeWidth={1.5} /> },
-                  { label: 'Statutory deductions', icon: <Shield size={16} strokeWidth={1.5} /> },
-                  { label: 'Reimbursements', icon: <ArrowRight size={16} strokeWidth={1.5} /> },
-                  { label: 'Final salary slip', icon: <CheckCircle2 size={16} strokeWidth={1.5} /> },
-                ].map((step, i, arr) => (
-                  <React.Fragment key={step.label}>
-                    <div className="flex flex-col items-center gap-1 min-w-[100px]">
-                      <div className="w-10 h-10 rounded-full bg-varistor-limeLight border-2 border-varistor-lime flex items-center justify-center text-varistor-lime">
-                        {step.icon}
-                      </div>
-                      <span className="text-[10px] font-semibold text-varistor-muted text-center leading-tight">{step.label}</span>
-                    </div>
-                    {i < arr.length - 1 && <ArrowRight size={14} strokeWidth={1.5} className="text-varistor-muted mb-3" />}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Formula */}
-              <div className="bg-[#0d1117] rounded-xl p-4 font-mono text-xs text-green-400 mb-4">
-                <p className="text-gray-400 mb-1">// Payroll formula (executed on payroll_date-1 snapshot)</p>
-                <p>Net pay = (Payable_days / Working_days) × Gross − (PF + PT + TDS)</p>
-                <p className="mt-1 text-gray-500">          + Reimbursements + Vari‑Point bonus</p>
-              </div>
-
-              {/* Info chips */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {['Runs: 15th every month · 09:00 IST', 'Auto-emails slip to employee'].map(chip => (
-                  <span key={chip} className="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-medium bg-varistor-limeLight text-varistor-limeText rounded-full border border-varistor-lime/30">
-                    <CheckCircle2 size={11} strokeWidth={1.5} /> {chip}
-                  </span>
-                ))}
-              </div>
-
-              {/* Dev note */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                <Info size={16} strokeWidth={1.5} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">
-                  <span className="font-bold">Note:</span> Payroll cron reads attendance snapshot on payroll_date-1. If HR edits attendance after payroll lock, a revision run is required. See <span className="font-mono bg-blue-100 px-1 rounded">attendanceService.getPayrollAttendanceSnapshot(month)</span>.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* ── Section 6: Holiday Calendar (HR/Admin) ─────────────────────── */}
           {isHR && (

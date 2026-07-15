@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, Paperclip, Plus, Calendar, Check } from 'lucide-react';
 import type { Task } from '../types';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
@@ -11,11 +11,19 @@ interface TaskDrawerProps {
 export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   const { 
     toggleChecklistItem, 
-    addChecklistItem, 
-    addAttachment 
+    addChecklistItem 
   } = useKanbanTasks();
 
   const [newCheckItem, setNewCheckItem] = useState('');
+
+  useEffect(() => {
+    const handleBackButton = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('app_back_button', handleBackButton);
+    return () => window.removeEventListener('app_back_button', handleBackButton);
+  }, [onClose]);
 
   if (!task) return null;
 
@@ -24,15 +32,6 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
     if (!newCheckItem.trim()) return;
     addChecklistItem(task.id, newCheckItem.trim());
     setNewCheckItem('');
-  };
-
-  const handleSimulateAttachment = () => {
-    const fileNames = ['contract_amendment.pdf', 'invoice_copy.xlsx', 'user_feedback.docx', 'design_mockup.png'];
-    const mockName = fileNames[Math.floor(Math.random() * fileNames.length)];
-    const mockSize = `${(Math.random() * 3 + 0.5).toFixed(1)} MB`;
-    const mockType = mockName.split('.').pop() || 'file';
-    
-    addAttachment(task.id, mockName, mockSize, mockType);
   };
 
   // Checklist statistics
@@ -163,17 +162,12 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
                 <Paperclip size={16} className="text-[#555]" />
                 Attachments ({task.attachments.length})
               </h3>
-              <button 
-                onClick={handleSimulateAttachment}
-                className="text-[10px] text-varistor-limeText font-semibold bg-varistor-limeLight border border-varistor-successBorder px-2 py-0.5 rounded hover:bg-varistor-lime hover:text-black hover:border-transparent transition-varistor"
-              >
-                Add Mock File
-              </button>
+
             </div>
 
             <div className="space-y-1.5">
               {task.attachments.length === 0 ? (
-                <p className="text-[11px] text-varistor-muted italic">No attachments. Drag and drop file to simulate.</p>
+                <p className="text-[11px] text-varistor-muted italic">No attachments.</p>
               ) : (
                 task.attachments.map((file) => (
                   <div 

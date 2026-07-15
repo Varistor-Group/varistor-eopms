@@ -10,7 +10,7 @@ import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { Bell, Menu, X, LogOut, Sun, Moon, BookOpen } from 'lucide-react';
+import { Bell, Menu, X, LogOut, Sun, Moon } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { useTrainingGate } from './hooks/useTrainingGate';
 import { Login } from './components/Login';
@@ -86,9 +86,9 @@ const AppContent: React.FC = () => {
     // We must dynamically import to avoid breaking the web build if Capacitor is missing
     let listener: { remove: () => void } | null = null;
 
-    // Hide native status bar if on mobile
+    // Make native status bar static so UI doesn't go under it
     import('@capacitor/status-bar').then(({ StatusBar }) => {
-      StatusBar.hide().catch(console.warn);
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(console.warn);
     }).catch(console.warn);
 
     import('@capacitor/app').then(async ({ App: CapApp }) => {
@@ -100,12 +100,37 @@ const AppContent: React.FC = () => {
 
         if (isOpenMobileRef.current) {
           setIsOpenMobile(false);
-        } else if (activeTabRef.current === 'dashboard') {
-          CapApp.exitApp();
         } else {
           setIsOpenMobile(true);
         }
       });
+    }).catch(console.warn);
+
+    // Support PWA back button via history API
+    import('@capacitor/core').then(({ Capacitor }) => {
+      if (Capacitor.isNativePlatform()) return; // Handled by CapApp above
+
+      window.history.replaceState({ app: 'eopms' }, '');
+      window.history.pushState({ app: 'eopms' }, '');
+
+      const handlePopState = () => {
+        const event = new CustomEvent('app_back_button', { cancelable: true });
+        window.dispatchEvent(event);
+        
+        // Push state again to trap the next back press
+        window.history.pushState({ app: 'eopms' }, '');
+
+        if (event.defaultPrevented) return;
+
+        if (isOpenMobileRef.current) {
+          setIsOpenMobile(false);
+        } else {
+          setIsOpenMobile(true);
+        }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      // Clean up manually if needed, though this is a top-level app component
     }).catch(console.warn);
 
     return () => {
@@ -173,13 +198,7 @@ const AppContent: React.FC = () => {
     refreshTrainingGate();
   }, [activeTab, refreshTrainingGate]);
 
-  // Confine employees/managers with incomplete required training to the Training tab.
-  useEffect(() => {
-    if (trainingLocked && activeTab !== 'training') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setActiveTab('training');
-    }
-  }, [trainingLocked, activeTab]);
+
 
   useEffect(() => {
     const channel = new BroadcastChannel('eopms_notifications');
@@ -324,15 +343,9 @@ const AppContent: React.FC = () => {
               }
             };
 
-            const allowedTabs = trainingLocked ? ['training'] : getAllowedTabs();
+            const allowedTabs = getAllowedTabs();
             if (!allowedTabs.includes(activeTab)) {
-              return trainingLocked ? (
-                <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-border shadow-sm animate-[fadeInPage_250ms_ease-out]">
-                  <BookOpen size={40} strokeWidth={1.5} className="text-varistor-lime mb-4" />
-                  <h2 className="text-xl font-bold text-varistor-dark">Complete Your Training First</h2>
-                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You need to finish your assigned training modules before you can access the rest of the app.</p>
-                </div>
-              ) : (
+              return (
                 <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>
                   <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
