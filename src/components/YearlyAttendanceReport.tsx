@@ -12,7 +12,7 @@ import {
   type EmployeeYearlySummary,
   type DayCode,
 } from '../api/attendance';
-import { getLeaveBalance } from '../api/leaves';
+import { getEmployeeBalances } from '../api/leaves';
 import * as XLSX from 'xlsx';
 
 // ─── Code colours ────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ const EmployeeYearDetail: React.FC<{
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getLeaveBalance(employeeId),
+      getEmployeeBalances(employeeId),
     ]).then(([balance]) => {
       return getYearlyAttendanceReport(year, employeeId, balance);
     }).then(r => {

@@ -48,7 +48,7 @@ export const EngineSimulationConsole: React.FC = () => {
       .limit(100);
 
     if (!error && data) {
-      setHistory(data as VPLogEntry[]);
+      setHistory(data as unknown as VPLogEntry[]);
     }
     setHistoryLoading(false);
   };
