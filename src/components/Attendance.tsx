@@ -342,12 +342,24 @@ export const Attendance: React.FC = () => {
     const filtered = reportDeptFilter === 'All'
       ? monthlyReport
       : monthlyReport.filter(r => r.department === reportDeptFilter);
-    const rows = filtered.map(r => ({
-      'Emp ID': r.employee_id, Name: r.employeeName, Department: r.department,
-      Present: r.present, Late: r.late, Leaves: r.leaves, 'W.O': r.weekOff,
-      Holidays: r.holidays, 'Half-day': r.halfDay, Absent: r.absent,
-      'Total Hrs': r.totalHrs, 'Payable Days': r.payableDays, 'Working Days': r.workingDays,
-    }));
+    const rows = filtered.map(r => {
+      const baseRow: any = {
+        'Emp ID': r.employee_id, Name: r.employeeName, Department: r.department,
+        Present: r.present, Late: r.late, Leaves: r.leaves, 'W.O': r.weekOff,
+        Holidays: r.holidays, 'Half-day': r.halfDay, Absent: r.absent,
+        'Total Hrs': r.totalHrs, 'Payable Days': r.payableDays, 'Working Days': r.workingDays,
+      };
+
+      if (r.dailyRecords) {
+        r.dailyRecords.forEach(record => {
+          const dayStr = new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+          baseRow[`${dayStr} IN`] = fmtTime(record.punch_in);
+          baseRow[`${dayStr} OUT`] = fmtTime(record.punch_out);
+        });
+      }
+
+      return baseRow;
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Monthly Report');
