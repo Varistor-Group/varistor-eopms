@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus, Edit2 } from 'lucide-react';
+import { Hash, Paperclip, Send, Smile, Pin, FileSpreadsheet, Users, Eye, Download, X, Trash2, Plus, Edit2, ArrowLeft } from 'lucide-react';
 import { chatApi } from '../api/chat';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Modal } from './shared/Modal';
@@ -72,6 +72,7 @@ export const Chat: React.FC = () => {
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState('');
+  const [showMobileSidebar, setShowMobileSidebar] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -250,7 +251,7 @@ export const Chat: React.FC = () => {
   return (
     <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
       {/* Channel List */}
-      <aside className="w-56 flex-shrink-0 border-r border-varistor-border flex flex-col bg-varistor-surfaceMuted">
+      <aside className={`${showMobileSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-56 flex-shrink-0 border-r border-varistor-border flex-col bg-varistor-surfaceMuted`}>
         <div className="px-4 py-3 border-b border-varistor-border flex items-center justify-between">
           <span className="text-[10px] font-bold text-varistor-muted uppercase tracking-wider">Channels</span>
           {canManageChannels && (
@@ -271,7 +272,10 @@ export const Chat: React.FC = () => {
             return (
               <div key={channel.id} className="group relative">
                 <button
-                  onClick={() => setActiveChannelId(channel.id)}
+                  onClick={() => {
+                    setActiveChannelId(channel.id);
+                    setShowMobileSidebar(false);
+                  }}
                   className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-varistor cursor-pointer border-l-[3px] ${
                     isActive
                       ? 'bg-varistor-limeLight text-varistor-dark border-varistor-lime'
@@ -304,11 +308,17 @@ export const Chat: React.FC = () => {
       </aside>
 
       {/* Message Thread */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`${showMobileSidebar ? 'hidden' : 'flex'} md:flex flex-1 flex-col min-w-0`}>
         {/* Channel Header */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-varistor-border flex-shrink-0">
           <div>
             <h3 className="text-sm font-bold text-varistor-dark flex items-center gap-1">
+              <button 
+                onClick={() => setShowMobileSidebar(true)}
+                className="md:hidden mr-2 p-1.5 rounded hover:bg-varistor-surfaceMuted text-varistor-muted transition-colors cursor-pointer"
+              >
+                <ArrowLeft size={16} />
+              </button>
               <Hash size={14} className="text-varistor-muted" />
               {activeChannel.name}
               {canManageChannels && (
