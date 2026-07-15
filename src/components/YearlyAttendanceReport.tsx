@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarDays, ChevronDown, ChevronUp,
-  FileSpreadsheet, X, Info
+  FileSpreadsheet, X, Info, Printer
 } from 'lucide-react';
 import { Button } from './shared/Button';
 import {
@@ -12,8 +12,9 @@ import {
   type EmployeeYearlySummary,
   type DayCode,
 } from '../api/attendance';
-import { getLeaveBalance } from '../api/leaves';
+import { getEmployeeBalances } from '../api/leaves';
 import * as XLSX from 'xlsx';
+import { API_URL } from '../config/api';
 
 // ─── Code colours ────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ const EmployeeYearDetail: React.FC<{
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getLeaveBalance(employeeId),
+      getEmployeeBalances(employeeId),
     ]).then(([balance]) => {
       return getYearlyAttendanceReport(year, employeeId, balance);
     }).then(r => {
@@ -144,6 +145,43 @@ const EmployeeYearDetail: React.FC<{
     XLSX.writeFile(wb, `attendance_${employeeId}_${year}.xlsx`);
   }
 
+  async function exportEmployeePDF() {
+    if (!report) return;
+    try {
+      const flattenedDays: any[] = [];
+      report.months.forEach(m => {
+        m.days.forEach(d => {
+          if (d.code !== '-') flattenedDays.push(d);
+        });
+      });
+      const rows = [{
+        employee_id: employeeId,
+        employeeName,
+        department,
+        present: report.totals.present,
+        absent: report.totals.absent,
+        leaves: report.totals.paidLeave,
+        weekOff: report.totals.weekOff,
+        holidays: report.totals.holidays,
+        totalHrs: '—', // totalHrs is not computed in yearly yet
+        dailyRecords: flattenedDays
+      }];
+      const res = await fetch(`${API_URL}/api/attendance/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows, month: year, type: 'yearly' }),
+      });
+      if (!res.ok) throw new Error('PDF server error');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `attendance_${employeeId}_${year}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch {
+      alert('PDF export failed. Is the server running?');
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8 px-4">
       <div className="bg-white dark:bg-varistor-surface w-full max-w-6xl rounded-2xl border border-varistor-border shadow-2xl">
@@ -159,6 +197,9 @@ const EmployeeYearDetail: React.FC<{
           <div className="flex items-center gap-2">
             <Button variant="secondary" className="text-xs gap-1.5" onClick={exportEmployeeExcel}>
               <FileSpreadsheet size={13} /> Export Excel
+            </Button>
+            <Button variant="secondary" className="text-xs gap-1.5" onClick={exportEmployeePDF}>
+              <Printer size={13} /> Export PDF
             </Button>
             <button onClick={onClose} className="p-2 rounded-lg border border-varistor-border hover:bg-varistor-pageBg transition-varistor">
               <X size={16} className="text-varistor-muted" />
@@ -302,6 +343,24 @@ export const YearlyAttendanceReport: React.FC<YearlyAttendanceReportProps> = ({ 
     XLSX.writeFile(wb, `attendance_yearly_${selectedYear}.xlsx`);
   }
 
+  async function exportAllPDF() {
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: filtered, month: selectedYear, type: 'yearly' }),
+      });
+      if (!res.ok) throw new Error('PDF server error');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `attendance_yearly_${selectedYear}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch {
+      alert('PDF export failed. Is the server running?');
+    }
+  }
+
   const SortIcon: React.FC<{ col: keyof EmployeeYearlySummary }> = ({ col }) => (
     <span className="inline-flex ml-1">
       {sortKey === col
@@ -347,6 +406,9 @@ export const YearlyAttendanceReport: React.FC<YearlyAttendanceReportProps> = ({ 
           </select>
           <Button variant="secondary" className="text-xs gap-1.5" onClick={exportAllExcel}>
             <FileSpreadsheet size={13} /> Export Excel
+          </Button>
+          <Button variant="secondary" className="text-xs gap-1.5" onClick={exportAllPDF}>
+            <Printer size={13} /> Export PDF
           </Button>
         </div>
       </div>

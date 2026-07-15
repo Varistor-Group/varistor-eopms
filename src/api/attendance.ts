@@ -11,7 +11,7 @@
  */
 
 import { API_URL } from '../config/api';
-import { getPayrollRecords, createRevision, updatePayrollRecord } from './payroll';
+
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +78,7 @@ export interface MonthlyReportRow {
   totalHrs: number;
   payableDays: number;
   workingDays: number;
+  dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[];
 }
 
 export interface Holiday {
@@ -447,11 +448,20 @@ export async function getMonthlyReport(
 
   return roster.map((emp, empIndex) => {
     let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
+    const dailyRecords: { date: string; punch_in?: string; punch_out?: string }[] = [];
 
     dates.forEach((date, di) => {
       const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());
       const override = _overrides.get(entry.id);
       const final = override ? { ...entry, ...override } : entry;
+
+      dailyRecords.push({
+        date: final.date,
+        punch_in: final.punch_in,
+        punch_out: final.punch_out,
+        work_hours: final.work_hours ?? undefined,
+        status: final.status,
+      });
 
       switch (final.status) {
         case 'Present': present++; break;
@@ -482,6 +492,7 @@ export async function getMonthlyReport(
       totalHrs: parseFloat(totalHrs.toFixed(1)),
       payableDays: parseFloat(payableDays.toFixed(1)),
       workingDays,
+      dailyRecords,
     };
   });
 }
@@ -832,7 +843,7 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 export async function getYearlyAttendanceReport(
   year: string,
   employeeId: string,
-  leaveBalance?: { casual: { total: number; used: number }; sick: { total: number; used: number }; earned: { total: number; used: number } }
+  leaveBalances?: any[]
 ): Promise<EmployeeYearlyReport> {
   await delay(300);
 
@@ -843,11 +854,10 @@ export async function getYearlyAttendanceReport(
   const today = new Date();
 
   // Calculate remaining leave balance
-  const totalBalance = leaveBalance
-    ? (leaveBalance.casual.total - leaveBalance.casual.used)
-    + (leaveBalance.sick.total - leaveBalance.sick.used)
-    + (leaveBalance.earned.total - leaveBalance.earned.used)
-    : 12; // default 12 days if no balance provided
+  let totalBalance = 12; // default 12 days if no balance provided
+  if (leaveBalances && leaveBalances.length > 0) {
+    totalBalance = leaveBalances.reduce((sum, bal) => sum + (bal.total - bal.used), 0);
+  }
 
   let remainingBalance = totalBalance;
 

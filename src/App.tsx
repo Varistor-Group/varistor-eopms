@@ -85,6 +85,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     // We must dynamically import to avoid breaking the web build if Capacitor is missing
     let listener: { remove: () => void } | null = null;
+    let lastBackPress = 0; // Added for double-tap exit tracking
 
     // Make native status bar static so UI doesn't go under it
     import('@capacitor/status-bar').then(({ StatusBar }) => {
@@ -98,10 +99,16 @@ const AppContent: React.FC = () => {
         window.dispatchEvent(event);
         if (event.defaultPrevented) return;
 
-        if (isOpenMobileRef.current) {
-          setIsOpenMobile(false);
-        } else {
+        if (!isOpenMobileRef.current) {
           setIsOpenMobile(true);
+        } else {
+          const now = Date.now();
+          if (now - lastBackPress < 2000) {
+            CapApp.exitApp();
+          } else {
+            lastBackPress = now;
+            // First tap when sidebar is open just records time, needs second tap to exit
+          }
         }
       });
     }).catch(console.warn);
@@ -122,10 +129,15 @@ const AppContent: React.FC = () => {
 
         if (event.defaultPrevented) return;
 
-        if (isOpenMobileRef.current) {
-          setIsOpenMobile(false);
-        } else {
+        if (!isOpenMobileRef.current) {
           setIsOpenMobile(true);
+        } else {
+          const now = Date.now();
+          if (now - lastBackPress < 2000) {
+            window.history.go(-2);
+          } else {
+            lastBackPress = now;
+          }
         }
       };
 
@@ -164,6 +176,18 @@ const AppContent: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Disable scroll in app when sidebar is open
+  useEffect(() => {
+    if (isOpenMobile) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpenMobile]);
 
   const handleLogin = (isFirstLogin: boolean) => {
     setIsLoggedIn(true);
@@ -333,7 +357,7 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'Reporting Manager') {
                 // All employee tabs (minus vault & attendance) + task-management
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];

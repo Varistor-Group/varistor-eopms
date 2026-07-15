@@ -72,6 +72,9 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
     }
 
+    if (!form.shiftStart) errs.shiftStart = 'Shift start time is required.';
+    if (!form.shiftEnd) errs.shiftEnd = 'Shift end time is required.';
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -184,6 +187,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
 
             <Field label="Reporting Manager" required error={errors.reportingManager}>
               <input className={inputCls(!!errors.reportingManager)} value={form.reportingManager} onChange={set('reportingManager')} />
+            </Field>
+
+            <Field label="Shift Start Time" required error={errors.shiftStart}>
+              <input type="time" className={inputCls(!!errors.shiftStart)} value={form.shiftStart} onChange={set('shiftStart')} />
+            </Field>
+
+            <Field label="Shift End Time" required error={errors.shiftEnd}>
+              <input type="time" className={inputCls(!!errors.shiftEnd)} value={form.shiftEnd} onChange={set('shiftEnd')} />
             </Field>
 
             <Field label="Payroll Options">

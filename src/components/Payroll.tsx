@@ -152,63 +152,52 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
       hasEsi: record.hasEsi,
       hasPt: record.hasPt,
     });
-    addHeads = comp.additionHeads;
-    dedHeads = comp.deductionHeads;
-    addValues = comp.additionValues;
-    dedValues = comp.deductionValues;
+    addHeads = comp.additionHeads ?? [];
+    dedHeads = comp.deductionHeads ?? [];
+    addValues = comp.additionValues ?? [];
+    dedValues = comp.deductionValues ?? [];
   }
 
-  const rawEarnings: { label: string; val: number }[] = [];
-  if (Array.isArray(addHeads) && addHeads.some(h => h && h.trim())) {
-    addHeads.forEach((h, i) => {
-      if (h && h.trim()) rawEarnings.push({ label: h, val: addValues[i] ?? 0 });
-    });
-  } else {
-    rawEarnings.push(
-      { label: 'Basic', val: basic },
-      { label: 'HRA', val: hra },
-      { label: 'Medical Allowance', val: medical },
-      { label: 'TA', val: ta },
-      { label: 'LTA', val: lta },
-      { label: 'Special Allowance', val: specialAllowance }
-    );
-  }
-  rawEarnings.push(
-    { label: 'Overtime', val: c.overtime ?? 0 },
-    { label: 'Reimbursement', val: c.reimbursement ?? 0 },
-    { label: 'Incentives', val: c.incentives ?? 0 }
-  );
+  const earnings: { label: string; val: number | null }[] = [];
+  const deductions: { label: string; val: number | null }[] = [];
 
-  const rawDeductions: { label: string; val: number }[] = [];
-  if (Array.isArray(dedHeads) && dedHeads.some(h => h && h.trim())) {
-    dedHeads.forEach((h, i) => {
-      if (h && h.trim()) rawDeductions.push({ label: h, val: dedValues[i] ?? 0 });
-    });
-    const hasTds = dedHeads.some(h => h && h.trim().toLowerCase() === 'tds');
-    const hasOther = dedHeads.some(h => h && ['other deductions', 'advance salary adjut'].includes(h.trim().toLowerCase()));
-    const finalOtherDed = record.deduction ?? otherDeductions;
-    if (!hasTds && c.tds) rawDeductions.push({ label: 'TDS', val: c.tds });
-    if (!hasOther && finalOtherDed) rawDeductions.push({ label: 'Other Deductions', val: finalOtherDed });
-  } else {
-    rawDeductions.push(
-      { label: 'PF Employee', val: pfEmployee },
-      { label: 'PF Employer', val: pfEmployer },
-      { label: 'ESI', val: esi },
-      { label: 'PT', val: pt },
-      { label: 'Other Deductions', val: record.deduction ?? otherDeductions }
-    );
+  for (let i = 0; i < 10; i++) {
+    const addName = addHeads[i]?.trim();
+    if (addName) {
+      earnings.push({ label: addName, val: addValues?.[i] ?? null });
+    } else {
+      earnings.push({ label: '', val: null });
+    }
+
+    const dedName = dedHeads[i]?.trim();
+    if (dedName) {
+      deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
+    } else {
+      deductions.push({ label: '', val: null });
+    }
   }
 
-  const maxSlipRows = Math.max(rawEarnings.length, rawDeductions.length, 5);
-  
-  const earnings: { label: string; val: number | null }[] = [...rawEarnings];
-  const deductions: { label: string; val: number | null }[] = [...rawDeductions];
-  
-  while (earnings.length < maxSlipRows) earnings.push({ label: '', val: null });
-  while (deductions.length < maxSlipRows) deductions.push({ label: '', val: null });
+  const postNetEarnings = [];
+  if (record.components?.reimbursement) postNetEarnings.push({ label: 'Travel Allowance', val: record.components.reimbursement });
+  if (record.components?.overtime) postNetEarnings.push({ label: 'Overtime', val: record.components.overtime });
+  if (record.components?.incentives) postNetEarnings.push({ label: 'Incentives', val: record.components.incentives });
 
-  const finalTotalCtc = rawEarnings.reduce((a, b) => a + b.val, 0);
-  const finalTotalDeductions = rawDeductions.reduce((a, b) => a + b.val, 0);
+  earnings.push(...postNetEarnings);
+
+  let maxSlipRows = 0;
+  for (let i = 0; i < Math.max(earnings.length, deductions.length); i++) {
+    if (earnings[i]?.label || deductions[i]?.label) {
+      maxSlipRows = i + 1;
+    }
+  }
+  if (maxSlipRows === 0) maxSlipRows = Math.max(10, earnings.length);
+
+  const finalTotalDeductions = Array.isArray(record.deductionValues)
+    ? record.deductionValues.reduce((a, b) => a + b, 0)
+    : totalDeductions;
+  const finalTotalCtc = Array.isArray(record.additionValues)
+    ? record.additionValues.reduce((a, b) => a + b, 0)
+    : totalCtc;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">
@@ -391,6 +380,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
       }
 
       const payrollRecords = await getPayrollRecords();
+      const clBalancesData = await fetchAllClBalances();
       const parsed: SlipRow[] = [];
       for (let i = 1; i < raw.length; i++) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -426,7 +416,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
         const tds = parseNumber(obj.tds ?? 0);
         const otherDeductions = parseNumber(obj.otherDeductions ?? 0);
 
-        const clBal = clBalances[employeeId] ?? { total: 12, used: 0 };
+        const clBal = clBalancesData[employeeId] ?? { total: 12, used: 0 };
         const lopDays = computeLopDays(clBal);
 
         const comp = computeNet({
@@ -586,8 +576,8 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               onDrop={handleDrop}
               onClick={() => fileRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${isDragging
-                  ? 'border-varistor-lime bg-varistor-limeLight'
-                  : 'border-varistor-border hover:border-varistor-lime hover:bg-varistor-limeLight'
+                ? 'border-varistor-lime bg-varistor-limeLight'
+                : 'border-varistor-border hover:border-varistor-lime hover:bg-varistor-limeLight'
                 }`}
             >
               <input
@@ -885,8 +875,8 @@ const PayslipSchedulePanel: React.FC = () => {
           <span className="font-bold text-varistor-dark text-sm">Payslip Auto-Send Schedule</span>
           {schedule && (
             <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${schedule.enabled
-                ? 'bg-varistor-limeTint text-varistor-limeText'
-                : 'bg-gray-100 text-gray-400'
+              ? 'bg-varistor-limeTint text-varistor-limeText'
+              : 'bg-gray-100 text-gray-400'
               }`}>
               {schedule.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
@@ -943,8 +933,8 @@ const PayslipSchedulePanel: React.FC = () => {
 
             {triggerResult && (
               <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm ${triggerResult.failed.length === 0
-                  ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
-                  : 'bg-red-50 border-red-200 text-red-700'
+                ? 'bg-varistor-limeLight border-varistor-lime text-varistor-limeText'
+                : 'bg-red-50 border-red-200 text-red-700'
                 }`}>
                 {triggerResult.skipped ? (
                   <><AlertTriangle size={16} className="flex-shrink-0 mt-0.5" /><span>No approved/released payroll records found on server. Sync records first by approving payroll.</span></>
@@ -1836,13 +1826,13 @@ const SalaryEngine: React.FC = () => {
       getPayrollRecords(),
       fetchAllClBalances(),
     ]);
-    
+
     let needsSync = false;
     const updatedData = data.map(rec => {
       if (rec.status === 'approved') return rec;
       const clBal = balances[rec.employeeId] ?? { total: 12, used: 0 };
       const lopDays = computeLopDays(clBal);
-      
+
       const comp = computeNet({
         monthlySalary: rec.monthlySalary ?? rec.ctc ?? 0,
         monthlyCtc: rec.ctc,
@@ -1888,7 +1878,7 @@ const SalaryEngine: React.FC = () => {
     setRecords(updatedData);
     setClBalances(balances);
     setLoading(false);
-    
+
     if (needsSync) {
       await syncPayrollToServer(updatedData);
     } else {
@@ -1896,7 +1886,7 @@ const SalaryEngine: React.FC = () => {
     }
   }, []);
 
-   
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
@@ -2057,8 +2047,8 @@ const SalaryEngine: React.FC = () => {
               <button
                 onClick={() => setShowUploadPanel(v => !v)}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors border ${showUploadPanel
-                    ? 'bg-varistor-lime text-white border-varistor-lime'
-                    : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
+                  ? 'bg-varistor-lime text-white border-varistor-lime'
+                  : 'border-varistor-border text-varistor-dark hover:bg-varistor-limeLight'
                   }`}
               >
                 <Mail size={14} /> {showUploadPanel ? 'Hide Upload Panel' : 'Upload Excel & Send Slips'}
@@ -2094,8 +2084,8 @@ const SalaryEngine: React.FC = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center gap-1.5 pb-2 text-xs font-bold border-b-2 transition-all ${activeTab === tab.id
-                ? 'border-varistor-lime text-varistor-limeText'
-                : 'border-transparent text-varistor-muted hover:text-varistor-dark'
+              ? 'border-varistor-lime text-varistor-limeText'
+              : 'border-transparent text-varistor-muted hover:text-varistor-dark'
               }`}
           >
             <tab.icon size={13} />
@@ -2191,11 +2181,10 @@ const SalaryEngine: React.FC = () => {
               <button
                 onClick={handleApprove}
                 disabled={approving || selectedIds.size === 0}
-                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  selectedIds.size > 0
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${selectedIds.size > 0
                     ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
                     : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
-                } disabled:opacity-60`}
+                  } disabled:opacity-60`}
               >
                 {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 {selectedIds.size > 0 ? `Approve ${selectedIds.size} Selected` : 'Approve Selected'}
@@ -2436,10 +2425,10 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   ];
 
   const maxSlipRows = Math.max(rawEarnings.length, rawDeductions.length, 5);
-  
+
   const earnings: { label: string; val: number | null }[] = [...rawEarnings];
   const deductions: { label: string; val: number | null }[] = [...rawDeductions];
-  
+
   while (earnings.length < maxSlipRows) earnings.push({ label: '', val: null });
   while (deductions.length < maxSlipRows) deductions.push({ label: '', val: null });
 
@@ -2581,8 +2570,8 @@ const EmployeePayrollView: React.FC = () => {
             <button
               onClick={() => setActiveSlipTab('detailed')}
               className={`px-3 py-2 font-semibold transition-colors ${activeSlipTab === 'detailed'
-                  ? 'bg-varistor-lime text-white'
-                  : 'text-varistor-muted hover:bg-varistor-pageBg'
+                ? 'bg-varistor-lime text-white'
+                : 'text-varistor-muted hover:bg-varistor-pageBg'
                 }`}
             >
               Detailed Slip
@@ -2590,8 +2579,8 @@ const EmployeePayrollView: React.FC = () => {
             <button
               onClick={() => setActiveSlipTab('summary')}
               className={`px-3 py-2 font-semibold transition-colors ${activeSlipTab === 'summary'
-                  ? 'bg-varistor-lime text-white'
-                  : 'text-varistor-muted hover:bg-varistor-pageBg'
+                ? 'bg-varistor-lime text-white'
+                : 'text-varistor-muted hover:bg-varistor-pageBg'
                 }`}
             >
               Summary

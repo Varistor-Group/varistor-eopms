@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
 import { getEmployees, type Employee } from '../api/employees';
 import type { TaskPriority } from '../types';
@@ -49,6 +49,14 @@ export const TaskManagement: React.FC = () => {
   // Find tasks awaiting approval for subordinates
   const subordinateIds = new Set(subordinates.map(emp => emp.id));
   const awaitingApprovalTasks = tasks.filter(t => t.status === 'awaiting_approval' && subordinateIds.has(t.assigneeId!));
+
+  // State for Employee Overview
+  const [selectedOverviewEmployeeId, setSelectedOverviewEmployeeId] = useState('');
+  const selectedEmployeeTasks = selectedOverviewEmployeeId 
+    ? tasks.filter(t => t.assigneeId === selectedOverviewEmployeeId)
+    : [];
+  const pendingTasks = selectedEmployeeTasks.filter(t => t.status === 'todo' || t.status === 'in_progress');
+  const completedTasks = selectedEmployeeTasks.filter(t => t.status === 'done' || t.status === 'awaiting_approval');
 
   return (
     <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
@@ -152,6 +160,77 @@ export const TaskManagement: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
+        <h2 className="text-lg font-bold text-varistor-dark mb-4">Employee Task Overview</h2>
+        <div className="mb-6">
+          <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Select Employee to View</label>
+          <select 
+            value={selectedOverviewEmployeeId} 
+            onChange={(e) => setSelectedOverviewEmployeeId(e.target.value)} 
+            className="w-full md:w-1/2 border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark"
+          >
+            <option value="">-- Choose an employee --</option>
+            {subordinates.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+            ))}
+          </select>
+        </div>
+
+        {selectedOverviewEmployeeId ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Pending Tasks */}
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-varistor-dark mb-3">
+                <Clock size={16} className="text-amber-500" /> Pending Tasks ({pendingTasks.length})
+              </h3>
+              {pendingTasks.length === 0 ? (
+                <p className="text-xs text-varistor-muted italic">No pending tasks.</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingTasks.map(t => (
+                    <div key={t.id} className="p-3 bg-varistor-pageBg border border-[#f1f3f0] rounded-lg">
+                      <p className="font-bold text-xs text-varistor-dark">{t.title}</p>
+                      <p className="text-[10px] text-varistor-muted mt-1 truncate">{t.description}</p>
+                      <div className="mt-2 flex justify-between items-center text-[10px]">
+                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase">{t.status.replace('_', ' ')}</span>
+                        <span className="text-varistor-muted">Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Completed Tasks */}
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-varistor-dark mb-3">
+                <CheckCircle2 size={16} className="text-green-500" /> Completed Tasks ({completedTasks.length})
+              </h3>
+              {completedTasks.length === 0 ? (
+                <p className="text-xs text-varistor-muted italic">No completed tasks yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {completedTasks.map(t => (
+                    <div key={t.id} className="p-3 bg-green-50/50 border border-green-100 rounded-lg">
+                      <p className="font-bold text-xs text-varistor-dark">{t.title}</p>
+                      <p className="text-[10px] text-varistor-muted mt-1 truncate">{t.description}</p>
+                      <div className="mt-2 flex justify-between items-center text-[10px]">
+                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase">{t.status.replace('_', ' ')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-varistor-muted">
+            <FileText size={32} strokeWidth={1.5} className="mb-2 opacity-50" />
+            <p className="text-sm">Select an employee from the dropdown to see their tasks.</p>
           </div>
         )}
       </div>

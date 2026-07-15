@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { getLeaveTypes, getEmployeeBalances } from '../api/leaves';
+import type { LeaveTypeModel, EmployeeLeaveBalance } from '../types';
+import { LeaveTypeManager } from './LeaveTypeManager';
+import { LeaveBalanceManager } from './LeaveBalanceManager';
 
 const Leaves: React.FC = () => {
-  const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser, leaveBalance } = useVariPoints();
+  const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser } = useVariPoints();
   
-  const [leaveType, setLeaveType] = useState('Casual Leave');
+  const [leaveTypes, setLeaveTypes] = useState<LeaveTypeModel[]>([]);
+  const [employeeBalances, setEmployeeBalances] = useState<EmployeeLeaveBalance[]>([]);
+  const [leaveType, setLeaveType] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -17,6 +23,23 @@ const Leaves: React.FC = () => {
   const LOGGED_IN_NAME = currentUser?.name ?? 'Aarav Patel';
   const LOGGED_IN_DEPT = currentUser?.department ?? 'Operations';
 
+  useEffect(() => {
+    // Fetch dynamic data
+    const fetchDynamicLeavesData = async () => {
+      const types = await getLeaveTypes();
+      setLeaveTypes(types);
+      if (types.length > 0 && !leaveType) {
+        setLeaveType(types[0].name);
+      }
+      
+      if (currentRole === 'Employee') {
+        const bals = await getEmployeeBalances(LOGGED_IN_EMP);
+        setEmployeeBalances(bals);
+      }
+    };
+    fetchDynamicLeavesData();
+  }, [currentRole, LOGGED_IN_EMP]);
+
   // Minimum date selection: today + 2 days
   const getMinDateStr = () => {
     const minDate = new Date();
@@ -24,14 +47,12 @@ const Leaves: React.FC = () => {
     return minDate.toISOString().split('T')[0];
   };
 
-  // Data is loaded via context
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!startDate || !endDate || !reason.trim()) {
+    if (!startDate || !endDate || !reason.trim() || !leaveType) {
       setErrorMsg('Please fill in all fields.');
       return;
     }
@@ -49,7 +70,7 @@ const Leaves: React.FC = () => {
     minAllowedDate.setDate(minAllowedDate.getDate() + 2);
 
     if (currentRole === 'Employee' && start < minAllowedDate) {
-      setErrorMsg('Leaves must be requested at least 2 days in advance. Dates prior to July 5th, 2026 are locked.');
+      setErrorMsg('Leaves must be requested at least 2 days in advance.');
       return;
     }
 
@@ -91,8 +112,6 @@ const Leaves: React.FC = () => {
     }
   };
 
-
-
   const filteredLeaves = (currentRole === 'Admin' || currentRole === 'HR')
     ? leaveRequests
     : leaveRequests.filter(l => l.employeeId === LOGGED_IN_EMP);
@@ -120,24 +139,20 @@ const Leaves: React.FC = () => {
             <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
               <h3 className="text-sm font-bold text-varistor-dark border-b pb-2 mb-4">Leave Balances</h3>
               <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-xs text-varistor-muted mb-1">
-                    <span>Casual Leave Balance</span>
-                    <span className="font-bold text-varistor-dark">{leaveBalance?.casual?.used ?? 0} / {leaveBalance?.casual?.total ?? 12} Taken</span>
+                {employeeBalances.map(bal => (
+                  <div key={bal.id}>
+                    <div className="flex justify-between text-xs text-varistor-muted mb-1">
+                      <span>{bal.leave_type_name}</span>
+                      <span className="font-bold text-varistor-dark">{bal.used} / {bal.total} Taken</span>
+                    </div>
+                    <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, (bal.used / (bal.total || 1)) * 100)}%` }} />
+                    </div>
                   </div>
-                  <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-varistor-lime h-full" style={{ width: `${Math.min(100, ((leaveBalance?.casual?.used ?? 0) / (leaveBalance?.casual?.total ?? 12)) * 100)}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-varistor-muted mb-1">
-                    <span>Sick Leave Balance</span>
-                    <span className="font-bold text-varistor-dark">{leaveBalance?.sick?.used ?? 0} / {leaveBalance?.sick?.total ?? 10} Taken</span>
-                  </div>
-                  <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, ((leaveBalance?.sick?.used ?? 0) / (leaveBalance?.sick?.total ?? 10)) * 100)}%` }} />
-                  </div>
-                </div>
+                ))}
+                {employeeBalances.length === 0 && (
+                  <div className="text-xs text-varistor-muted italic">No balances found.</div>
+                )}
               </div>
             </div>
 
@@ -162,9 +177,9 @@ const Leaves: React.FC = () => {
                     onChange={e => setLeaveType(e.target.value)}
                     className="w-full text-xs border border-varistor-border rounded px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-varistor-lime cursor-pointer"
                   >
-                    <option value="Casual Leave">Casual Leave</option>
-                    <option value="Sick Leave">Sick Leave</option>
-                    <option value="Loss of Pay">Loss of Pay (LOP)</option>
+                    {leaveTypes.map(lt => (
+                      <option key={lt.id} value={lt.name}>{lt.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -228,6 +243,14 @@ const Leaves: React.FC = () => {
 
         {/* Requests Table Column */}
         <div className={`${currentRole === 'Employee' ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
+          
+          {(currentRole === 'Admin' || currentRole === 'HR') && (
+            <>
+              <LeaveTypeManager />
+              <LeaveBalanceManager />
+            </>
+          )}
+
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">
             <div className="px-5 py-4 border-b border-varistor-border flex justify-between items-center">
               <h3 className="text-sm font-bold text-varistor-dark">

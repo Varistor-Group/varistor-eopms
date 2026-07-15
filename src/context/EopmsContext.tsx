@@ -331,6 +331,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         const unnotifiedPolicies = data.filter(ann => {
           if (ann.type !== 'Policy') return false;
+          const notifiedKey = `policy_notified_${ann.id}`;
+          if (localStorage.getItem(notifiedKey)) return false;
+
           if (isPolling) {
             return !knownAnnouncementsRef.current.has(ann.id);
           } else {
@@ -340,6 +343,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         if (unnotifiedPolicies.length > 0) {
           const latest = unnotifiedPolicies[0];
+          localStorage.setItem(`policy_notified_${latest.id}`, 'true');
           setPolicyNotification({ show: true, title: latest.title || 'New Policy' });
           setTimeout(() => {
             setPolicyNotification(prev => ({ ...prev, show: false }));
@@ -366,12 +370,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newRow = payload.new as any;
           if (newRow.type === 'Policy') {
-            setPolicyNotification({ show: true, title: newRow.title || 'New Policy' });
+            const notifiedKey = `policy_notified_${newRow.id}`;
+            if (!localStorage.getItem(notifiedKey)) {
+              localStorage.setItem(notifiedKey, 'true');
+              setPolicyNotification({ show: true, title: newRow.title || 'New Policy' });
 
-            // Auto-dismiss toast after 5s
-            setTimeout(() => {
-              setPolicyNotification(prev => ({ ...prev, show: false }));
-            }, 5000);
+              // Auto-dismiss toast after 5s
+              setTimeout(() => {
+                setPolicyNotification(prev => ({ ...prev, show: false }));
+              }, 5000);
+            }
           }
 
           // Refresh announcements to get the new one and increment bell badge
@@ -821,9 +829,31 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           : Math.max(0, currentVP - pointsAmount);
         // Update local mock store so UI reflects immediately
         emp.variPoints = newVP;
-        // Persist to Supabase
+        // Persist vari_points to Supabase
         updateEmployee(employeeId, { variPoints: newVP }).catch((err) => {
           console.error('[VP] Failed to sync vari_points to Supabase:', err);
+        });
+        // Log transaction to activity_log for audit history
+        supabase.from('activity_log').insert({
+          action: 'VP_TRANSACTION',
+          performed_by: currentUser?.id ?? 'system',
+          details: `${ruleTitle}: "${reason}" — ${isCredit ? '+' : '-'}${pointsAmount} VP for ${emp.fullName} (${emp.employeeId})`,
+          metadata: {
+            transaction_type: transactionType,
+            rule_type: type,
+            points: pointsAmount,
+            reason,
+            employee_id: employeeId,
+            employee_name: emp.fullName,
+            employee_code: emp.employeeId,
+            performed_by_id: currentUser?.id ?? 'system',
+            performed_by_name: currentUser?.name ?? 'System',
+            performed_by_role: currentRole,
+            vp_before: currentVP,
+            vp_after: newVP,
+          }
+        }).then(({ error }) => {
+          if (error) console.error('[VP] Failed to log to activity_log:', error.message);
         });
       }
     }
