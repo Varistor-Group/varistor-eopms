@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
-import { mockEmployeeStore } from '../api/employees';
+import { mockEmployeeStore, updateEmployee } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 import { API_URL } from '../config/api';
 import { supabase } from '../lib/supabase';
@@ -810,6 +810,23 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
     addToast(`${ruleTitle} applied: "${reason}"`, pointsAmount, transactionType);
+
+    // ── Persist VP change to Supabase so dashboard and employee master reflect it ──
+    if (employeeId) {
+      const emp = mockEmployeeStore.find(e => e.id === employeeId);
+      if (emp) {
+        const currentVP = emp.variPoints ?? 0;
+        const newVP = isCredit
+          ? currentVP + pointsAmount
+          : Math.max(0, currentVP - pointsAmount);
+        // Update local mock store so UI reflects immediately
+        emp.variPoints = newVP;
+        // Persist to Supabase
+        updateEmployee(employeeId, { variPoints: newVP }).catch((err) => {
+          console.error('[VP] Failed to sync vari_points to Supabase:', err);
+        });
+      }
+    }
   };
 
   return (

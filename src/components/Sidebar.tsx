@@ -138,9 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }
 
-  if (trainingLocked) {
-    menuItems = menuItems.map(item => ({ ...item, enabled: item.id === 'training' }));
-  }
+
 
   const handleTabClick = (itemId: string, enabled: boolean) => {
     if (!enabled) return;

@@ -97,7 +97,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-varistor-surface border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
+        <div className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 bg-varistor-surface border border-varistor-border rounded-varistor shadow-[0_8px_24px_rgba(0,0,0,0.10)] z-50 animate-[fadeIn_150ms_ease-out] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-varistor-border">
             <h4 className="text-xs font-bold text-varistor-dark uppercase tracking-wider">Notifications</h4>
             {totalUnread > 0 && (
