@@ -100,7 +100,7 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
 // ─── Salary Slip Preview Modal ─────────────────────────────────────────────────
 
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
-  const finalPay = record.netPay - (record.deduction ?? 0);
+  const finalPay = (record.finalPay ?? record.netPay) - (record.deduction ?? 0);
   const netPayWords = numberToWords(finalPay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -295,7 +295,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           <div className="grid grid-cols-2 border border-gray-300 rounded overflow-hidden text-sm font-bold divide-x divide-gray-300 mb-4">
             <div className="bg-green-50 p-3 flex justify-between items-center">
               <span className="text-gray-700">Final Pay [In-Hand]</span>
-              <span className="text-xl text-varistor-limeText font-black">{fmt(record.netPay + (record.components?.reimbursement ?? 0) + (record.components?.overtime ?? 0) + (record.components?.incentives ?? 0) - (record.deduction ?? 0))}</span>
+              <span className="text-xl text-varistor-limeText font-black">{fmt((record.finalPay ?? record.netPay) - (record.deduction ?? 0))}</span>
             </div>
             <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
               {record.deduction && record.deduction > 0 && (
@@ -439,6 +439,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           ctc,
           deductions: comp.totalDeductions,
           netPay: comp.netPay,
+          finalPay: comp.finalPay,
           additionHeads: comp.additionHeads,
           deductionHeads: comp.deductionHeads,
           additionValues: comp.additionValues,
@@ -593,6 +594,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
           ctc,
           deductions: comp.totalDeductions,
           netPay: comp.netPay,
+          finalPay: comp.finalPay,
           additionHeads: comp.additionHeads,
           deductionHeads: comp.deductionHeads,
           additionValues: comp.additionValues,
@@ -823,7 +825,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
                         </td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-mono">{fmt(row.monthlySalary)}</td>
                         <td className="px-4 py-2.5 tabular-nums text-xs font-mono text-red-600">{fmt(row.deductions)}</td>
-                        <td className="px-4 py-2.5 tabular-nums text-xs font-bold text-varistor-limeText">{fmt(row.netPay)}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-xs font-bold text-varistor-limeText">{fmt(row.finalPay ?? row.netPay)}</td>
                         <td className="px-4 py-2.5 text-varistor-muted text-xs">{row.month || MONTH}</td>
                         <td className="px-4 py-2.5">
                           <button
@@ -1237,6 +1239,7 @@ const SalaryHeadMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 
@@ -1452,12 +1455,13 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
         { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
         { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, $BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
-        { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
+        { code: "F7", name: "PF Employee", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
+        { code: "F10", name: "PF Employer", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
         { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
         { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
       ];
       let loaded = saved ? JSON.parse(saved) : [];
-      if (loaded.length < 9) {
+      if (loaded.length < 10) {
         loaded = defaults;
         localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaults));
       }
@@ -1470,7 +1474,7 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         if (parsed.additions) headsList = [...headsList, ...parsed.additions];
         if (parsed.deductions) headsList = [...headsList, ...parsed.deductions];
       } else {
-        headsList = ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "PF", "ESI", "PT", "Advance salary adjut"];
+        headsList = ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "PF Employee", "PF Employer", "ESI", "PT", "Advance salary adjut"];
       }
       setAvailableHeads(headsList.filter(h => h.trim() !== ''));
     } catch (e) {
@@ -1479,6 +1483,7 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 
@@ -1736,6 +1741,7 @@ export const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 
@@ -2002,6 +2008,7 @@ const SalaryEngine: React.FC = () => {
           gross: comp.gross,
           deduction: comp.totalDeductions,
           netPay: comp.netPay,
+          finalPay: comp.finalPay,
         };
       }
       return rec;
@@ -2019,6 +2026,7 @@ const SalaryEngine: React.FC = () => {
   }, []);
 
    
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   // Keep only the latest revision for each employee in the month to avoid duplicate keys and rows
@@ -2151,7 +2159,7 @@ const SalaryEngine: React.FC = () => {
 
   const draftCount = monthRecords.filter(r => r.status === 'draft').length;
   const approvedCount = monthRecords.filter(r => r.status === 'approved').length;
-  const totalNetPay = monthRecords.reduce((s, r) => s + r.netPay, 0);
+  const totalNetPay = monthRecords.reduce((s, r) => s + (r.finalPay ?? r.netPay), 0);
 
   const SortIcon = ({ field }: { field: keyof PayrollRecord }) =>
     sortField === field
@@ -2177,7 +2185,7 @@ const SalaryEngine: React.FC = () => {
                     <ShieldCheck size={16} className="text-varistor-lime mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="font-semibold text-gray-800">{entry.action} · {entry.employeeId}</p>
-                      <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.netPay)}</p>
+                      <p className="text-gray-500 text-xs">{entry.by} · Net: {fmt(entry.finalPay ?? entry.netPay)}</p>
                       <p className="text-gray-400 text-[11px]">{new Date(entry.timestamp).toLocaleString('en-IN')}</p>
                     </div>
                   </div>
@@ -2478,7 +2486,7 @@ const SalaryEngine: React.FC = () => {
                               {fmt(rec.components.specialAllowance ?? 0)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.netPay)}</td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.finalPay ?? rec.netPay)}</td>
                           <td className="px-4 py-3">
                             {isAdmin && !isApproved ? (
                               <input
@@ -2525,7 +2533,7 @@ const SalaryEngine: React.FC = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-varistor-limeText">
-                            {fmt(rec.netPay + (rec.components.reimbursement ?? 0) + (rec.components.overtime ?? 0) + (rec.components.incentives ?? 0) - (rec.deduction ?? 0))}
+                            {fmt((rec.finalPay ?? rec.netPay) - (rec.deduction ?? 0))}
                           </td>
                           {/* PF checkbox */}
                           <td className="px-4 py-3 text-center">
@@ -2612,7 +2620,7 @@ const SalaryEngine: React.FC = () => {
 // ─── Employee Salary Slip Card (Inline View) ──────────────────────────────────
 
 const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
-  const finalPay = record.netPay - (record.deduction ?? 0);
+  const finalPay = (record.finalPay ?? record.netPay) - (record.deduction ?? 0);
   const netPayWords = numberToWords(finalPay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2889,7 +2897,7 @@ const EmployeePayrollView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Monthly CTC', val: fmt(rec.ctc) },
-                  { label: 'Net Pay', val: fmt(rec.netPay), highlight: true },
+                  { label: 'Net Pay', val: fmt(rec.finalPay ?? rec.netPay), highlight: true },
                   { label: 'Basic', val: fmt(rec.components.basic) },
                   { label: 'HRA', val: fmt(rec.components.hra) },
                   { label: 'PF Deduction', val: fmt(rec.components.pfEmployee), deduct: true },
@@ -2930,7 +2938,7 @@ const EmployeePayrollView: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-varistor-dark">Salary Slip · {r.month}</p>
-                    <p className="text-[11px] text-varistor-muted">Net: {fmt(r.netPay)} · Rev {r.revision}</p>
+                    <p className="text-[11px] text-varistor-muted">Net: {fmt(r.finalPay ?? r.netPay)} · Rev {r.revision}</p>
                   </div>
                 </div>
                 <button

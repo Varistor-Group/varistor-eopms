@@ -45,7 +45,8 @@ export interface PayrollRecord {
   month: string; // e.g. "Jun 2026"
   ctc: number;
   components: SalaryComponents;
-  netPay: number;
+  netPay: number; // Monthly CTC - LOP
+  finalPay: number; // Final in-hand salary (Net Pay - Deductions + Additions)
   status: 'draft' | 'approved';
   revision: number;
   approvedBy?: string;
@@ -84,6 +85,7 @@ export interface PayrollAuditEntry {
   by: string;
   employeeId: string;
   netPay: number;
+  finalPay: number;
 }
 
 // ─── Shared formula util ─────────────────────────────────────────────────────
@@ -250,7 +252,7 @@ export function computeNet(params: {
     "Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""
   ];
   let dedHeads = [
-    "PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""
+    "PF Employee", "PF Employer", "ESI", "PT", "Advance salary adjut", "", "", "", "", ""
   ];
   let ptRanges = [
     { min: 0, max: 2999, amount: 0 },
@@ -332,7 +334,7 @@ export function computeNet(params: {
 
   // 2. Determine $BS (Base/Reference Amount)
   // Prioritize the passed monthlySalary (the record's CTC), falling back to master settings only if zero/undefined.
-  let refAmt = monthlySalary || (params.employeeId ? employeeDetails[params.employeeId] : 0) || 0;
+  const refAmt = monthlySalary || (params.employeeId ? employeeDetails[params.employeeId] : 0) || 0;
 
   // 3. Determine attendance values
   const present = params.attendanceBreakdown?.present ?? payDays;
@@ -353,7 +355,7 @@ export function computeNet(params: {
   const additionValues = Array(10).fill(0);
   const deductionValues = Array(10).fill(0);
 
-  const prorata = Math.round((monthlySalary / totalDays) * payDays);
+  const prorata = monthlySalary;
 
   // 5. Evaluate Additions
   for (let i = 0; i < 10; i++) {
@@ -388,11 +390,11 @@ export function computeNet(params: {
         const basicVal = context['$basic'] ?? Math.round(prorata * 0.5);
         additionValues[i] = Math.round(basicVal * 0.5);
       } else if (['medical', 'medical allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.medical ?? Math.round(1250 / totalDays * payDays);
+        additionValues[i] = params.medical ?? 1250;
       } else if (['ta', 'travel allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.ta ?? Math.round(2500 / totalDays * payDays);
+        additionValues[i] = params.ta ?? 2500;
       } else if (['lta', 'leave travel allowance'].includes(headName.toLowerCase())) {
-        additionValues[i] = params.lta ?? Math.round(3500 / totalDays * payDays);
+        additionValues[i] = params.lta ?? 3500;
       } else {
         additionValues[i] = 0;
       }
@@ -425,7 +427,7 @@ export function computeNet(params: {
       deductionValues[i] = evaluateFormula(formula.equation, context);
     } else {
       // Fallback
-      if (headName.toLowerCase() === 'pf') {
+      if (['pf', 'pf employee', 'pf employer'].includes(headName.toLowerCase())) {
         const rawPf = basic >= 15000 ? 1800 : Math.round(basic * (pfPct / 100));
         deductionValues[i] = (params.hasPf !== false) ? rawPf : 0;
       } else if (headName.toLowerCase() === 'esi') {
@@ -466,7 +468,11 @@ export function computeNet(params: {
   }
 
   const totalDeductions = deductionValues.reduce((a, b) => a + b, 0);
-  const netPay = gross - totalDeductions;
+  const netPay = monthlySalary - lopDeduction;
+  
+  // Calculate total statutory and other deductions (excluding LOP)
+  const totalDeductionsExcludingLop = totalDeductions - lopDeduction;
+  const finalPay = netPay - totalDeductionsExcludingLop + (params.reimbursement ?? 0) + (params.overtime ?? 0) + (params.incentives ?? 0);
 
   // Return standard fields for compatibility
   const medical = context['$medical'] ?? context['$medicalallowance'] ?? 1250;
@@ -486,10 +492,10 @@ export function computeNet(params: {
     ta,
     lta,
     specialAllowance,
-    pfEmployee: deductionValues[0],
-    pfEmployer: deductionValues[0],
-    esi: deductionValues[2] ?? deductionValues[1],
-    pt: deductionValues[3] ?? deductionValues[2],
+    pfEmployee: context['$pfemployee'] ?? context['$pf'] ?? deductionValues[0] ?? 0,
+    pfEmployer: context['$pfemployer'] ?? context['$pf'] ?? deductionValues[1] ?? 0,
+    esi: context['$esi'] ?? deductionValues[2] ?? 0,
+    pt: context['$pt'] ?? deductionValues[3] ?? 0,
     tds: params.tds ?? 0,
     otherDeductions: params.otherDeductions ?? 0,
     totalDeductions,
@@ -499,6 +505,7 @@ export function computeNet(params: {
     lopDays,
     lopDeduction,
     netPay,
+    finalPay,
     gross,
     additionHeads: addHeads,
     deductionHeads: dedHeads,
@@ -523,7 +530,8 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     month: 'Jun 2026',
     ctc: 150000,
     monthlySalary: 150000,
-    netPay: 148000,
+    netPay: 150000,
+    finalPay: 148000,
     status: 'draft',
     revision: 1,
     autoFormula: true,
@@ -562,7 +570,8 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     month: 'Jun 2026',
     ctc: 50000,
     monthlySalary: 50000,
-    netPay: 46200,
+    netPay: 50000,
+    finalPay: 46200,
     status: 'draft',
     revision: 1,
     autoFormula: true,
@@ -601,7 +610,8 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     month: 'Jun 2026',
     ctc: 35000,
     monthlySalary: 35000,
-    netPay: 31200,
+    netPay: 35000,
+    finalPay: 31200,
     status: 'draft',
     revision: 1,
     autoFormula: true,
@@ -640,7 +650,8 @@ const DEFAULT_SEED_RECORDS: PayrollRecord[] = [
     month: 'Jun 2026',
     ctc: 45000,
     monthlySalary: 45000,
-    netPay: 41200,
+    netPay: 45000,
+    finalPay: 41200,
     status: 'draft',
     revision: 1,
     autoFormula: true,
@@ -751,6 +762,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
             otherDeductions: comp.otherDeductions,
           },
           netPay: comp.netPay,
+          finalPay: comp.finalPay,
           status: 'draft',
           revision: 0,
           autoFormula: true,
@@ -822,7 +834,7 @@ export async function updatePayrollRecord(
       const details: Record<string, number> = detailsRaw ? JSON.parse(detailsRaw) : {};
       details[updated.employeeId] = updated.monthlySalary;
       localStorage.setItem('eopms_employee_salary_details', JSON.stringify(details));
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     // ─────────────────────────────────────────────────────────────────────────
 
     const comp = computeNet({
@@ -861,15 +873,23 @@ export async function updatePayrollRecord(
       otherDeductions: comp.otherDeductions,
     };
     updated.netPay = comp.netPay;
+    updated.finalPay = comp.finalPay;
     updated.additionHeads = comp.additionHeads;
     updated.deductionHeads = comp.deductionHeads;
     updated.additionValues = comp.additionValues;
     updated.deductionValues = comp.deductionValues;
   } else if (patch.components) {
     const c = updated.components;
-    const gross = c.basic + c.hra + c.medical + c.ta + c.lta + c.specialAllowance;
-    const totalDeductions = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + c.otherDeductions;
-    updated.netPay = gross - totalDeductions;
+    const monthlySalary = updated.monthlySalary ?? updated.ctc;
+    const totalDays = updated.totalDays || 30;
+    const payDays = updated.payDays || 30;
+    const lopDays = Math.max(0, totalDays - payDays);
+    const lopDeduction = Math.round((monthlySalary / totalDays) * lopDays);
+
+    const totalDeductionsExcludingLop = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + c.otherDeductions;
+    
+    updated.netPay = monthlySalary - lopDeduction;
+    updated.finalPay = updated.netPay - totalDeductionsExcludingLop + (c.reimbursement ?? 0) + (c.overtime ?? 0) + (c.incentives ?? 0);
   }
   _records[idx] = updated;
   savePayrollRecords(_records);
@@ -895,6 +915,7 @@ export async function approvePayroll(ids: string[], approverEmail: string): Prom
         by: approverEmail,
         employeeId: _records[idx].employeeId,
         netPay: _records[idx].netPay,
+        finalPay: _records[idx].finalPay,
       });
       console.log(`[Payroll Audit] APPROVED ${_records[idx].employeeId} net=${_records[idx].netPay} by=${approverEmail} at=${now}`);
     }
@@ -924,6 +945,7 @@ export async function createRevision(id: string, approverEmail: string): Promise
     by: approverEmail,
     employeeId: rec.employeeId,
     netPay: rec.netPay,
+    finalPay: rec.finalPay,
   });
   return revised;
 }
@@ -972,6 +994,7 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
         otherDeductions: comp.otherDeductions,
       },
       netPay: comp.netPay,
+      finalPay: comp.finalPay,
       additionHeads: comp.additionHeads,
       deductionHeads: comp.deductionHeads,
       additionValues: comp.additionValues,
@@ -1032,6 +1055,7 @@ export async function releaseAndSyncSlips(sentRows: SlipRow[]): Promise<void> {
         otherDeductions: row.otherDeductions || 0
       },
       netPay: row.netPay,
+      finalPay: row.finalPay || row.netPay,
       status: 'approved',
       revision: existingIdx !== -1 ? _records[existingIdx].revision + 1 : 1,
       autoFormula: true,
@@ -1164,6 +1188,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
       ctc: monthlySalary,
       monthlySalary,
       netPay: comp.netPay,
+      finalPay: comp.finalPay,
       status: existingIdx !== -1 ? _records[existingIdx].status : 'draft',
       revision: existingIdx !== -1 ? _records[existingIdx].revision : 1,
       autoFormula: true,
@@ -1293,6 +1318,7 @@ export interface SlipRow {
   ctc: number;
   deductions: number;
   netPay: number;
+  finalPay?: number;
   additionHeads?: string[];
   deductionHeads?: string[];
   additionValues?: number[];

@@ -497,13 +497,13 @@ const generateSalarySlipPDF = (slip) => {
           { label: 'TA', val: slip.ta },
           { label: 'LTA', val: slip.lta },
           { label: 'Special Allowance', val: slip.specialAllowance },
-          { label: 'Reimbursement', val: slip.reimbursement },
+          { label: 'Travel Allowance', val: slip.reimbursement },
+          { label: 'Overtime', val: slip.overtime },
           { label: 'Incentives', val: slip.incentives },
-          { label: 'OT Hours', val: slip.overtime },
           { label: '', val: null },
         ];
 
-        const deductions = [
+        deductions = [
           { label: 'PF Employee', val: slip.pfEmployee },
           { label: 'PF Employer', val: slip.pfEmployer },
           { label: 'ESI', val: slip.esi },
@@ -515,95 +515,97 @@ const generateSalarySlipPDF = (slip) => {
           { label: '', val: null },
           { label: '', val: null },
         ];
+      }
 
-        let currentY = 204;
-        for (let idx = 0; idx < 10; idx++) {
-          const earn = earnings[idx];
-          doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
-          if (earn.label) {
-            doc.text(earn.label, 45, currentY + 3);
-            if (earn.val !== null && earn.val !== undefined) {
-              doc.text(fmt(earn.val), 210, currentY + 3, { align: 'right', width: 82 });
-            }
+      // ── Draw earnings / deductions table (runs for both branches) ───────────
+      let currentY = 204;
+      for (let idx = 0; idx < 10; idx++) {
+        const earn = earnings[idx];
+        doc.fillColor('#111111').fontSize(8.5).font('Helvetica');
+        if (earn && earn.label) {
+          doc.text(earn.label, 45, currentY + 3);
+          if (earn.val !== null && earn.val !== undefined) {
+            doc.text(fmt(earn.val), 210, currentY + 3, { align: 'right', width: 82 });
           }
-
-          const deduct = deductions[idx];
-          if (deduct.label) {
-            doc.text(deduct.label, 302, currentY + 3);
-            if (deduct.val !== null && deduct.val !== undefined) {
-              doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
-            }
-          }
-
-          // Draw divider
-          doc.lineWidth(1).strokeColor('#e5e7eb');
-          doc.moveTo(40, currentY + 16).lineTo(555, currentY + 16).stroke();
-          currentY += 16;
         }
 
-        // Vertical lines for the table grid
-        doc.lineWidth(1).strokeColor('#cccccc');
-        doc.moveTo(40, 186).lineTo(40, currentY).stroke();
-        doc.moveTo(210, 186).lineTo(210, currentY).stroke();
-        doc.moveTo(297.5, 186).lineTo(297.5, currentY).stroke();
-        doc.moveTo(470, 186).lineTo(470, currentY).stroke();
-        doc.moveTo(555, 186).lineTo(555, currentY).stroke();
+        const deduct = deductions[idx];
+        if (deduct && deduct.label) {
+          doc.text(deduct.label, 302, currentY + 3);
+          if (deduct.val !== null && deduct.val !== undefined) {
+            doc.text(fmt(deduct.val), 470, currentY + 3, { align: 'right', width: 80 });
+          }
+        }
 
-        // Totals Row
-        doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
-
-        doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
-        doc.text('Total Earnings', 45, currentY + 5);
-        doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
-
-        doc.text('Total Deduction', 302, currentY + 5);
-        doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
-
-        // Outlines for Totals row
-        doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
-        doc.moveTo(40, currentY + 20).lineTo(555, currentY + 20).stroke();
-        doc.moveTo(40, currentY).lineTo(40, currentY + 20).stroke();
-        doc.moveTo(210, currentY).lineTo(210, currentY + 20).stroke();
-        doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 20).stroke();
-        doc.moveTo(470, currentY).lineTo(470, currentY + 20).stroke();
-        doc.moveTo(555, currentY).lineTo(555, currentY + 20).stroke();
-
-        currentY += 20;
-
-        // Net Pay Row
-        doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
-        doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
-
-        doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
-        doc.text('NetPay [In-Hand]', 45, currentY + 13);
-
-        doc.fontSize(14).font('Helvetica-Bold');
-        doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
-
-        // Number to Words
-        const words = numberToWords(slip.netPay);
-        doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
-        doc.text(words, 305, currentY + 8, { width: 242, align: 'center' });
-
-        // Borders for Net Pay row
-        doc.moveTo(40, currentY + 36).lineTo(555, currentY + 36).stroke();
-        doc.moveTo(40, currentY).lineTo(40, currentY + 36).stroke();
-        doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 36).stroke();
-        doc.moveTo(555, currentY).lineTo(555, currentY + 36).stroke();
-
-        currentY += 36;
-
-        // Footer
-        doc.fillColor('#555555')
-          .fontSize(8.5)
-          .font('Helvetica-Bold')
-          .text('This is a computer generated payslip no signature is required.', 40, currentY + 12, { align: 'center', width: 515 });
-
-        doc.end();
-      } catch (e) {
-        reject(e);
+        // Draw divider
+        doc.lineWidth(1).strokeColor('#e5e7eb');
+        doc.moveTo(40, currentY + 16).lineTo(555, currentY + 16).stroke();
+        currentY += 16;
       }
-    });
+
+      // Vertical lines for the table grid
+      doc.lineWidth(1).strokeColor('#cccccc');
+      doc.moveTo(40, 186).lineTo(40, currentY).stroke();
+      doc.moveTo(210, 186).lineTo(210, currentY).stroke();
+      doc.moveTo(297.5, 186).lineTo(297.5, currentY).stroke();
+      doc.moveTo(470, 186).lineTo(470, currentY).stroke();
+      doc.moveTo(555, 186).lineTo(555, currentY).stroke();
+
+      // Totals Row
+      doc.rect(40, currentY, 515, 20).fill('#f1f5f9');
+
+      doc.fillColor('#111111').fontSize(9).font('Helvetica-Bold');
+      doc.text('Total Earnings', 45, currentY + 5);
+      doc.text(fmt(pdfTotalCtc), 210, currentY + 5, { align: 'right', width: 82 });
+
+      doc.text('Total Deduction', 302, currentY + 5);
+      doc.text(fmt(slip.deductions), 470, currentY + 5, { align: 'right', width: 80 });
+
+      // Outlines for Totals row
+      doc.moveTo(40, currentY).lineTo(555, currentY).stroke();
+      doc.moveTo(40, currentY + 20).lineTo(555, currentY + 20).stroke();
+      doc.moveTo(40, currentY).lineTo(40, currentY + 20).stroke();
+      doc.moveTo(210, currentY).lineTo(210, currentY + 20).stroke();
+      doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 20).stroke();
+      doc.moveTo(470, currentY).lineTo(470, currentY + 20).stroke();
+      doc.moveTo(555, currentY).lineTo(555, currentY + 20).stroke();
+
+      currentY += 20;
+
+      // Net Pay Row
+      doc.rect(40, currentY, 257.5, 36).fill('#e2e8f0');
+      doc.rect(297.5, currentY, 257.5, 36).fill('#f1f5f9');
+
+      doc.fillColor('#111111').fontSize(10).font('Helvetica-Bold');
+      doc.text('Final Pay [In-Hand]', 45, currentY + 13);
+
+      doc.fontSize(14).font('Helvetica-Bold');
+      doc.text(fmt(slip.netPay), 150, currentY + 11, { align: 'right', width: 140 });
+
+      // Number to Words
+      const words = numberToWords(slip.netPay);
+      doc.fillColor('#111111').fontSize(7.5).font('Helvetica-Bold');
+      doc.text(words, 305, currentY + 8, { width: 242, align: 'center' });
+
+      // Borders for Net Pay row
+      doc.moveTo(40, currentY + 36).lineTo(555, currentY + 36).stroke();
+      doc.moveTo(40, currentY).lineTo(40, currentY + 36).stroke();
+      doc.moveTo(297.5, currentY).lineTo(297.5, currentY + 36).stroke();
+      doc.moveTo(555, currentY).lineTo(555, currentY + 36).stroke();
+
+      currentY += 36;
+
+      // Footer
+      doc.fillColor('#555555')
+        .fontSize(8.5)
+        .font('Helvetica-Bold')
+        .text('This is a computer generated payslip no signature is required.', 40, currentY + 12, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
 };
 
 // ── Modules 11 & 12: Bulk salary slip emails ──────────────────────────────────
