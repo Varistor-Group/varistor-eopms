@@ -29,6 +29,8 @@ export interface Employee {
   uanNumber?: string;
   shiftStart?: string;
   shiftEnd?: string;
+  optOutPF?: boolean;
+  optOutPT?: boolean;
 }
 
 export type Department = string;
@@ -99,6 +101,8 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
     dateOfBirth: (row.date_of_birth as string) ?? undefined,
     uanNumber: (row.uan_number as string) ?? undefined,
+    optOutPF: (row.opt_out_pf as boolean) ?? false,
+    optOutPT: (row.opt_out_pt as boolean) ?? false,
   };
 }
 
@@ -168,6 +172,8 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
   if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
   if (input.shiftStart) extraUpdates.shift_start = input.shiftStart;
   if (input.shiftEnd) extraUpdates.shift_end = input.shiftEnd;
+  if (input.optOutPF !== undefined) extraUpdates.opt_out_pf = input.optOutPF;
+  if (input.optOutPT !== undefined) extraUpdates.opt_out_pt = input.optOutPT;
 
   if (Object.keys(extraUpdates).length > 0) {
     await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
@@ -233,9 +239,11 @@ export async function updateEmployee(
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
       ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
       ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
-      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
+      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth || null }),
       ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
-      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),
+      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining || null }),
+      ...(updates.optOutPF !== undefined && { opt_out_pf: updates.optOutPF }),
+      ...(updates.optOutPT !== undefined && { opt_out_pt: updates.optOutPT }),
     })
     .eq('id', id)
     .select()

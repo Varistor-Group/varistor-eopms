@@ -623,7 +623,7 @@ app.post('/api/payroll/send-slips', async (req, res) => {
 
     const buildSlipHtml = (slip) => {
       const month = slip.month || new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-      const finalPay = slip.netPay + (slip.reimbursement || 0) + (slip.overtime || 0) + (slip.incentives || 0) - (slip.deduction || 0);
+      const finalPay = slip.finalPay !== undefined ? slip.finalPay : (slip.netPay + (slip.reimbursement || 0) + (slip.overtime || 0) + (slip.incentives || 0) - (slip.deduction || 0));
       const words = numberToWords(finalPay);
 
       let rowsHtml = '';
@@ -981,7 +981,7 @@ async function buildSlipsFromDb() {
 
     const slips = [];
     for (const rec of filteredRecords) {
-      if (!rec.slipReleased && rec.status !== 'approved') continue; // Only send approved/released slips
+      // rec.status !== 'approved' check removed so drafts are also sent
       const emp = employees.find(e => e.employeeId === rec.employeeId);
       if (!emp || !emp.personalEmail || emp.status !== 'Active') continue;
 
@@ -1016,6 +1016,7 @@ async function buildSlipsFromDb() {
         otherDeductions: c.otherDeductions || 0,
         deductions: (c.pfEmployee || 0) + (c.esi || 0) + (c.pt || 0) + (c.tds || 0) + (c.otherDeductions || 0),
         netPay: rec.netPay || 0,
+        finalPay: rec.finalPay || 0,
         deduction: rec.deduction || 0,
         additionHeads: rec.additionHeads || [],
         deductionHeads: rec.deductionHeads || [],

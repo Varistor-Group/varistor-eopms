@@ -8,7 +8,7 @@ import {
   Calendar, ToggleLeft, ToggleRight, Zap
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { getMonthlyReport } from '../api/attendance';
+
 import { getEmployees } from '../api/employees';
 import {
   getPayrollRecords,
@@ -40,6 +40,7 @@ import {
 // We import the type only; actual lib loaded at runtime
 // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
 declare const XLSX: any;
+import logoUrl from '../assets/logo.png';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ const FormulaBadge = ({ formula }: { formula: string }) => (
 // ─── Salary Slip Preview Modal ─────────────────────────────────────────────────
 
 const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({ record, onClose }) => {
-  const finalPay = (record.finalPay ?? record.netPay) - (record.deduction ?? 0);
+  const finalPay = record.finalPay ?? 0;
   const netPayWords = numberToWords(finalPay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,46 +158,57 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
     dedValues = comp.deductionValues;
   }
 
-  const earnings: { label: string; val: number | null }[] = [];
-  const deductions: { label: string; val: number | null }[] = [];
+  const rawEarnings: { label: string; val: number }[] = [];
+  if (Array.isArray(addHeads) && addHeads.some(h => h && h.trim())) {
+    addHeads.forEach((h, i) => {
+      if (h && h.trim()) rawEarnings.push({ label: h, val: addValues[i] ?? 0 });
+    });
+  } else {
+    rawEarnings.push(
+      { label: 'Basic', val: basic },
+      { label: 'HRA', val: hra },
+      { label: 'Medical Allowance', val: medical },
+      { label: 'TA', val: ta },
+      { label: 'LTA', val: lta },
+      { label: 'Special Allowance', val: specialAllowance }
+    );
+  }
+  rawEarnings.push(
+    { label: 'Overtime', val: c.overtime ?? 0 },
+    { label: 'Reimbursement', val: c.reimbursement ?? 0 },
+    { label: 'Incentives', val: c.incentives ?? 0 }
+  );
 
-  for (let i = 0; i < 10; i++) {
-    const addName = addHeads[i]?.trim();
-    if (addName) {
-      earnings.push({ label: addName, val: addValues?.[i] ?? null });
-    } else {
-      earnings.push({ label: '', val: null });
-    }
-
-    const dedName = dedHeads[i]?.trim();
-    if (dedName) {
-      deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
-    } else {
-      deductions.push({ label: '', val: null });
-    }
+  const rawDeductions: { label: string; val: number }[] = [];
+  if (Array.isArray(dedHeads) && dedHeads.some(h => h && h.trim())) {
+    dedHeads.forEach((h, i) => {
+      if (h && h.trim()) rawDeductions.push({ label: h, val: dedValues[i] ?? 0 });
+    });
+    const hasTds = dedHeads.some(h => h && h.trim().toLowerCase() === 'tds');
+    const hasOther = dedHeads.some(h => h && ['other deductions', 'advance salary adjut'].includes(h.trim().toLowerCase()));
+    const finalOtherDed = record.deduction ?? otherDeductions;
+    if (!hasTds && c.tds) rawDeductions.push({ label: 'TDS', val: c.tds });
+    if (!hasOther && finalOtherDed) rawDeductions.push({ label: 'Other Deductions', val: finalOtherDed });
+  } else {
+    rawDeductions.push(
+      { label: 'PF Employee', val: pfEmployee },
+      { label: 'PF Employer', val: pfEmployer },
+      { label: 'ESI', val: esi },
+      { label: 'PT', val: pt },
+      { label: 'Other Deductions', val: record.deduction ?? otherDeductions }
+    );
   }
 
-  const postNetEarnings = [];
-  if (record.components?.reimbursement) postNetEarnings.push({ label: 'Travel Allowance', val: record.components.reimbursement });
-  if (record.components?.overtime) postNetEarnings.push({ label: 'Overtime', val: record.components.overtime });
-  if (record.components?.incentives) postNetEarnings.push({ label: 'Incentives', val: record.components.incentives });
+  const maxSlipRows = Math.max(rawEarnings.length, rawDeductions.length, 5);
+  
+  const earnings: { label: string; val: number | null }[] = [...rawEarnings];
+  const deductions: { label: string; val: number | null }[] = [...rawDeductions];
+  
+  while (earnings.length < maxSlipRows) earnings.push({ label: '', val: null });
+  while (deductions.length < maxSlipRows) deductions.push({ label: '', val: null });
 
-  earnings.push(...postNetEarnings);
-
-  let maxSlipRows = 0;
-  for (let i = 0; i < Math.max(earnings.length, deductions.length); i++) {
-    if (earnings[i]?.label || deductions[i]?.label) {
-      maxSlipRows = i + 1;
-    }
-  }
-  if (maxSlipRows === 0) maxSlipRows = Math.max(10, earnings.length);
-
-  const finalTotalDeductions = Array.isArray(record.deductionValues)
-    ? record.deductionValues.reduce((a, b) => a + b, 0)
-    : totalDeductions;
-  const finalTotalCtc = Array.isArray(record.additionValues)
-    ? record.additionValues.reduce((a, b) => a + b, 0)
-    : totalCtc;
+  const finalTotalCtc = rawEarnings.reduce((a, b) => a + b.val, 0);
+  const finalTotalDeductions = rawDeductions.reduce((a, b) => a + b.val, 0);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0" id="salary-slip-overlay">
@@ -217,13 +229,11 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
             )}
           </div>
         </div>
-        <div className="p-8 font-sans text-gray-900 leading-normal">
+        <div className="p-8 font-sans text-gray-900 leading-normal print:[&_*]:text-black">
           {/* Header Banner */}
           <div className="text-center mb-4 relative pb-4 border-b border-gray-200">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <svg className="w-6 h-6 text-varistor-lime" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+            <div className="flex flex-col items-center justify-center gap-2 mb-1">
+              <img src={logoUrl} alt="Varistor Logo" className="h-12 object-contain" />
               <h1 className="text-2xl font-bold tracking-tight text-gray-900">Varistor Technologies Pvt. Ltd.</h1>
             </div>
             <p className="text-[11px] text-gray-500">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
@@ -295,11 +305,11 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
           <div className="grid grid-cols-2 border border-gray-300 rounded overflow-hidden text-sm font-bold divide-x divide-gray-300 mb-4">
             <div className="bg-green-50 p-3 flex justify-between items-center">
               <span className="text-gray-700">Final Pay [In-Hand]</span>
-              <span className="text-xl text-varistor-limeText font-black">{fmt((record.finalPay ?? record.netPay) - (record.deduction ?? 0))}</span>
+              <span className="text-xl text-varistor-limeText font-black">{fmt(finalPay)}</span>
             </div>
             <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
-              {record.deduction && record.deduction > 0 && (
-                <span className="text-[10px] text-gray-400 mb-1">Net Pay: {fmt(record.netPay)} | Deduction: {fmt(record.deduction)}</span>
+              {finalTotalDeductions > 0 && (
+                <span className="text-[10px] text-gray-400 mb-1">Total Earnings: {fmt(finalTotalCtc)} | Total Deductions: {fmt(finalTotalDeductions)}</span>
               )}
               <span>{netPayWords}</span>
             </div>
@@ -318,17 +328,6 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
 
 type SendStep = 'idle' | 'preview' | 'sending' | 'done';
 
-function convertMonthToYYYYMM(monthStr: string): string {
-  const parts = monthStr.split(' ');
-  if (parts.length !== 2) return new Date().toISOString().slice(0, 7);
-  const [monStr, yearStr] = parts;
-  const monthMap: Record<string, string> = {
-    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
-  };
-  const monVal = monthMap[monStr.toLowerCase().slice(0, 3)] || '01';
-  return `${yearStr}-${monVal}`;
-}
 
 interface ExcelUploadPanelProps {
   onClose: () => void;
@@ -344,122 +343,6 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleCalculateFromAttendance = async () => {
-    setParseError('');
-    try {
-      const emps = await getEmployees();
-      const payrollRecords = await getPayrollRecords();
-      const apiMonth = convertMonthToYYYYMM(MONTH);
-      const attendanceReport = await getMonthlyReport(apiMonth);
-
-      const parsed: SlipRow[] = [];
-      attendanceReport.forEach(att => {
-        const emp = emps.find(e => e.employeeId === att.employee_id);
-        const email = emp?.personalEmail || `${att.employee_id.toLowerCase()}@varistor.in`;
-        const payRec = payrollRecords.find(r => r.employeeId === att.employee_id);
-
-        const monthlySalary = payRec?.monthlySalary ?? 30000;
-        const ctc = payRec?.ctc ?? monthlySalary;
-        const pfUan = payRec?.pfUan || '—';
-        const clBalance = payRec?.clBalance ?? 0;
-        const designation = payRec?.designation || 'EMPLOYEE';
-
-        const totalDays = getDaysInMonth(MONTH);
-        const payDaysRaw = att.present + att.late + (att.halfDay * 0.5) + att.weekOff + att.holidays + att.leaves;
-        const payDays = Math.min(payDaysRaw, totalDays);
-
-        const medical = payRec?.components?.medical ?? 1250;
-        const ta = payRec?.components?.ta ?? 2500;
-        const lta = payRec?.components?.lta ?? 3500;
-
-        const reimbursement = payRec?.components?.reimbursement ?? 0;
-        const incentives = payRec?.components?.incentives ?? 0;
-        const overtime = payRec?.components?.overtime ?? 0;
-        const tds = payRec?.components?.tds ?? 0;
-        const otherDeductions = payRec?.components?.otherDeductions ?? 0;
-
-        const attendanceBreakdown = {
-          present: att.present || 0,
-          weekOff: att.weekOff || 0,
-          leaves: att.leaves || 0,
-          holidays: att.holidays || 0,
-          absent: att.absent || 0
-        };
-
-        const clBal = clBalances[att.employee_id] ?? { total: 12, used: 0 };
-        const lopDays = computeLopDays(clBal);
-
-        const comp = computeNet({
-          monthlySalary,
-          totalDays,
-          payDays,
-          medical,
-          ta,
-          lta,
-          reimbursement,
-          incentives,
-          overtime,
-          tds,
-          otherDeductions,
-          employeeId: att.employee_id,
-          attendanceBreakdown,
-          lopDays,
-          hasPf: payRec?.hasPf,
-          hasEsi: payRec?.hasEsi,
-          hasPt: payRec?.hasPt,
-        });
-
-        parsed.push({
-          name: att.employeeName,
-          email,
-          employeeId: att.employee_id,
-          department: att.department,
-          designation,
-          month: MONTH,
-          monthlySalary,
-          totalDays,
-          payDays,
-          clBalance,
-          pfUan,
-          medical: comp.medical,
-          ta: comp.ta,
-          lta: comp.lta,
-          reimbursement: comp.reimbursement,
-          incentives: comp.incentives,
-          overtime: comp.overtime,
-          tds: comp.tds,
-          otherDeductions: comp.otherDeductions,
-          basic: comp.basic,
-          hra: comp.hra,
-          specialAllowance: comp.specialAllowance,
-          pfEmployee: comp.pfEmployee,
-          pfEmployer: comp.pfEmployer,
-          esi: comp.esi,
-          pt: comp.pt,
-          ctc,
-          deductions: comp.totalDeductions,
-          netPay: comp.netPay,
-          finalPay: comp.finalPay,
-          additionHeads: comp.additionHeads,
-          deductionHeads: comp.deductionHeads,
-          additionValues: comp.additionValues,
-          deductionValues: comp.deductionValues,
-          deduction: payRec?.deduction ?? 0,
-        });
-      });
-
-      if (parsed.length === 0) {
-        setParseError('No employees found in the attendance report.');
-        return;
-      }
-
-      setRows(parsed);
-      setFileName(`Attendance Tab data (${MONTH})`);
-      setStep('preview');
-    } catch (err) {
-      setParseError(`Failed to fetch attendance data: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
 
   // Dynamically load xlsx from CDN if not already available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -719,18 +602,6 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
               <p className="text-xs text-varistor-muted mt-1">or click to browse · .xlsx / .xls / .csv</p>
             </div>
 
-            <div className="flex items-center my-5">
-              <div className="flex-1 border-t border-varistor-border"></div>
-              <span className="px-3 text-[10px] text-varistor-muted uppercase tracking-wider font-bold">Or calculate automatically</span>
-              <div className="flex-1 border-t border-varistor-border"></div>
-            </div>
-
-            <button
-              onClick={handleCalculateFromAttendance}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border-2 border-varistor-lime text-varistor-limeText hover:bg-varistor-limeLight font-bold text-xs rounded-xl transition-all shadow-sm hover:shadow-md"
-            >
-              <Clock size={14} className="text-varistor-lime" /> Load Days Present from Attendance Tab
-            </button>
 
             {/* Column guide */}
             <div className="mt-5 p-4 bg-varistor-pageBg rounded-lg border border-varistor-border">
@@ -2085,6 +1956,18 @@ const SalaryEngine: React.FC = () => {
     }
   };
 
+  const handleComponentChange = async (id: string, field: 'overtime' | 'reimbursement' | 'incentives', value: string) => {
+    const val = parseInt(value.replace(/,/g, ''), 10) || 0;
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    const updated = await updatePayrollRecord(id, { autoFormula: true, components: { ...rec.components, [field]: val } });
+    if (updated) {
+      const next = records.map(r => r.id === id ? updated : r);
+      setRecords(next);
+      await syncPayrollToServer(next);
+    }
+  };
+
   const handleDeductionChange = async (id: string, value: string) => {
     const deduction = parseInt(value.replace(/,/g, ''), 10);
     if (isNaN(deduction) || deduction < 0) return;
@@ -2095,43 +1978,6 @@ const SalaryEngine: React.FC = () => {
       await syncPayrollToServer(next);
     }
   };
-
-  const handleComponentChange = async (id: string, field: 'basic' | 'hra' | 'reimbursement' | 'overtime', value: string) => {
-    const val = parseInt(value.replace(/,/g, ''), 10);
-    if (isNaN(val) || val < 0) return;
-    const rec = records.find(r => r.id === id);
-    if (!rec) return;
-    const updated = await updatePayrollRecord(id, {
-      components: {
-        ...rec.components,
-        [field]: val
-      }
-    });
-    if (updated) {
-      const next = records.map(r => r.id === id ? updated : r);
-      setRecords(next);
-      await syncPayrollToServer(next);
-    }
-  };
-
-  const handleToggleFlag = async (id: string, flag: 'hasPf' | 'hasEsi' | 'hasPt', value: boolean) => {
-    const updated = await updatePayrollRecord(id, { [flag]: value });
-    if (updated) {
-      const next = records.map(r => r.id === id ? updated : r);
-      setRecords(next);
-      await syncPayrollToServer(next);
-    }
-  };
-
-  const handleCLBalanceChange = async (employeeId: string, value: string) => {
-    const total = parseInt(value, 10);
-    if (isNaN(total) || total < 0) return;
-    const updated = await updateClBalance(employeeId, total);
-    setClBalances(prev => ({ ...prev, [employeeId]: updated }));
-    // Re-sync load to reflect changes
-    await load();
-  };
-
   const handleApprove = async () => {
     const draftSelected = [...selectedIds].filter(id => records.find(r => r.id === id)?.status === 'draft');
     if (!draftSelected.length) return;
@@ -2376,21 +2222,25 @@ const SalaryEngine: React.FC = () => {
                       </th>
                       {[
                         { key: 'employeeName', label: 'Employee' },
-                        { key: 'department', label: 'Dept' },
+                        { key: 'designation', label: 'Designation' },
                         { key: 'ctc', label: 'Monthly CTC' },
-                        { key: null, label: 'CL Balance' },
-                        { key: null, label: 'LOP' },
+                        { key: null, label: 'Gross Payable' },
                         { key: null, label: 'Basic' },
                         { key: null, label: 'HRA' },
+                        { key: null, label: 'Medical' },
+                        { key: null, label: 'TA' },
+                        { key: null, label: 'LTA' },
                         { key: null, label: 'Special Allowance' },
-                        { key: null, label: 'Net Pay' },
-                        { key: null, label: 'Travel Allowance' },
                         { key: null, label: 'Overtime' },
-                        { key: null, label: 'Deductions' },
-                        { key: null, label: 'Final Pay' },
-                        { key: null, label: 'PF' },
+                        { key: null, label: 'Reimbursement' },
+                        { key: null, label: 'Incentives' },
+                        { key: null, label: 'PF Employee' },
+                        { key: null, label: 'PF Employer' },
                         { key: null, label: 'ESI' },
                         { key: null, label: 'PT' },
+                        { key: 'deduction', label: 'Other Deductions' },
+                        { key: null, label: 'Total Deductions' },
+                        { key: null, label: 'Final Pay' },
                         { key: 'status', label: 'Status' },
                         { key: null, label: 'Actions' },
                       ].map((col, i) => (
@@ -2411,8 +2261,6 @@ const SalaryEngine: React.FC = () => {
                     {visible.map(rec => {
                       const isSelected = selectedIds.has(rec.id);
                       const isApproved = rec.status === 'approved';
-                      const clBal = clBalances[rec.employeeId] ?? { total: 12, used: 0 };
-                      const lopDays = computeLopDays(clBal);
                       return (
                         <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
                           <td className="px-4 py-3">
@@ -2428,7 +2276,7 @@ const SalaryEngine: React.FC = () => {
                             <div className="font-semibold text-varistor-dark">{rec.employeeName}</div>
                             <div className="text-[11px] text-varistor-muted">{rec.employeeId}</div>
                           </td>
-                          <td className="px-4 py-3 text-varistor-muted">{rec.department}</td>
+                          <td className="px-4 py-3 text-varistor-muted">{rec.designation}</td>
                           {/* Monthly CTC */}
                           <td className="px-4 py-3">
                             {isAdmin && !isApproved ? (
@@ -2445,77 +2293,47 @@ const SalaryEngine: React.FC = () => {
                               <span className="font-mono text-xs">{fmt(rec.ctc)}</span>
                             )}
                           </td>
-                          {/* CL Balance */}
-                          <td className="px-4 py-3">
-                            {isAdmin ? (
-                              <div className="flex flex-col gap-0.5">
-                                <input
-                                  type="number"
-                                  defaultValue={clBal.total}
-                                  onBlur={e => handleCLBalanceChange(rec.employeeId, e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') e.currentTarget.blur();
-                                  }}
-                                  min={0}
-                                  className="w-14 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                                  title="Total CL days entitlement"
-                                />
-                                <span className="text-[10px] text-varistor-muted">{clBal.used} used</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs font-mono">{clBal.total - clBal.used} / {clBal.total}</span>
-                            )}
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono font-semibold text-varistor-dark">
+                            {fmt(rec.netPay)}
                           </td>
-                          {/* LOP Days */}
-                          <td className="px-4 py-3 text-center">
-                            {lopDays > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[11px] font-bold rounded border border-red-200">
-                                -{lopDays}d
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-300">—</span>
-                            )}
-                          </td>
-                          {(['basic', 'hra'] as const).map(f => (
+                          {(['basic', 'hra', 'medical', 'ta', 'lta'] as const).map(f => (
                             <td key={f} className="px-4 py-3">
-                              <span className="font-mono text-xs text-varistor-muted" title="Auto-calculated from CTC">{fmt(rec.components[f])}</span>
+                              <span className="font-mono text-xs text-varistor-muted" title={`Auto-calculated: ${f.toUpperCase()}`}>{fmt(rec.components[f])}</span>
                             </td>
                           ))}
                           <td className="px-4 py-3">
-                            <span className="font-mono text-xs text-varistor-muted" title="Balancing amount to make Gross equal CTC">
+                            <span className="font-mono text-xs text-varistor-muted" title="Balancing amount">
                               {fmt(rec.components.specialAllowance ?? 0)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">{fmt(rec.finalPay ?? rec.netPay)}</td>
-                          <td className="px-4 py-3">
-                            {isAdmin && !isApproved ? (
-                              <input
-                                type="number"
-                                defaultValue={rec.components.reimbursement ?? 0}
-                                onBlur={e => handleComponentChange(rec.id, 'reimbursement', e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') e.currentTarget.blur();
-                                }}
-                                className="w-16 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                              />
-                            ) : (
-                              <span className="font-mono text-xs">{fmt(rec.components.reimbursement ?? 0)}</span>
-                            )}
+                          {(['overtime', 'reimbursement', 'incentives'] as const).map(f => (
+                            <td key={f} className="px-4 py-3">
+                              {isAdmin && !isApproved ? (
+                                <input
+                                  type="number"
+                                  defaultValue={rec.components[f] ?? 0}
+                                  onBlur={e => handleComponentChange(rec.id, f, e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                  }}
+                                  className="w-20 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                                />
+                              ) : (
+                                <span className="font-mono text-xs">{fmt(rec.components[f] ?? 0)}</span>
+                              )}
+                            </td>
+                          ))}
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">
+                            {fmt(rec.components.pfEmployee ?? 0)}
                           </td>
-                          <td className="px-4 py-3">
-                            {isAdmin && !isApproved ? (
-                              <input
-                                type="number"
-                                defaultValue={rec.components.overtime ?? 0}
-                                onBlur={e => handleComponentChange(rec.id, 'overtime', e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') e.currentTarget.blur();
-                                }}
-                                className="w-16 border border-varistor-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-varistor-lime"
-                              />
-                            ) : (
-                              <span className="font-mono text-xs">{fmt(rec.components.overtime ?? 0)}</span>
-                            )}
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">
+                            {fmt(rec.components.pfEmployer ?? 0)}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">
+                            {fmt(rec.components.esi ?? 0)}
+                          </td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-varistor-dark">
+                            {fmt(rec.components.pt ?? 0)}
                           </td>
                           <td className="px-4 py-3">
                             {isAdmin && !isApproved ? (
@@ -2532,53 +2350,11 @@ const SalaryEngine: React.FC = () => {
                               <span className="font-mono text-xs">{fmt(rec.deduction ?? 0)}</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-red-600">
+                            {fmt((rec.components.pfEmployee ?? 0) + (rec.components.pfEmployer ?? 0) + (rec.components.esi ?? 0) + (rec.components.pt ?? 0) + (rec.deduction ?? 0))}
+                          </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-varistor-limeText">
-                            {fmt((rec.finalPay ?? rec.netPay) - (rec.deduction ?? 0))}
-                          </td>
-                          {/* PF checkbox */}
-                          <td className="px-4 py-3 text-center">
-                            {isAdmin && !isApproved ? (
-                              <input
-                                type="checkbox"
-                                checked={rec.hasPf}
-                                onChange={(e) => handleToggleFlag(rec.id, 'hasPf', e.target.checked)}
-                                title={rec.hasPf ? 'PF applied — uncheck to disable' : 'PF disabled — check to enable'}
-                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                              />
-                            ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasPf ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                                }`}>{rec.hasPf ? 'On' : 'Off'}</span>
-                            )}
-                          </td>
-                          {/* ESI checkbox */}
-                          <td className="px-4 py-3 text-center">
-                            {isAdmin && !isApproved ? (
-                              <input
-                                type="checkbox"
-                                checked={rec.hasEsi}
-                                onChange={(e) => handleToggleFlag(rec.id, 'hasEsi', e.target.checked)}
-                                title={rec.hasEsi ? 'ESI applied — uncheck to disable' : 'ESI disabled — check to enable'}
-                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                              />
-                            ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasEsi ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                                }`}>{rec.hasEsi ? 'On' : 'Off'}</span>
-                            )}
-                          </td>
-                          {/* PT checkbox */}
-                          <td className="px-4 py-3 text-center">
-                            {isAdmin && !isApproved ? (
-                              <input
-                                type="checkbox"
-                                checked={rec.hasPt}
-                                onChange={(e) => handleToggleFlag(rec.id, 'hasPt', e.target.checked)}
-                                title={rec.hasPt ? 'PT applied — uncheck to disable' : 'PT disabled — check to enable'}
-                                className="w-4 h-4 rounded border-gray-300 text-varistor-lime focus:ring-varistor-lime/50 cursor-pointer"
-                              />
-                            ) : (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${rec.hasPt ? 'bg-varistor-limeTint text-varistor-limeText' : 'bg-gray-100 text-gray-400'
-                                }`}>{rec.hasPt ? 'On' : 'Off'}</span>
-                            )}
+                            {fmt(rec.finalPay ?? 0)}
                           </td>
                           <td className="px-4 py-3">
                             {isApproved ? (
@@ -2620,7 +2396,7 @@ const SalaryEngine: React.FC = () => {
 // ─── Employee Salary Slip Card (Inline View) ──────────────────────────────────
 
 const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
-  const finalPay = (record.finalPay ?? record.netPay) - (record.deduction ?? 0);
+  const finalPay = record.finalPay ?? 0;
   const netPayWords = numberToWords(finalPay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2636,81 +2412,46 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   const pfEmployer = c.pfEmployer ?? 0;
   const esi = c.esi ?? 0;
   const pt = c.pt ?? 0;
-  const tds = c.tds ?? 0;
-  const otherDeductions = c.otherDeductions ?? 0;
+  const otherDeductions = record.deduction ?? 0;
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + otherDeductions;
 
-  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
-  const totalCtc = basic + hra + medical + ta + lta + specialAllowance;
+  const rawEarnings: { label: string; val: number }[] = [
+    { label: 'Basic', val: basic },
+    { label: 'HRA', val: hra },
+    { label: 'Medical Allowance', val: medical },
+    { label: 'TA', val: ta },
+    { label: 'LTA', val: lta },
+    { label: 'Special Allowance', val: specialAllowance },
+    { label: 'Overtime', val: c.overtime ?? 0 },
+    { label: 'Reimbursement', val: c.reimbursement ?? 0 },
+    { label: 'Incentives', val: c.incentives ?? 0 },
+  ];
 
-  let addHeads = record.additionHeads;
-  let dedHeads = record.deductionHeads;
-  let addValues = record.additionValues;
-  let dedValues = record.deductionValues;
+  const rawDeductions: { label: string; val: number }[] = [
+    { label: 'PF Employee', val: pfEmployee },
+    { label: 'PF Employer', val: pfEmployer },
+    { label: 'ESI', val: esi },
+    { label: 'PT', val: pt },
+    { label: 'Other Deductions', val: otherDeductions },
+  ];
 
-  if (!addHeads || addHeads.length === 0 || !dedHeads || dedHeads.length === 0) {
-    const clBal = clBalances[record.employeeId] ?? { total: 12, used: 0 };
-    const lopDays = computeLopDays(clBal);
+  const maxSlipRows = Math.max(rawEarnings.length, rawDeductions.length, 5);
+  
+  const earnings: { label: string; val: number | null }[] = [...rawEarnings];
+  const deductions: { label: string; val: number | null }[] = [...rawDeductions];
+  
+  while (earnings.length < maxSlipRows) earnings.push({ label: '', val: null });
+  while (deductions.length < maxSlipRows) deductions.push({ label: '', val: null });
 
-    const comp = computeNet({
-      monthlySalary: record.monthlySalary ?? record.ctc ?? 0,
-      monthlyCtc: record.ctc,
-      totalDays: record.totalDays,
-      payDays: record.payDays,
-      lopDays: lopDays,
-      medical: c.medical,
-      ta: c.ta,
-      lta: c.lta,
-      reimbursement: c.reimbursement,
-      incentives: c.incentives,
-      overtime: c.overtime,
-      tds: c.tds,
-      otherDeductions: c.otherDeductions,
-      employeeId: record.employeeId,
-      attendanceBreakdown: record.attendanceBreakdown,
-      hasPf: record.hasPf,
-      hasEsi: record.hasEsi,
-      hasPt: record.hasPt,
-    });
-    addHeads = comp.additionHeads;
-    dedHeads = comp.deductionHeads;
-    addValues = comp.additionValues;
-    dedValues = comp.deductionValues;
-  }
-
-  const earnings: { label: string; val: number | null }[] = [];
-  const deductions: { label: string; val: number | null }[] = [];
-
-  for (let i = 0; i < 10; i++) {
-    const addName = addHeads[i]?.trim();
-    earnings.push({ label: addName || '', val: addName ? (addValues?.[i] ?? null) : null });
-
-    const dedName = dedHeads[i]?.trim();
-    deductions.push({ label: dedName || '', val: dedName ? (dedValues?.[i] ?? null) : null });
-  }
-
-  let maxSlipRows = 0;
-  for (let i = 0; i < 10; i++) {
-    if (earnings[i]?.label || deductions[i]?.label) {
-      maxSlipRows = i + 1;
-    }
-  }
-  if (maxSlipRows === 0) maxSlipRows = 10;
-
-  const finalTotalDeductions = Array.isArray(record.deductionValues)
-    ? record.deductionValues.reduce((a, b) => a + b, 0)
-    : totalDeductions;
-  const finalTotalCtc = Array.isArray(record.additionValues)
-    ? record.additionValues.reduce((a, b) => a + b, 0)
-    : totalCtc;
+  const finalTotalCtc = rawEarnings.reduce((a, b) => a + b.val, 0);
+  const finalTotalDeductions = rawDeductions.reduce((a, b) => a + b.val, 0);
 
   return (
-    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 md:p-8 font-sans text-gray-900 leading-normal mb-6">
+    <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 md:p-8 font-sans text-gray-900 leading-normal mb-6 print:hidden">
       {/* Header Banner */}
       <div className="text-center mb-4 relative pb-4 border-b border-gray-200">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <svg className="w-6 h-6 text-varistor-lime" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="flex flex-col items-center justify-center gap-2 mb-1">
+          <img src={logoUrl} alt="Varistor Logo" className="h-12 object-contain" />
           <h2 className="text-xl font-bold tracking-tight text-gray-900">Varistor Technologies Pvt. Ltd.</h2>
         </div>
         <p className="text-[10px] text-gray-500">No. F-1107, Block-1, First Floor Ardente Office One, Hoodi Circle, ITPL Main Rd, Bengaluru, Karnataka 560048</p>
@@ -2785,8 +2526,8 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
           <span className="text-lg text-varistor-limeText font-black">{fmt(finalPay)}</span>
         </div>
         <div className="bg-gray-50 p-3 flex flex-col items-center justify-center text-center text-xs text-gray-700 leading-tight">
-          {record.deduction && record.deduction > 0 && (
-            <span className="text-[10px] text-gray-400 mb-1">Net Pay: {fmt(record.netPay)} | Deduction: {fmt(record.deduction)}</span>
+          {totalDeductions > 0 && (
+            <span className="text-[10px] text-gray-400 mb-1">Total Earnings: {fmt(finalTotalCtc)} | Total Deductions: {fmt(finalTotalDeductions)}</span>
           )}
           <span>{netPayWords}</span>
         </div>
