@@ -15,6 +15,7 @@
  *  - Approved rows locked via DB trigger
  */
 import { getEmployees } from './employees';
+import { getMonthlyReport } from './attendance';
 
 
 
@@ -77,6 +78,8 @@ export interface PayrollRecord {
     absent: number;
   };
   deduction?: number;
+  lopDays?: number;
+  lopDeduction?: number;
 }
 
 export interface PayrollAuditEntry {
@@ -497,9 +500,9 @@ export function computeNet(params: {
   }
 
   // 7. LOP deduction
-  const lopDays = Math.max(0, params.lopDays ?? 0);
-  const dailyRate = Math.round(monthlySalary / totalDays);
-  const lopDeduction = lopDays * dailyRate;
+  const lopDays = Math.max(0, params.lopDays ?? params.attendanceBreakdown?.absent ?? 0);
+  const dailyRate = monthlySalary / totalDays;
+  const lopDeduction = Math.round(lopDays * dailyRate);
 
   if (lopDeduction > 0) {
     const emptyIdx = dedHeads.findIndex(h => !h || h.trim() === '');
@@ -760,6 +763,13 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     const targetMonth = 'Jun 2026';
     let modified = false;
 
+    let attendanceReports: any[] = [];
+    try {
+      attendanceReports = await getMonthlyReport('2026-06');
+    } catch (e) {
+      console.warn('Could not fetch attendance reports for payroll', e);
+    }
+
     // Sync existing unapproved records with latest employee opt-out settings
     _records = _records.map(r => {
       if (r.status === 'approved') return r;
@@ -768,7 +778,16 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
         const expectedHasPf = !emp.optOutPF;
         const expectedHasPt = !emp.optOutPT;
         const expectedUan = emp.uanNumber || '—';
-        if (r.hasPf !== expectedHasPf || r.hasPt !== expectedHasPt || r.pfUan !== expectedUan) {
+        const attendance = attendanceReports.find(a => a.employee_id === emp.employeeId || a.id === emp.employeeId);
+        const latestAttendanceBreakdown = attendance ? {
+          present: attendance.present || 0,
+          weekOff: attendance.weekOff || 0,
+          leaves: attendance.leaves || 0,
+          holidays: attendance.holidays || 0,
+          absent: attendance.absent || 0,
+        } : r.attendanceBreakdown;
+
+        if (r.hasPf !== expectedHasPf || r.hasPt !== expectedHasPt || r.pfUan !== expectedUan || JSON.stringify(r.attendanceBreakdown) !== JSON.stringify(latestAttendanceBreakdown)) {
           modified = true;
           const comp = computeNet({
             monthlySalary: r.monthlySalary,
@@ -787,13 +806,14 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
             hasEsi: r.hasEsi,
             hasPt: expectedHasPt,
             employeeId: r.employeeId,
-            attendanceBreakdown: r.attendanceBreakdown,
+            attendanceBreakdown: latestAttendanceBreakdown,
           });
           return {
             ...r,
             hasPf: expectedHasPf,
             hasPt: expectedHasPt,
             pfUan: expectedUan,
+            attendanceBreakdown: latestAttendanceBreakdown,
             additionHeads: comp.additionHeads,
             deductionHeads: comp.deductionHeads,
             additionValues: comp.additionValues,
@@ -819,6 +839,15 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     for (const emp of employees) {
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
       if (!exists) {
+        const attendance = attendanceReports.find(a => a.employee_id === emp.employeeId || a.id === emp.employeeId);
+        const newAttendanceBreakdown = attendance ? {
+          present: attendance.present || 0,
+          weekOff: attendance.weekOff || 0,
+          leaves: attendance.leaves || 0,
+          holidays: attendance.holidays || 0,
+          absent: attendance.absent || 0,
+        } : undefined;
+
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
@@ -836,6 +865,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           hasEsi: true,
           hasPt: !emp.optOutPT,
           employeeId: emp.employeeId,
+          attendanceBreakdown: newAttendanceBreakdown,
         });
 
         const newRec: PayrollRecord = {
@@ -881,6 +911,9 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           deductionHeads: comp.deductionHeads,
           additionValues: comp.additionValues,
           deductionValues: comp.deductionValues,
+          attendanceBreakdown: newAttendanceBreakdown,
+          lopDays: comp.lopDays,
+          lopDeduction: comp.lopDeduction,
         };
         _records.push(newRec);
         modified = true;
@@ -981,18 +1014,21 @@ export async function updatePayrollRecord(
     updated.deductionHeads = comp.deductionHeads;
     updated.additionValues = comp.additionValues;
     updated.deductionValues = comp.deductionValues;
+    updated.lopDays = comp.lopDays;
+    updated.lopDeduction = comp.lopDeduction;
   } else if (patch.components || patch.deduction !== undefined) {
     const c = updated.components;
     const monthlySalary = updated.monthlySalary ?? updated.ctc;
     const totalDays = updated.totalDays || 30;
-    const payDays = updated.payDays || 30;
-    const lopDays = Math.max(0, totalDays - payDays);
+    const lopDays = updated.lopDays ?? updated.attendanceBreakdown?.absent ?? 0;
     const lopDeduction = Math.round((monthlySalary / totalDays) * lopDays);
 
     const totalDeductionsExcludingLop = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + (updated.deduction ?? c.otherDeductions ?? 0);
     
     updated.netPay = monthlySalary - lopDeduction;
     updated.finalPay = updated.netPay - totalDeductionsExcludingLop + (c.reimbursement ?? 0) + (c.overtime ?? 0) + (c.incentives ?? 0);
+    updated.lopDays = lopDays;
+    updated.lopDeduction = lopDeduction;
   }
   _records[idx] = updated;
   savePayrollRecords(_records);
@@ -1241,7 +1277,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   reportRows.forEach(row => {
     const emp = employees.find(e => e.employeeId === row.employee_id || e.id === row.employee_id);
     const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
-    const lopDays = Math.max(0, clBal.used - clBal.total);
+    const lopDays = row.absent || 0;
 
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
@@ -1333,7 +1369,9 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
         incentives: comp.incentives,
         overtime: comp.overtime,
         otherDeductions: comp.otherDeductions,
-      }
+      },
+      lopDays: comp.lopDays,
+      lopDeduction: comp.lopDeduction,
     };
 
     if (existingIdx !== -1) {

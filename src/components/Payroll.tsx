@@ -120,7 +120,7 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const tds = c.tds ?? 0;
   const otherDeductions = c.otherDeductions ?? 0;
 
-  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions;
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions + (record.lopDeduction ?? 0);
   const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
 
   let addHeads = record.additionHeads;
@@ -2228,6 +2228,7 @@ const SalaryEngine: React.FC = () => {
                         { key: null, label: 'ESI' },
                         { key: null, label: 'PT' },
                         { key: 'deduction', label: 'Other Deductions' },
+                        { key: 'lopDeduction', label: 'Loss of Pay' },
                         { key: null, label: 'Total Deductions' },
                         { key: null, label: 'Final Pay' },
                         { key: 'status', label: 'Status' },
@@ -2339,8 +2340,14 @@ const SalaryEngine: React.FC = () => {
                               <span className="font-mono text-xs">{fmt(rec.deduction ?? 0)}</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 tabular-nums text-xs font-mono text-red-600 font-semibold">
+                            <div className="flex flex-col">
+                              <span>{fmt(rec.lopDeduction ?? 0)}</span>
+                              <span className="text-[10px] text-gray-400">({rec.lopDays ?? 0} {rec.lopDays === 1 ? 'day' : 'days'})</span>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-red-600">
-                            {fmt((rec.components.pfEmployee ?? 0) + (rec.components.pfEmployer ?? 0) + (rec.components.esi ?? 0) + (rec.components.pt ?? 0) + (rec.deduction ?? 0))}
+                            {fmt((rec.components.pfEmployee ?? 0) + (rec.components.pfEmployer ?? 0) + (rec.components.esi ?? 0) + (rec.components.pt ?? 0) + (rec.deduction ?? 0) + (rec.lopDeduction ?? 0))}
                           </td>
                           <td className="px-4 py-3 tabular-nums text-xs font-mono font-bold text-varistor-limeText">
                             {fmt(rec.finalPay ?? 0)}
@@ -2402,7 +2409,7 @@ const SalarySlipCard: React.FC<{ record: PayrollRecord }> = ({ record }) => {
   const esi = c.esi ?? 0;
   const pt = c.pt ?? 0;
   const otherDeductions = record.deduction ?? 0;
-  const totalDeductions = pfEmployee + pfEmployer + esi + pt + otherDeductions;
+  const totalDeductions = pfEmployee + pfEmployer + esi + pt + otherDeductions + (record.lopDeduction ?? 0);
 
   const rawEarnings: { label: string; val: number }[] = [
     { label: 'Basic', val: basic },
