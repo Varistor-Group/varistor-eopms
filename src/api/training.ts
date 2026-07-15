@@ -109,11 +109,7 @@ function writeSavedAnswers(data: Record<string, Record<string, number>>) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export const trainingApi = {
-  getCurrentUserId(): string {
-    return 'user-session'; // resolved from auth session in callers
-  },
-
-  async fetchModulesWithStatus(employeeId: string, role?: UserRole): Promise<TrainingModuleWithStatus[]> {
+  async fetchModulesWithStatus(employeeId: string, role?: UserRole, department?: string): Promise<TrainingModuleWithStatus[]> {
     const [{ data: modulesData }, { data: progressData }, { data: attemptsData }] = await Promise.all([
       supabase.from('training_modules').select('*').order('order', { ascending: true }),
       supabase.from('training_progress').select('*').eq('employee_id', employeeId),
@@ -127,7 +123,11 @@ export const trainingApi = {
     const isManager = role === 'HR' || role === 'Admin';
     const visible = !role || isManager
       ? allModules
-      : allModules.filter(m => !m.visibleToRoles || m.visibleToRoles.length === 0 || m.visibleToRoles.includes(role));
+      : allModules.filter(m => {
+          const roleOk = !m.visibleToRoles || m.visibleToRoles.length === 0 || m.visibleToRoles.includes(role);
+          const departmentOk = !m.department || m.department === department;
+          return roleOk && departmentOk;
+        });
     const visibleIds = new Set(visible.map(m => m.id));
 
     return visible.map(module => {
@@ -271,7 +271,7 @@ export const trainingApi = {
       video_url,
       order: parseInt((formData.get('order') as string) || '1', 10),
       prerequisite_id: (formData.get('prerequisite_id') as string) || null,
-      visible_to_roles: [] as string[],
+      visible_to_roles: JSON.parse((formData.get('visibleToRoles') as string) || '[]') as string[],
       is_seed: false,
     };
 

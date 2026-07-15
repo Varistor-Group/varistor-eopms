@@ -120,14 +120,15 @@ export const chatApi = {
   createChannel(name: string, allowedEmployeeIds?: string[], departments?: string[]): ChatChannel {
     const channels = loadChannelList();
     const newChannel: Omit<ChatChannel, 'memberCount'> = {
-      id,
-      name: trimmed,
+      id: slugify(name) + '-' + Math.random().toString(36).slice(2, 6),
+      name,
       allowedEmployeeIds: allowedEmployeeIds && allowedEmployeeIds.length > 0 ? allowedEmployeeIds : undefined,
       departments: departments && departments.length > 0 ? departments : undefined
     };
-    saveChannelList([...existing, newChannel]);
+    channels.push(newChannel);
+    saveChannelList(channels);
     notifyUpdated();
-
+    
     let count = mockEmployeeStore.length;
     if (newChannel.departments || newChannel.allowedEmployeeIds) {
       const matches = mockEmployeeStore.filter(e => {
@@ -138,6 +139,33 @@ export const chatApi = {
       count = matches.length;
     }
     return { ...newChannel, memberCount: count };
+  },
+
+  editChannel(channelId: string, name: string, allowedEmployeeIds?: string[], departments?: string[]): ChatChannel | null {
+    const channels = loadChannelList();
+    const index = channels.findIndex(c => c.id === channelId);
+    if (index === -1) return null;
+
+    channels[index] = {
+      ...channels[index],
+      name,
+      allowedEmployeeIds: allowedEmployeeIds && allowedEmployeeIds.length > 0 ? allowedEmployeeIds : undefined,
+      departments: departments && departments.length > 0 ? departments : undefined
+    };
+    saveChannelList(channels);
+    notifyUpdated();
+
+    const updatedChannel = channels[index];
+    let count = mockEmployeeStore.length;
+    if (updatedChannel.departments || updatedChannel.allowedEmployeeIds) {
+      const matches = mockEmployeeStore.filter(e => {
+        if (updatedChannel.departments && updatedChannel.departments.includes(e.department)) return true;
+        if (updatedChannel.allowedEmployeeIds && updatedChannel.allowedEmployeeIds.includes(e.id)) return true;
+        return false;
+      });
+      count = matches.length;
+    }
+    return { ...updatedChannel, memberCount: count };
   },
 
   async fetchMessages(channelId: ChannelId, selfName?: string): Promise<ChatMessage[]> {

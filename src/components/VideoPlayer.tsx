@@ -14,6 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { TrainingModuleWithStatus } from '../types';
 
 interface Props {
@@ -34,7 +35,8 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const employeeId = trainingApi.getCurrentUserId();
+  const { currentUser } = useVariPoints();
+  const employeeId = currentUser?.id ?? '';
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -56,10 +58,10 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const handleReady = () => {
     const saved = mod.progress?.watched_seconds ?? 0;
     if (saved > 0 && playerRef.current) {
-      const d = playerRef.current.getDuration();
-      setDuration(d || mod.duration_seconds);
+      const d = playerRef.current.duration;
+      setDuration(Number.isFinite(d) && d > 0 ? d : mod.duration_seconds);
       if (saved < d) {
-        playerRef.current.seekTo(saved, 'seconds');
+        playerRef.current.currentTime = saved;
         setCurrentTime(saved);
         setMaxReached(saved);
       }
@@ -81,7 +83,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   useEffect(() => {
     progressSaveTimer.current = setInterval(() => {
       if (playerRef.current && isPlaying) {
-        trainingApi.updateProgress(employeeId, mod.id, Math.floor(playerRef.current.getCurrentTime()));
+        trainingApi.updateProgress(employeeId, mod.id, Math.floor(playerRef.current.currentTime));
       }
     }, 5000);
     return () => {
@@ -90,11 +92,12 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   }, [isPlaying, employeeId, mod.id]);
 
 
-  const handleProgress = (state: { playedSeconds: number }) => {
-    const t = state.playedSeconds;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleTimeUpdate = (e: any) => {
+    const t = e.currentTarget?.currentTime ?? 0;
     setCurrentTime(t);
     setMaxReached(prev => Math.max(prev, t));
-    
+
     if (duration > 0 && t >= duration - 1) {
       handleVideoEnded();
     }
@@ -140,7 +143,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
     setIsDragging(true);
     if (playerRef.current) {
       const clampedTime = videoCompleted ? targetTime : Math.min(targetTime, maxReached);
-      playerRef.current.seekTo(clampedTime, 'seconds');
+      playerRef.current.currentTime = clampedTime;
       setCurrentTime(clampedTime);
     }
   };
@@ -152,7 +155,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
       const targetTime = calcSeekPosition(e);
       const clampedTime = videoCompleted ? targetTime : Math.min(targetTime, maxReached);
       if (playerRef.current) {
-        playerRef.current.seekTo(clampedTime, 'seconds');
+        playerRef.current.currentTime = clampedTime;
         setCurrentTime(clampedTime);
       }
     };
@@ -227,13 +230,14 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
         <div className="absolute inset-0 bg-black pointer-events-none">
           <Player
             ref={playerRef}
-            url={mod.video_url}
+            src={mod.video_url}
             width="100%"
             height="100%"
             playing={isPlaying}
             muted={isMuted}
-            onProgress={handleProgress}
-            onDuration={(d: number) => setDuration(d)}
+            onTimeUpdate={handleTimeUpdate}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onDurationChange={(e: any) => setDuration(e.currentTarget?.duration ?? 0)}
             onReady={handleReady}
             onEnded={handleVideoEnded}
             onPlay={() => setIsPlaying(true)}
@@ -242,9 +246,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
             playsInline
             style={{ pointerEvents: 'none' }}
             config={{
-              youtube: {
-                playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0 }
-              }
+              youtube: { disablekb: 1, rel: 0 }
             }}
           />
         </div>

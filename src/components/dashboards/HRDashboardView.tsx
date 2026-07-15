@@ -1,15 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Calendar, FileText, Megaphone, Camera, CheckCircle, Clock } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
-import { mockEmployeeStore } from '../../api/employees';
+import { getEmployees, type Employee } from '../../api/employees';
 import { getLeaveRequests } from '../../api/leaves';
 
 export const HRDashboardView: React.FC = () => {
   const { currentUser } = useVariPoints();
   const [editingAvatar, setEditingAvatar] = useState(false);
 
-  const employees = mockEmployeeStore;
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  React.useEffect(() => {
+    getEmployees().then(setEmployees);
+  }, []);
+
   const allLeaves = getLeaveRequests();
   const pendingLeaves = allLeaves.filter(l => l.status === 'Pending');
   const approvedThisMonth = allLeaves.filter(l => {
@@ -23,11 +29,34 @@ export const HRDashboardView: React.FC = () => {
   const totalHeadcount = employees.length;
   const activeCount = employees.filter(e => e.status === 'Active').length;
 
+  const isBirthday = () => {
+    const dob = currentUser?.dob;
+    if (!dob) return false;
+    const today = new Date();
+    const dobDate = new Date(dob);
+    return today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate();
+  };
+
+  useEffect(() => {
+    if (isBirthday()) {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#6366F1', '#84CC16', '#3b82f6', '#f59e0b', '#ec4899'],
+        zIndex: 9999
+      });
+    }
+  }, [currentUser?.dob]);
+
   const getGreeting = () => {
+    if (isBirthday()) {
+      return "Happy Birthday, ";
+    }
     const h = new Date().getHours();
-    if (h >= 5 && h < 12) return 'Good morning';
-    if (h >= 12 && h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h >= 5 && h < 12) return 'Good morning, ';
+    if (h >= 12 && h < 17) return 'Good afternoon, ';
+    return 'Good evening, ';
   };
 
   const statCards = [
@@ -64,12 +93,8 @@ export const HRDashboardView: React.FC = () => {
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-varistor-dark">
-              {getGreeting()}, {currentUser?.name ?? 'HR'}
-            </h1>
-            <p className="text-xs text-varistor-muted mt-0.5">
-              {currentUser?.department ?? 'Human Resources'} · HR Portal
-            </p>
+            <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()} {currentUser?.name ?? 'HR'}{isBirthday() ? '! 🎉' : ''}</h1>
+            <p className="text-xs text-varistor-muted mt-0.5">Human Resources · {currentUser?.role ?? 'HR'}</p>
           </div>
         </div>
         <div className="text-[11px] text-varistor-muted bg-white border border-varistor-border px-3 py-1.5 rounded-full shadow-sm font-semibold">

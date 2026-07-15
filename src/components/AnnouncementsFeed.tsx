@@ -39,7 +39,7 @@ export const AnnouncementsFeed: React.FC = () => {
 
   // Helper to format relative time
   const formatRelativeTime = (dateString: string) => {
-   
+  // eslint-disable-next-line react-hooks/purity
     const diffMs = Date.now() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);

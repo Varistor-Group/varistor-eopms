@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { QuizQuestion, QuizAttempt, TrainingModuleWithStatus } from '../types';
 
 interface Props {
@@ -115,7 +116,8 @@ function ScoreGauge({ score }: { score: number }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 const QuizScreen: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
-  const employeeId = trainingApi.getCurrentUserId();
+  const { currentUser } = useVariPoints();
+  const employeeId = currentUser?.id ?? '';
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);

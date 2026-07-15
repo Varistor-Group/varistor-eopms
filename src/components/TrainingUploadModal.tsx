@@ -4,6 +4,7 @@ import ReactPlayer from 'react-player';
 const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
+import { getDepartments } from '../api/employees';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';
 
 interface Props {
@@ -27,6 +28,14 @@ const emptyQuestion = (): QuestionDraft => ({
   correct_index: 0,
 });
 
+// Matches youtube.com/watch?v=, youtu.be/, youtube.com/embed/ and /shorts/ URLs.
+const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/;
+
+function extractYouTubeId(url: string): string | null {
+  const match = url.trim().match(YOUTUBE_ID_RE);
+  return match ? match[1] : null;
+}
+
 const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -42,6 +51,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const [durationError, setDurationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const departments = useMemo(() => getDepartments(), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,7 +62,10 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
     return null;
   }, [file, videoUrl]);
 
+  const youtubeId = useMemo(() => extractYouTubeId(videoUrl), [videoUrl]);
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDuration(null);
     setDurationError(null);
     return () => {
@@ -145,6 +158,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
       if (prerequisiteId) formData.append('prerequisite_id', prerequisiteId);
       formData.append('duration_seconds', String(Math.round(duration!)));
       formData.append('order', String(order));
+      if (youtubeId) formData.append('thumbnail_url', `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`);
       formData.append('visibleToRoles', JSON.stringify(everyone ? [] : selectedRoles));
       formData.append(
         'questions',
@@ -175,10 +189,13 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
       {videoSrc && (
         <div className="absolute opacity-0 pointer-events-none w-[1px] h-[1px] overflow-hidden z-[-1]">
           <Player
-            url={videoSrc}
+            src={videoSrc}
             playing={true}
-            muted={true}
-            onDuration={(d: number) => {
+            muted
+            playsInline
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onDurationChange={(e: any) => {
+              const d = e.currentTarget?.duration;
               if (Number.isFinite(d) && d > 0) {
                 setDuration(d);
                 setDurationError(null);
@@ -187,6 +204,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
               }
             }}
             onError={() => setDurationError('Could not load this video. Check the file or URL.')}
+            config={{ youtube: { disablekb: 1, rel: 0 } }}
           />
         </div>
       )}
@@ -226,7 +244,13 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
             </div>
             <div>
               <label className={labelCls}>Department <span className="normal-case font-normal">(optional)</span></label>
-              <input className={inputCls} value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Operations" disabled={track !== 'Department'} />
+              <select className={inputCls} value={department} onChange={e => setDepartment(e.target.value)} disabled={track !== 'Department'}>
+                <option value="">All departments</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              {track === 'Department' && department && (
+                <p className="mt-1.5 text-[10px] text-varistor-muted">Only employees in {department} will be able to access this module.</p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Prerequisite</label>
@@ -239,7 +263,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
 
           {/* Video source */}
           <div className="space-y-3">
-            <label className={labelCls}>Video (MP4 or Video Link, max 200 MB)</label>
+            <label className={labelCls}>Video (MP4 upload, or a YouTube / direct video link)</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -256,7 +280,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
               className={inputCls}
               value={videoUrl}
               onChange={e => handleUrlChange(e.target.value)}
-              placeholder="Paste a direct MP4 URL (not YouTube), e.g. https://…/video.mp4"
+              placeholder="Paste a YouTube link or a direct video URL, e.g. https://youtube.com/watch?v=… or https://…/video.mp4"
             />
 
             {/* Duration feedback */}
@@ -266,7 +290,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
                   <>
                     <CheckCircle size={12} strokeWidth={2} className="text-varistor-lime" />
                     <span className="text-varistor-successText font-medium">
-                      Duration detected: {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
+                      {youtubeId ? 'YouTube video linked' : 'Duration detected'}: {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
                     </span>
                   </>
                 ) : durationError ? (
@@ -277,7 +301,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
                 ) : (
                   <>
                     <Clock size={12} strokeWidth={1.5} className="text-varistor-muted" />
-                    <span className="text-varistor-muted">Detecting duration…</span>
+                    <span className="text-varistor-muted">{youtubeId ? 'Loading YouTube video…' : 'Detecting duration…'}</span>
                   </>
                 )}
               </div>

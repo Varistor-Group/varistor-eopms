@@ -1,15 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
-import { mockEmployeeStore } from '../api/employees';
+import { getEmployees, type Employee } from '../api/employees';
 import type { TaskPriority } from '../types';
 
 export const TaskManagement: React.FC = () => {
   const { currentRole, createTask, tasks, approveTask, rejectTask } = useKanbanTasks();
   const MOCK_MANAGER_ID = 'VAR-001'; // Simulated logged-in manager
 
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    getEmployees().then(setAllEmployees);
+  }, []);
+
   // Subordinates are anyone whose reportingManager is the current manager. Or if Admin/HR, everyone.
-  const subordinates = mockEmployeeStore.filter(emp => 
+  const subordinates = allEmployees.filter(emp => 
     (currentRole === 'Admin' || currentRole === 'HR') ? true : emp.reportingManager === MOCK_MANAGER_ID
   );
 
@@ -23,7 +29,15 @@ export const TaskManagement: React.FC = () => {
   const handleAssignTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description || !dueDate || !assigneeId) return;
-    createTask(title, description, dueDate, priority, assigneeId, checkpoints.filter(c => c.trim() !== ''));
+
+    if (assigneeId === 'ALL') {
+      subordinates.forEach(emp => {
+        createTask(title, description, dueDate, priority, emp.id, checkpoints.filter(c => c.trim() !== ''));
+      });
+    } else {
+      createTask(title, description, dueDate, priority, assigneeId, checkpoints.filter(c => c.trim() !== ''));
+    }
+
     setTitle('');
     setDescription('');
     setDueDate('');
@@ -44,12 +58,15 @@ export const TaskManagement: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Task Title</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime" />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
             </div>
             <div>
               <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Assignee</label>
-              <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime">
+              <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark">
                 <option value="" disabled>Select Employee</option>
+                {(currentRole === 'Admin' || currentRole === 'HR') && (
+                  <option value="ALL" className="font-bold text-[#5da00d]">-- Select All Employees --</option>
+                )}
                 {subordinates.map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.fullName}</option>
                 ))}
@@ -57,15 +74,15 @@ export const TaskManagement: React.FC = () => {
             </div>
             <div className="md:col-span-2">
               <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Description</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime" />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
             </div>
             <div>
               <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Due Date</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime" />
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
             </div>
             <div>
               <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Priority</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime">
+              <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark">
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>

@@ -84,7 +84,6 @@ export async function mockLogin(email: string, password: string): Promise<{ user
   };
 }
 
-
 // ─── Sign Out ─────────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
@@ -144,7 +143,7 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
       return { success: false, error: data.error || 'Failed to send reset link.' };
     }
     return { success: true, message: 'Reset link sent — check your inbox.' };
-  } catch {
+  } catch (err) {
     return { success: false, error: 'Could not reach the server. Make sure the backend is running.' };
   }
 }

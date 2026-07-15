@@ -1,31 +1,31 @@
 import React, { useState } from 'react';
 import { Megaphone, Users, Award, Calendar } from 'lucide-react';
-import { mockEmployeeStore } from '../../api/employees';
+import { getEmployees } from '../../api/employees';
 
 export const ManagerDashboardView: React.FC = () => {
   const MOCK_MANAGER_ID = 'VAR-001';
   
-  // Scoped to direct reports
-  const teamMembers = mockEmployeeStore.filter(emp => emp.reportingManager === MOCK_MANAGER_ID);
-  
-  // Mock data generation for demo purposes
-  const generateMockPerformance = () => {
-    return teamMembers.map(emp => ({
-      id: emp.id,
-      name: emp.fullName,
-      department: emp.department,
-      rating: Math.floor(Math.random() * 40) + 60, // 60-99
-      points: Math.floor(Math.random() * 1000) + 200,
-      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
-      status: emp.status
-    })).sort((a, b) => {
-      if (a.status === 'Active' && b.status === 'Inactive') return -1;
-      if (a.status === 'Inactive' && b.status === 'Active') return 1;
-      return b.points - a.points;
-    });
-  };
+  const [mockData, setMockData] = useState<any[]>([]);
 
-  const [mockData] = useState(generateMockPerformance());
+  React.useEffect(() => {
+    getEmployees().then(data => {
+      const teamMembers = data.filter(emp => emp.reportingManager === MOCK_MANAGER_ID);
+      const perfData = teamMembers.map(emp => ({
+        id: emp.id,
+        name: emp.fullName,
+        department: emp.department,
+        rating: Math.floor(Math.random() * 40) + 60, // 60-99
+        points: emp.variPoints || 0,
+        pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
+        status: emp.status
+      })).sort((a, b) => {
+        if (a.status === 'Active' && b.status === 'Inactive') return -1;
+        if (a.status === 'Inactive' && b.status === 'Active') return 1;
+        return b.points - a.points;
+      });
+      setMockData(perfData);
+    });
+  }, []);
 
   return (
     <div className="space-y-8 md:space-y-6 animate-[fadeInPage_250ms_ease-out] px-2 md:px-0">

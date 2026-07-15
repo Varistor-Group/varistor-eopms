@@ -78,7 +78,6 @@ export interface MonthlyReportRow {
   totalHrs: number;
   payableDays: number;
   workingDays: number;
-  daysInMonth: number;  // actual calendar days in the full month
 }
 
 export interface Holiday {
@@ -155,6 +154,8 @@ export interface RosterEmployee {
   name: string;
   dept: string;
   isField: boolean;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 let _cachedRoster: RosterEmployee[] | null = null;
@@ -168,7 +169,9 @@ export async function fetchAttendanceRoster(): Promise<RosterEmployee[]> {
         id: e.employeeId,
         name: e.fullName,
         dept: e.department,
-        isField: e.is_field_employee || false
+        isField: !!e.is_field_employee,
+        shiftStart: e.shiftStart,
+        shiftEnd: e.shiftEnd
       }));
   }
   return _cachedRoster;
@@ -264,11 +267,6 @@ function generateEntryForEmployee(
 
   const work_hours = calcWorkHours(punchIn, punchOut);
 
-  // Apply Late Entry Penalty Logic if hours < 9
-  if (work_hours !== undefined && work_hours < 9.0 && (status === 'Present' || status === 'Late')) {
-    status = 'Late';
-  }
-
   return {
     id: `atl-${emp.id}-${date}`,
     employee_id: emp.id,
@@ -304,24 +302,24 @@ function getDatesInMonth(month: string): string[] {
 // ─── In-memory stores ──────────────────────────────────────────────────────
 
 /** National holidays for 2026 */
-const _holidays: Holiday[] = [
-  { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day',       type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-2', date: '2026-03-28', occasion: 'Holi',               type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti',type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-4', date: '2026-04-10', occasion: 'Good Friday',        type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-5', date: '2026-08-15', occasion: 'Independence Day',   type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-6', date: '2026-10-02', occasion: 'Gandhi Jayanti',     type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-7', date: '2026-11-04', occasion: 'Diwali',             type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-8', date: '2026-11-05', occasion: 'Diwali (2nd day)',   type: 'Festival',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
-  { id: 'hol-9', date: '2026-12-25', occasion: 'Christmas',          type: 'National',  apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+let _holidays: Holiday[] = [
+  { id: 'hol-1', date: '2026-01-26', occasion: 'Republic Day', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-2', date: '2026-03-28', occasion: 'Holi', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-3', date: '2026-04-14', occasion: 'Dr. Ambedkar Jayanti', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-4', date: '2026-04-10', occasion: 'Good Friday', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-5', date: '2026-08-15', occasion: 'Independence Day', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-6', date: '2026-10-02', occasion: 'Gandhi Jayanti', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-7', date: '2026-11-04', occasion: 'Diwali', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-8', date: '2026-11-05', occasion: 'Diwali (2nd day)', type: 'Festival', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
+  { id: 'hol-9', date: '2026-12-25', occasion: 'Christmas', type: 'National', apply_to_all: true, created_by: 'HR', created_at: '2026-01-01T00:00:00Z' },
 ];
 
 const _holidayDates = () => _holidays.map(h => h.date);
 
-const _attendanceEdits: AttendanceEdit[] = [];
+let _attendanceEdits: AttendanceEdit[] = [];
 
 /** Dynamic field photos array */
-const _fieldPhotos: FieldPhotoEntry[] = [];
+let _fieldPhotos: FieldPhotoEntry[] = [];
 
 // Override store: HR-edited entries (stored by id for quick lookup)
 const _overrides = new Map<string, Partial<AttendanceLedgerEntry>>();
@@ -402,16 +400,8 @@ export async function updateAttendance(
     updates.punch_out ?? existing.punch_out
   );
 
-  let newStatus = updates.status ?? existing.status;
-  
-  // Apply Late Entry Penalty Logic if hours < 9
-  if (newWorkHours !== undefined && newWorkHours < 9.0 && (newStatus === 'Present' || newStatus === 'Late')) {
-    newStatus = 'Late';
-  }
-
   const updatedFields: Partial<AttendanceLedgerEntry> = {
     ...updates,
-    status: newStatus,
     work_hours: newWorkHours,
     source: 'hr_override',
     override_reason: reason,
@@ -436,38 +426,6 @@ export async function updateAttendance(
     reason,
     edited_at: new Date().toISOString(),
   });
-
-  // Automate payroll sync
-  try {
-    const dateMatch = ledgerId.match(/(\d{4}-\d{2})-\d{2}$/);
-    if (dateMatch) {
-      const d = new Date(dateMatch[1] + '-01');
-      const monthStr = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      const empId = ledgerId.replace('atl-', '').replace(`-${dateMatch[0]}`, '');
-
-      const records = await getPayrollRecords();
-      const rec = records.find(r => r.employeeId === empId && r.month === monthStr);
-      
-      if (rec) {
-        const snapshot = await getMonthlyReport(dateMatch[1], [empId]);
-        if (snapshot && snapshot.length > 0) {
-          const payDays = snapshot[0].payableDays;
-          const workingDays = snapshot[0].workingDays;
-          
-          if (rec.status === 'approved') {
-             const rev = await createRevision(rec.id, editorId);
-             if (rev) {
-               await updatePayrollRecord(rev.id, { payDays, totalDays: workingDays });
-             }
-          } else {
-             await updatePayrollRecord(rec.id, { payDays, totalDays: workingDays });
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Auto payroll sync failed', e);
-  }
 
   return { success: true, error: null };
 }
@@ -496,22 +454,19 @@ export async function getMonthlyReport(
       const final = override ? { ...entry, ...override } : entry;
 
       switch (final.status) {
-        case 'Present':  present++;  break;
-        case 'Late':     late++; present++; break;
+        case 'Present': present++; break;
+        case 'Late': late++; present++; break;
         case 'Half-day': halfDay++; break;
-        case 'Holiday':  holidays++; break;
-        case 'W.O':      weekOff++; break;
-        case 'Leave':    leaves++;  break;
-        case 'Absent':   absent++;  break;
+        case 'Holiday': holidays++; break;
+        case 'W.O': weekOff++; break;
+        case 'Leave': leaves++; break;
+        case 'Absent': absent++; break;
       }
       if (final.work_hours) totalHrs += final.work_hours;
     });
 
     const workingDays = dates.length - weekOff - holidays;
     const payableDays = present + late + halfDay * 0.5;
-    // Always use the full calendar days of the month (not capped at today)
-    const [year, mon] = month.split('-').map(Number);
-    const daysInMonth = new Date(year, mon, 0).getDate();
 
     return {
       employee_id: emp.id,
@@ -527,7 +482,6 @@ export async function getMonthlyReport(
       totalHrs: parseFloat(totalHrs.toFixed(1)),
       payableDays: parseFloat(payableDays.toFixed(1)),
       workingDays,
-      daysInMonth,
     };
   });
 }
@@ -661,7 +615,6 @@ export async function uploadFieldPhoto(
 
   return { success: true, photoUrl, error: null };
 }
-
 
 /**
  * Checks if a field employee is currently punched in for today without a punch out.
@@ -865,7 +818,7 @@ export interface EmployeeYearlySummary {
   halfDay: number;
 }
 
-const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
  * Returns a full-year per-day attendance report for one employee.
@@ -899,7 +852,7 @@ export async function getYearlyAttendanceReport(
   let remainingBalance = totalBalance;
 
   const months: EmployeeYearlyReport['months'] = [];
-  const totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
+  let totals = { present: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, holidays: 0, weekOff: 0, halfDay: 0, totalLeaveBalance: totalBalance, usedLeaveBalance: 0 };
 
   for (let m = 0; m < 12; m++) {
     const monthStr = `${year}-${String(m + 1).padStart(2, '0')}`;
@@ -993,7 +946,7 @@ export async function getEmployeeYearlySummaries(year: string): Promise<Employee
 
   return roster.map((emp, empIndex) => {
     let present = 0, paidLeave = 0, unpaidLeave = 0, absent = 0,
-        holidays = 0, weekOff = 0, halfDay = 0, remaining = 12;
+      holidays = 0, weekOff = 0, halfDay = 0, remaining = 12;
 
     for (let m = 0; m < 12; m++) {
       const daysInMonth = new Date(Number(year), m + 1, 0).getDate();

@@ -10,8 +10,9 @@ import { NotificationBell } from './components/NotificationBell';
 import { Toast } from './components/Toast';
 import { EopmsProvider } from './context/EopmsContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { Menu, X, LogOut, Sun, Moon } from 'lucide-react';
+import { Bell, Menu, X, LogOut, Sun, Moon, BookOpen } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
+import { useTrainingGate } from './hooks/useTrainingGate';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
@@ -26,8 +27,8 @@ import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
-import { PolicyBanner } from './components/PolicyBanner';
 import { mockEmployeeStore } from './api/employees';
+import { FieldPunch } from './components/FieldPunch';
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
@@ -39,12 +40,36 @@ const FieldTrackerBackground: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, currentUser, setCurrentUser, setCurrentRole } = useVariPoints();
+  const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification, addAnnouncement, announcements } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
+  const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole, currentUser?.department);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('eopms_current_user'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
   const [taskNotification, setTaskNotification] = useState<{ title: string; show: boolean } | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.dob) {
+      const today = new Date();
+      const dobDate = new Date(currentUser.dob);
+      if (today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate()) {
+        const title = `Today is ${currentUser.name}'s birthday! Wish them a great day! 🎂`;
+        const storageKey = `bday_posted_${currentUser.id}_${today.getFullYear()}_${today.getMonth()}_${today.getDate()}`;
+
+        // Prevent duplicate posts today
+        const hasAnnounced = announcements.some(a =>
+          a.type === 'Birthday' &&
+          a.title === title &&
+          new Date(a.created_at).toDateString() === today.toDateString()
+        );
+
+        if (!hasAnnounced && !localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, 'true');
+          addAnnouncement(title, 'Join us in wishing them the happiest of birthdays!', 'Birthday', 'Admin');
+        }
+      }
+    }
+  }, [currentUser?.dob, currentUser?.name, currentUser?.id, announcements]);
 
   // Profile dropdown state
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -60,7 +85,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     // We must dynamically import to avoid breaking the web build if Capacitor is missing
     let listener: { remove: () => void } | null = null;
-    
+
     // Hide native status bar if on mobile
     import('@capacitor/status-bar').then(({ StatusBar }) => {
       StatusBar.hide().catch(console.warn);
@@ -143,6 +168,19 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('navigateTab', handleNavigate);
   }, []);
 
+  // Re-check training completion whenever the user changes tabs (e.g. right after finishing a module).
+  useEffect(() => {
+    refreshTrainingGate();
+  }, [activeTab, refreshTrainingGate]);
+
+  // Confine employees/managers with incomplete required training to the Training tab.
+  useEffect(() => {
+    if (trainingLocked && activeTab !== 'training') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab('training');
+    }
+  }, [trainingLocked, activeTab]);
+
   useEffect(() => {
     const channel = new BroadcastChannel('eopms_notifications');
     channel.onmessage = (event) => {
@@ -172,6 +210,7 @@ const AppContent: React.FC = () => {
       case 'task-management': return 'Task Management';
       case 'engine-simulation': return 'Engine Simulation Console';
       case 'field-tracker': return 'Field Tracker';
+      case 'field-punch': return 'Field Punch';
       case 'training': return 'Training Library';
       case 'policy': return 'Company Policy';
       case 'leaves': return 'Leave Management';
@@ -198,11 +237,12 @@ const AppContent: React.FC = () => {
         setActiveTab={setActiveTab}
         isOpenMobile={isOpenMobile}
         setIsOpenMobile={setIsOpenMobile}
+        onLogout={handleLogout}
+        trainingLocked={trainingLocked}
       />
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col lg:pl-[220px] min-w-0">
-        <PolicyBanner />
 
         {/* Top Header bar */}
         <header className="h-16 bg-varistor-surface border-b border-varistor-border flex items-center justify-between px-6 sticky top-0 z-20">
@@ -271,7 +311,7 @@ const AppContent: React.FC = () => {
             const getAllowedTabs = () => {
               if (currentRole === 'Admin') {
                 // Admin has access to everything
-                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
+                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
               } else if (currentRole === 'HR') {
                 // HR does not have Vari Points (ledger)
                 return ['dashboard', 'admin', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
@@ -280,17 +320,23 @@ const AppContent: React.FC = () => {
                 return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
               } else {
                 // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+                return ['dashboard', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
               }
             };
 
-            const allowedTabs = getAllowedTabs();
+            const allowedTabs = trainingLocked ? ['training'] : getAllowedTabs();
             if (!allowedTabs.includes(activeTab)) {
-              return (
+              return trainingLocked ? (
+                <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-border shadow-sm animate-[fadeInPage_250ms_ease-out]">
+                  <BookOpen size={40} strokeWidth={1.5} className="text-varistor-lime mb-4" />
+                  <h2 className="text-xl font-bold text-varistor-dark">Complete Your Training First</h2>
+                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You need to finish your assigned training modules before you can access the rest of the app.</p>
+                </div>
+              ) : (
                 <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>
                   <h2 className="text-xl font-bold text-varistor-dark">Forbidden Access</h2>
-                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have the required permissions to view this page.</p>
+                  <p className="text-sm text-varistor-muted mt-2 text-center max-w-sm">You do not have permission to view the <span className="font-bold">{activeTab}</span> page.</p>
                 </div>
               );
             }
@@ -306,6 +352,7 @@ const AppContent: React.FC = () => {
                 {activeTab === 'task-management' && <TaskManagement />}
                 {activeTab === 'admin' && <EmployeeManagementPortal />}
                 {activeTab === 'field-tracker' && <FieldTracker />}
+                {activeTab === 'field-punch' && <FieldPunch />}
                 {activeTab === 'engine-simulation' && <EngineSimulationConsole />}
                 {activeTab === 'training' && <TrainingLibrary />}
                 {activeTab === 'policy' && <PolicyPage />}
@@ -330,6 +377,26 @@ const AppContent: React.FC = () => {
               <p className="text-xs text-varistor-muted mt-1">You have been assigned: <span className="font-semibold text-varistor-dark">{taskNotification.title}</span></p>
             </div>
             <button onClick={() => setTaskNotification({ ...taskNotification, show: false })} className="text-varistor-muted hover:text-varistor-dark transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Policy Notification Pop-up */}
+      {policyNotification && policyNotification.show && (
+        <div className="fixed top-20 right-4 z-[60] w-80 bg-varistor-surface border-l-4 border-blue-500 shadow-xl rounded-r-lg p-4 animate-[slideInRight_0.3s_ease-out]">
+          <div className="flex justify-between items-start">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
+                <Bell size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-varistor-dark">New Policy Uploaded</h3>
+                <p className="text-xs text-varistor-muted mt-1 font-semibold">{policyNotification.title}</p>
+              </div>
+            </div>
+            <button onClick={() => setPolicyNotification({ show: false, title: '' })} className="text-varistor-muted hover:text-varistor-dark transition-colors">
               <X size={16} />
             </button>
           </div>

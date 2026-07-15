@@ -19,21 +19,43 @@ export interface Employee {
   role: UserRole;
   tempPassword: string;
   createdAt: string;
+  dob?: string;
   status: 'Active' | 'Inactive';
   variPoints: number;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
+  dateOfBirth?: string;
+  uanNumber?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
-export type Department =
-  | 'Finance'
-  | 'Sales'
-  | 'Operations'
-  | 'Ops Heads'
-  | 'Tech'
-  | 'Digital Marketing'
-  | 'Management'
-  | 'Human Resources';
+export type Department = string;
+
+const DEFAULT_DEPARTMENTS = [
+  'Finance',
+  'Sales',
+  'Operations',
+  'Ops Heads',
+  'Tech',
+  'Digital Marketing',
+  'Management',
+  'Human Resources'
+];
+
+export function getDepartments(): string[] {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  return Array.from(new Set([...DEFAULT_DEPARTMENTS, ...custom]));
+}
+
+export function addDepartment(name: string) {
+  const custom = JSON.parse(localStorage.getItem('eopms_custom_departments') || '[]');
+  if (!custom.includes(name) && !DEFAULT_DEPARTMENTS.includes(name)) {
+    custom.push(name);
+    localStorage.setItem('eopms_custom_departments', JSON.stringify(custom));
+  }
+}
 
 export interface CreateEmployeeInput {
   fullName: string;
@@ -46,6 +68,11 @@ export interface CreateEmployeeInput {
   role: UserRole;
   is_field_employee?: boolean;
   avatarUrl?: string;
+  dateOfJoining: string;
+  dateOfBirth?: string;
+  uanNumber?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -67,6 +94,11 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     variPoints: (row.vari_points as number) ?? 0,
     is_field_employee: (row.is_field_employee as boolean) ?? false,
     avatarUrl: (row.avatar_url as string) ?? '',
+    shiftStart: (row.shift_start as string) ?? undefined,
+    shiftEnd: (row.shift_end as string) ?? undefined,
+    dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
+    dateOfBirth: (row.date_of_birth as string) ?? undefined,
+    uanNumber: (row.uan_number as string) ?? undefined,
   };
 }
 
@@ -115,7 +147,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     p_role: input.role,
     p_temp_password: tempPassword,
     p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: input.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=84CC16&color=fff&size=200&bold=true`,
+    p_avatar_url: input.avatarUrl ?? undefined,
   });
 
   if (rpcError) {
@@ -124,16 +156,28 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 
   // The RPC returns a JSON object. We typecast it to check success.
   const result = rpcData as unknown as { success: boolean; error?: string; employee_id?: string };
-  
+
   if (!result.success) {
     return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
+  }
+
+  // Update additional fields via a direct update since RPC doesn't handle them
+  const extraUpdates: any = {};
+  if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
+  if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
+  if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
+  if (input.shiftStart) extraUpdates.shift_start = input.shiftStart;
+  if (input.shiftEnd) extraUpdates.shift_end = input.shiftEnd;
+
+  if (Object.keys(extraUpdates).length > 0) {
+    await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
   }
 
   // Fetch the newly created employee row to return it
   const { data: empRow } = await supabase
     .from('employees')
     .select('*')
-    .eq('id', input.employeeId)
+    .eq('employee_id', input.employeeId)
     .single();
 
   // Create leave balance entry
@@ -163,7 +207,6 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       emailErrorMsg = result?.error || 'Failed to send welcome email.';
       console.error('[Email]', emailErrorMsg);
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     emailErrorMsg = e.message;
     console.error('[Email Exception]', e);
@@ -188,6 +231,11 @@ export async function updateEmployee(
       ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
       ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
+      ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
+      ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
+      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
+      ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
+      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),
     })
     .eq('id', id)
     .select()
@@ -199,18 +247,18 @@ export async function updateEmployee(
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
   const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
-  
+
   if (error) {
     return { success: false, error: error.message };
   }
 
   // The RPC returns a JSON object. We typecast it to check success.
   const result = data as unknown as { success: boolean; error?: string };
-  
+
   if (!result.success) {
     return { success: false, error: result.error || 'Failed to delete employee.' };
   }
-  
+
   return { success: true, error: null };
 }
 
@@ -236,9 +284,9 @@ const todayAt = (h: number, min: number) => {
 };
 
 export const mockFieldLocations: FieldEmployeeLocation[] = [
-  { employeeId: 'VAR-031', employeeName: 'Rohan Deshmukh', department: 'Sales', lat: 12.9716, lng: 77.5946, accuracy: 8, batteryLevel: 82, status: 'Active', lastUpdated: minutesAgo(2), todayCheckIn: todayAt(9, 5), distanceTravelledKm: 14.2, routeHistory: [[12.9352,77.6245],[12.9451,77.6100],[12.9716,77.5946]] },
-  { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081,77.6010],[12.9345,77.5820]] },
-  { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716,77.5946],[13.0067,77.5890]] },
+  { employeeId: 'VAR-031', employeeName: 'Rohan Deshmukh', department: 'Sales', lat: 12.9716, lng: 77.5946, accuracy: 8, batteryLevel: 82, status: 'Active', lastUpdated: minutesAgo(2), todayCheckIn: todayAt(9, 5), distanceTravelledKm: 14.2, routeHistory: [[12.9352, 77.6245], [12.9451, 77.6100], [12.9716, 77.5946]] },
+  { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081, 77.6010], [12.9345, 77.5820]] },
+  { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716, 77.5946], [13.0067, 77.5890]] },
 ];
 
 let mockLocationHistory: LocationEntry[] = [];
@@ -301,7 +349,7 @@ export async function getFieldEmployees(): Promise<Employee[]> {
 
 export const mockActivityLog: { timestamp: string; action: string; by: string; details: string }[] = [];
 // Kept for backwards compatibility — writes now go to Supabase activity_log table
-export const mockEmployeeStore: Employee[] = [];
+export let mockEmployeeStore: Employee[] = [];
 // Lazy sync: populate on first access
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
@@ -322,7 +370,6 @@ export async function sendRecoveryEmail(employee: Employee): Promise<{ success: 
       return { success: false, error: result?.error || 'Failed to send recovery email.' };
     }
     return { success: true, error: null };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     console.error('[Email Exception]', e);
     return { success: false, error: e.message };

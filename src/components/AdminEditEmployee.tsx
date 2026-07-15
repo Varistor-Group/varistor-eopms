@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, UserCog } from 'lucide-react';
-import { updateEmployee } from '../api/employees';
-import type { Employee, Department } from '../api/employees';
+import { updateEmployee, getDepartments } from '../api/employees';
+import type { Employee } from '../api/employees';
 import type { UserRole } from '../types';
 import { useVariPoints } from '../hooks/useVariPoints';
 
@@ -28,10 +28,6 @@ const inputCls = (hasError?: boolean) =>
   focus:ring-2 focus:ring-varistor-lime/40
   ${hasError ? 'border-red-400 focus:border-red-400' : 'border-varistor-border focus:border-varistor-lime'}`;
 
-const DEPARTMENTS: Department[] = [
-  'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech', 'Digital Marketing',
-];
-
 const ROLES: UserRole[] = ['Employee', 'Field Employee', 'Reporting Manager', 'HR', 'Admin'];
 
 export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => void; onSuccess: () => void }> = ({ employee, onCancel, onSuccess }) => {
@@ -45,8 +41,12 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
     variPoints: (employee.variPoints ?? 0).toString(),
+    shiftStart: employee.shiftStart ?? '09:30',
+    shiftEnd: employee.shiftEnd ?? '18:30',
+    dateOfBirth: employee.dateOfBirth || '',
+    uanNumber: employee.uanNumber || '',
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
@@ -61,12 +61,15 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
-    if (!form.phone.trim()) errs.phone = 'Phone number is required.';
+    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
     if (!form.role) errs.role = 'System role is required.';
     if (isNaN(Number(form.variPoints)) || Number(form.variPoints) < 0) errs.variPoints = 'Points must be a positive number.';
-    
+    if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
+      errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -128,7 +131,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 lg:p-8">
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-            
+
             {/* Read Only Fields */}
             <Field label="Employee ID">
               <input className={`${inputCls()} bg-varistor-pageBg text-varistor-muted cursor-not-allowed`} value={employee.employeeId} disabled readOnly />
@@ -143,14 +146,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             <Field label="Full name" required error={errors.fullName}>
               <input className={inputCls(!!errors.fullName)} value={form.fullName} onChange={set('fullName')} />
             </Field>
-            
+
             <Field label="Phone" required error={errors.phone}>
               <input className={inputCls(!!errors.phone)} value={form.phone} onChange={set('phone')} />
             </Field>
 
             <Field label="Department" required error={errors.department}>
               <select className={inputCls(!!errors.department)} value={form.department} onChange={set('department')}>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                {getDepartments().map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </Field>
 
@@ -182,7 +185,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
                 {toast.message}
               </span>
             )}
-            
+
             <button
               type="button"
               onClick={onCancel}

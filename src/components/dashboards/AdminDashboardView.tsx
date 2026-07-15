@@ -1,35 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Megaphone, Users, Award, Calendar, Camera } from 'lucide-react';
-import { mockEmployeeStore } from '../../api/employees';
+import { getEmployees } from '../../api/employees';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
 
 export const AdminDashboardView: React.FC = () => {
   const { currentUser } = useVariPoints();
-  // Global company data
-  const employees = mockEmployeeStore;
 
-  // Profile picture editing
+  const [mockData, setMockData] = useState<any[]>([]);
   const [editingAvatar, setEditingAvatar] = useState(false);
 
-  // Mock data generation for demo purposes
-  const generateMockPerformance = () => {
-    return employees.map(emp => ({
-      id: emp.id,
-      name: emp.fullName,
-      department: emp.department,
-      rating: Math.floor(Math.random() * 40) + 60, // 60-99
-      points: Math.floor(Math.random() * 1000) + 200,
-      pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
-      status: emp.status
-    })).sort((a, b) => {
-      if (a.status === 'Active' && b.status === 'Inactive') return -1;
-      if (a.status === 'Inactive' && b.status === 'Active') return 1;
-      return b.points - a.points;
+  useEffect(() => {
+    getEmployees().then(data => {
+      
+      const perfData = data.map(emp => ({
+        id: emp.id,
+        name: emp.fullName,
+        department: emp.department,
+        rating: Math.floor(Math.random() * 40) + 60, // 60-99
+        points: emp.variPoints || 0,
+        pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
+        status: emp.status
+      })).sort((a, b) => {
+        if (a.status === 'Active' && b.status === 'Inactive') return -1;
+        if (a.status === 'Inactive' && b.status === 'Active') return 1;
+        return b.points - a.points;
+      });
+      
+      setMockData(perfData);
     });
-  };
-
-  const [mockData] = useState(generateMockPerformance());
+  }, []);
 
   return (
     <div className="space-y-8 md:space-y-6 animate-[fadeInPage_250ms_ease-out] px-2 md:px-0">
