@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Paperclip, Plus, Calendar, Check } from 'lucide-react';
+import { X, CheckSquare, Calendar, Check } from 'lucide-react';
 import type { Task } from '../types';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
 
@@ -10,16 +10,24 @@ interface TaskDrawerProps {
 
 export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   const { 
-    toggleChecklistItem, 
-    addChecklistItem 
+    toggleChecklistItem
   } = useKanbanTasks();
 
-  const [newCheckItem, setNewCheckItem] = useState('');
+
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+      setIsClosing(false);
+    }, 200);
+  };
 
   useEffect(() => {
     const handleBackButton = (e: Event) => {
       e.preventDefault();
-      onClose();
+      handleClose();
     };
     window.addEventListener('app_back_button', handleBackButton);
     return () => window.removeEventListener('app_back_button', handleBackButton);
@@ -27,12 +35,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
 
   if (!task) return null;
 
-  const handleAddCheckItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCheckItem.trim()) return;
-    addChecklistItem(task.id, newCheckItem.trim());
-    setNewCheckItem('');
-  };
+
 
   // Checklist statistics
   const completedCount = task.checklist.filter(c => c.completed).length;
@@ -43,12 +46,12 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
     <>
       {/* Backdrop overlay */}
       <div 
-        className="fixed inset-0 bg-black/30 z-40 transition-opacity animate-fade-in"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/30 z-40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'animate-fade-in opacity-100'}`}
+        onClick={handleClose}
       />
 
       {/* Drawer Body */}
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col transition-transform duration-200 ease-out transform translate-x-0 animate-[slideIn_200ms_ease-out]">
+      <div className={`fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col transition-transform duration-200 ease-out transform ${isClosing ? 'translate-x-full' : 'translate-x-0 animate-[slideIn_200ms_ease-out]'}`}>
         
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border flex-shrink-0">
@@ -56,7 +59,7 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
             {task.status.replace('_', ' ')}
           </span>
           <button 
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 rounded-full text-varistor-muted hover:text-black hover:bg-gray-100 transition-colors"
           >
             <X size={20} />
@@ -137,63 +140,6 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
               ))}
             </div>
 
-            {/* Add checklist input */}
-            <form onSubmit={handleAddCheckItem} className="flex gap-2 pt-1.5">
-              <input
-                type="text"
-                placeholder="Add item..."
-                value={newCheckItem}
-                onChange={(e) => setNewCheckItem(e.target.value)}
-                className="flex-1 bg-white border border-varistor-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-varistor-lime transition-colors"
-              />
-              <button 
-                type="submit"
-                className="bg-varistor-lime text-black px-3 py-1.5 rounded-lg font-bold hover:bg-[#7bc012] transition-colors flex items-center justify-center"
-              >
-                <Plus size={14} />
-              </button>
-            </form>
-          </div>
-
-          {/* Attachments */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold text-varistor-dark flex items-center gap-1.5 uppercase tracking-wider">
-                <Paperclip size={16} className="text-[#555]" />
-                Attachments ({task.attachments.length})
-              </h3>
-
-            </div>
-
-            <div className="space-y-1.5">
-              {task.attachments.length === 0 ? (
-                <p className="text-[11px] text-varistor-muted italic">No attachments.</p>
-              ) : (
-                task.attachments.map((file) => (
-                  <div 
-                    key={file.id} 
-                    className="flex items-center justify-between p-2 border border-varistor-border rounded-lg bg-white hover:bg-varistor-pageBg transition-varistor"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded bg-varistor-pageBg flex items-center justify-center text-[10px] font-bold text-varistor-muted uppercase">
-                        {file.type.substring(0, 3)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-varistor-dark truncate">{file.name}</p>
-                        <p className="text-[9px] text-varistor-muted">{file.size}</p>
-                      </div>
-                    </div>
-                    <a 
-                      href="#" 
-                      onClick={(e) => e.preventDefault()}
-                      className="text-xs font-semibold text-varistor-limeText hover:text-black bg-varistor-limeLight px-2.5 py-1 rounded border border-[#d2f3a6] transition-colors"
-                    >
-                      Download
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
 
         </div>

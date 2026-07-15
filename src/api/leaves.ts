@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import type { LeaveRequest, LeaveBalance } from '../types';
+import type { LeaveRequest, LeaveBalance, LeaveTypeModel, EmployeeLeaveBalance } from '../types';
 
 export const INDIA_HOLIDAYS_2026: string[] = [
   '2026-01-26','2026-03-25','2026-04-02','2026-04-14','2026-04-29',
@@ -57,41 +57,67 @@ function rowToLeaveRequest(row: any): LeaveRequest {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToLeaveBalance(row: any): LeaveBalance {
-  return {
-    employeeId: row.employee_id,
-    casual: { total: row.casual_total, used: row.casual_used },
-    sick: { total: row.sick_total, used: row.sick_used },
-    earned: { total: row.earned_total, used: row.earned_used },
-    unpaidTaken: row.unpaid_taken,
-  };
+// ─── Dynamic Leave Types ──────────────────────────────────────────────────────
+
+export async function getLeaveTypes(): Promise<LeaveTypeModel[]> {
+  const { data, error } = await (supabase as any).from('leave_types').select('*').order('name');
+  if (error) { console.error('[getLeaveTypes]', error.message); return []; }
+  return data ?? [];
+}
+
+export async function createLeaveType(input: Omit<LeaveTypeModel, 'id'>): Promise<LeaveTypeModel | null> {
+  const { data, error } = await (supabase as any).from('leave_types').insert([input]).select().single();
+  if (error) { console.error('[createLeaveType]', error.message); return null; }
+  return data;
+}
+
+export async function deleteLeaveType(id: string): Promise<boolean> {
+  const { error } = await (supabase as any).from('leave_types').delete().eq('id', id);
+  if (error) { console.error('[deleteLeaveType]', error.message); return false; }
+  return true;
+}
+
+// ─── Dynamic Leave Balances ───────────────────────────────────────────────────
+
+export async function getEmployeeBalances(employeeId: string): Promise<EmployeeLeaveBalance[]> {
+  const { data, error } = await (supabase as any)
+    .from('employee_leave_balances')
+    .select('*')
+    .eq('employee_id', employeeId);
+  if (error) { console.error('[getEmployeeBalances]', error.message); return []; }
+  return data ?? [];
+}
+
+export async function updateEmployeeBalance(employeeId: string, leaveTypeName: string, total: number, used: number): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('employee_leave_balances')
+    .upsert({ employee_id: employeeId, leave_type_name: leaveTypeName, total, used }, { onConflict: 'employee_id,leave_type_name' });
+  if (error) { console.error('[updateEmployeeBalance]', error.message); }
+}
+
+export async function getAllEmployeeBalances(): Promise<EmployeeLeaveBalance[]> {
+  const { data, error } = await (supabase as any).from('employee_leave_balances').select('*');
+  if (error) { console.error('[getAllEmployeeBalances]', error.message); return []; }
+  return data ?? [];
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
+// Legacy wrapper for existing code, can be refactored out later
 export async function getLeaveBalance(employeeId: string): Promise<LeaveBalance> {
-  const { data, error } = await supabase
-    .from('leave_balances')
-    .select('*')
-    .eq('employee_id', employeeId)
-    .single();
-
-  if (error || !data) {
-    // Auto-create balance if missing
-    const { data: newBal } = await supabase
-      .from('leave_balances')
-      .insert({ employee_id: employeeId })
-      .select()
-      .single();
-    return newBal ? rowToLeaveBalance(newBal) : { employeeId, casual: { total: 12, used: 0 }, sick: { total: 10, used: 0 }, earned: { total: 15, used: 0 }, unpaidTaken: 0 };
+  const balances = await getEmployeeBalances(employeeId);
+  const legacy: LeaveBalance = { employeeId };
+  for (const b of balances) {
+    if (b.leave_type_name === 'Casual Leave') legacy.casual = { total: b.total, used: b.used };
+    if (b.leave_type_name === 'Sick Leave') legacy.sick = { total: b.total, used: b.used };
+    if (b.leave_type_name === 'Earned Leave') legacy.earned = { total: b.total, used: b.used };
+    if (b.leave_type_name === 'Loss of Pay') legacy.unpaidTaken = b.used;
   }
-  return rowToLeaveBalance(data);
+  return legacy;
 }
 
 export function getLeaveRequests(employeeId?: string): LeaveRequest[] {
   // Sync wrapper — components that call this should use getLeaveRequestsAsync instead.
-  // Kept for backwards-compat; returns whatever is in the in-memory cache.
   return mockLeaveRequests.filter(r => !employeeId || r.employeeId === employeeId);
 }
 
@@ -106,7 +132,6 @@ export async function getLeaveRequestsAsync(employeeId?: string): Promise<LeaveR
 }
 
 export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>): LeaveRequest {
-  // Sync wrapper that fires-and-forgets to Supabase
   const optimistic: LeaveRequest = {
     ...input,
     id: `LV-${String(Date.now()).slice(-6)}`,
@@ -115,7 +140,6 @@ export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | '
   };
   mockLeaveRequests.unshift(optimistic);
 
-  // Async persist
   supabase.from('leave_requests').insert({
     id: optimistic.id,
     employee_id: input.employeeId,
@@ -134,7 +158,7 @@ export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | '
   return optimistic;
 }
 
-export function approveLeaveRequest(leaveId: string, reviewerName: string): void {
+export async function approveLeaveRequest(leaveId: string, reviewerName: string): Promise<void> {
   const request = mockLeaveRequests.find(r => r.id === leaveId);
   if (!request || request.status !== 'Pending') return;
 
@@ -143,37 +167,36 @@ export function approveLeaveRequest(leaveId: string, reviewerName: string): void
   request.reviewedAt = new Date().toISOString();
 
   // Persist to Supabase
-  supabase.from('leave_requests').update({
+  await supabase.from('leave_requests').update({
     status: 'Approved',
     reviewer_name: reviewerName,
     reviewed_at: request.reviewedAt,
-  }).eq('id', leaveId).then(({ error }) => {
-    if (error) console.error('[approveLeaveRequest]', error.message);
-  });
+  }).eq('id', leaveId);
 
-  // Deduct from balance via direct column update
-  const balanceColumnMap: Record<string, keyof { casual_used: number; sick_used: number; earned_used: number }> = {
-    Casual: 'casual_used',
-    Sick: 'sick_used',
-    Earned: 'earned_used',
-  };
-  const balanceCol = balanceColumnMap[request.type];
+  // Deduct from balance
+  const { data: balData } = await (supabase as any)
+    .from('employee_leave_balances')
+    .select('used')
+    .eq('employee_id', request.employeeId)
+    .eq('leave_type_name', request.type)
+    .single();
 
-  supabase.from('leave_balances').select('casual_used,sick_used,earned_used,unpaid_taken').eq('employee_id', request.employeeId).single()
-    .then(({ data }) => {
-      if (!data) return;
-      if (balanceCol) {
-        const newVal = (data[balanceCol] as number) + request.days;
-        const updates: Record<string, number> = {};
-        updates[balanceCol] = newVal;
-        supabase.from('leave_balances').update(updates as any).eq('employee_id', request.employeeId)
-          .then(({ error }) => { if (error) console.error(error); });
-      } else {
-        // Unpaid
-        supabase.from('leave_balances').update({ unpaid_taken: data.unpaid_taken + request.days }).eq('employee_id', request.employeeId)
-          .then(({ error }) => { if (error) console.error(error); });
-      }
-    });
+  if (balData) {
+    await (supabase as any)
+      .from('employee_leave_balances')
+      .update({ used: balData.used + request.days })
+      .eq('employee_id', request.employeeId)
+      .eq('leave_type_name', request.type);
+  } else {
+    await (supabase as any)
+      .from('employee_leave_balances')
+      .insert({
+         employee_id: request.employeeId,
+         leave_type_name: request.type,
+         total: 0,
+         used: request.days
+      });
+  }
 }
 
 export function rejectLeaveRequest(leaveId: string, reviewerName: string, comment: string): void {

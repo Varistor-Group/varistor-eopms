@@ -71,6 +71,23 @@ export const announcementsApi = {
     announcement: Omit<Announcement, 'id' | 'created_at'>,
     userId: string
   ): Promise<AnnouncementDTO[]> {
+    if (announcement.type === 'Birthday') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data: existing } = await supabase
+        .from('announcements')
+        .select('id')
+        .eq('type', 'Birthday')
+        .eq('title', announcement.title)
+        .gte('created_at', todayStart.toISOString())
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        return this.fetchAnnouncements(userId);
+      }
+    }
+
     const { data: newAnn, error } = await supabase
       .from('announcements')
       .insert({

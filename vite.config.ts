@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5000000 // 5MB
+      },
       manifest: {
         name: 'EOPMS',
         short_name: 'EOPMS',
@@ -29,4 +32,22 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'COMMONJS_VARIABLE_IN_ESM' && warning.message.includes('dashjs')) {
+          return;
+        }
+        warn(warning);
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    }
+  }
 })

@@ -11,7 +11,7 @@
  */
 
 import { API_URL } from '../config/api';
-import { getPayrollRecords, createRevision, updatePayrollRecord } from './payroll';
+
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -843,7 +843,7 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 export async function getYearlyAttendanceReport(
   year: string,
   employeeId: string,
-  leaveBalance?: { casual: { total: number; used: number }; sick: { total: number; used: number }; earned: { total: number; used: number } }
+  leaveBalances?: any[]
 ): Promise<EmployeeYearlyReport> {
   await delay(300);
 
@@ -854,11 +854,10 @@ export async function getYearlyAttendanceReport(
   const today = new Date();
 
   // Calculate remaining leave balance
-  const totalBalance = leaveBalance
-    ? (leaveBalance.casual.total - leaveBalance.casual.used)
-    + (leaveBalance.sick.total - leaveBalance.sick.used)
-    + (leaveBalance.earned.total - leaveBalance.earned.used)
-    : 12; // default 12 days if no balance provided
+  let totalBalance = 12; // default 12 days if no balance provided
+  if (leaveBalances && leaveBalances.length > 0) {
+    totalBalance = leaveBalances.reduce((sum, bal) => sum + (bal.total - bal.used), 0);
+  }
 
   let remainingBalance = totalBalance;
 

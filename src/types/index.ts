@@ -249,14 +249,20 @@ export interface TrainingModuleWithStatus extends TrainingModule {
 
 // ─── Leave Management ────────────────────────────────────────────────────────
 
-export type LeaveType = 'Casual' | 'Sick' | 'Earned' | 'Unpaid';
+export interface LeaveTypeModel {
+  id: string;
+  name: string;
+  description: string;
+  default_allocation: number;
+}
+
 export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
 
 export interface LeaveRequest {
   id: string;                    // e.g. "LV-0044"
   employeeId: string;
   employeeName: string;
-  type: LeaveType;
+  type: string;                  // Dynamic leave type name
   from: string;                  // ISO date "2026-07-03"
   to: string;                    // ISO date "2026-07-03"
   days: number;                  // calculated working days
@@ -269,11 +275,20 @@ export interface LeaveRequest {
   reviewedAt?: string;
 }
 
+export interface EmployeeLeaveBalance {
+  id: string;
+  employee_id: string;
+  leave_type_name: string;
+  total: number;
+  used: number;
+}
+
+// Legacy fallback (will be removed eventually)
 export interface LeaveBalance {
   employeeId: string;
-  casual: { total: number; used: number };
-  sick: { total: number; used: number };
-  earned: { total: number; used: number };
-  unpaidTaken: number;           // days of unpaid leave taken this year
+  casual?: { total: number; used: number };
+  sick?: { total: number; used: number };
+  earned?: { total: number; used: number };
+  unpaidTaken?: number;
 }
 
