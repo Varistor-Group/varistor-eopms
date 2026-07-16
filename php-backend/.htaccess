@@ -12,7 +12,7 @@ Options -Indexes
 # ── Route all requests to index.php (excluding real files) ────────────────────
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
+    RewriteBase /eopms-api/
 
     # Allow direct access to real files (vendor assets etc.)
     RewriteCond %{REQUEST_FILENAME} -f

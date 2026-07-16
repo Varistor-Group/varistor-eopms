@@ -99,14 +99,14 @@ cd public_html/eopms.ytbhai.com/eopms-api
 ### Step 3.3 — Download Composer
 Type exactly this and press Enter (one long line):
 ```
-curl -sS https://getcomposer.org/installer | php
+curl -sS https://getcomposer.org/installer | php -d allow_url_fopen=On
 ```
 Wait for it to finish. You'll see `Composer successfully installed`.
 
 ### Step 3.4 — Install the libraries
 Type exactly this and press Enter:
 ```
-php composer.phar install --no-dev
+php -d allow_url_fopen=On composer.phar install --no-dev
 ```
 This will download PHPMailer and TCPDF into a `vendor/` folder. It takes 1–3 minutes. You'll see a progress bar. When done it says `Generating optimized autoload files`.
 
