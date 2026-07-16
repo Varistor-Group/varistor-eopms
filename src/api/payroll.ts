@@ -16,6 +16,7 @@
  */
 import { getEmployees } from './employees';
 import { getMonthlyReport } from './attendance';
+import { API_URL } from '../config/api';
 
 
 
@@ -1255,7 +1256,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let employees: any[] = [];
   try {
-    const res = await fetch('http://localhost:3001/api/employees');
+    const res = await fetch(`${API_URL}/api/employees`);
     if (res.ok) {
       employees = await res.json();
     }
@@ -1266,7 +1267,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   // Fetch CL balances
   let clBalances: Record<string, ClBalance> = {};
   try {
-    const res = await fetch('http://localhost:3001/api/cl-balances');
+    const res = await fetch(`${API_URL}/api/cl-balances`);
     if (res.ok) {
       clBalances = await res.json();
     }
@@ -1396,7 +1397,7 @@ export interface ClBalance {
 /** Fetch one employee's CL balance from the server */
 export async function fetchClBalance(employeeId: string): Promise<ClBalance> {
   try {
-    const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`);
+    const res = await fetch(`${API_URL}/api/cl-balances/${employeeId}`);
     if (!res.ok) return { total: 12, used: 0 };
     return res.json();
   } catch {
@@ -1417,7 +1418,7 @@ export async function fetchAllClBalances(): Promise<Record<string, ClBalance>> {
 
 /** Update an employee's CL total via the server */
 export async function updateClBalance(employeeId: string, total: number): Promise<ClBalance> {
-  const res = await fetch(`http://localhost:3001/api/cl-balances/${employeeId}`, {
+  const res = await fetch(`${API_URL}/api/cl-balances/${employeeId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ total }),
@@ -1488,7 +1489,7 @@ export interface BulkSendResult {
  * Calls the Express backend at /api/payroll/send-slips.
  */
 export async function sendBulkSlips(rows: SlipRow[]): Promise<BulkSendResult> {
-  const res = await fetch('http://localhost:3001/api/payroll/send-slips', {
+  const res = await fetch(`${API_URL}/api/payroll/send-slips`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slips: rows }),
@@ -1513,7 +1514,7 @@ export interface PayslipSchedule {
 /** Fetch the current payslip auto-send schedule from the server. */
 export async function getPayslipSchedule(): Promise<PayslipSchedule> {
   try {
-    const res = await fetch('http://localhost:3001/api/payroll/schedule');
+    const res = await fetch(`${API_URL}/api/payroll/schedule`);
     if (!res.ok) throw new Error('Server error');
     return res.json();
   } catch {
@@ -1523,7 +1524,7 @@ export async function getPayslipSchedule(): Promise<PayslipSchedule> {
 
 /** Update the payslip auto-send schedule on the server. */
 export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'lastRun'>): Promise<PayslipSchedule> {
-  const res = await fetch('http://localhost:3001/api/payroll/schedule', {
+  const res = await fetch(`${API_URL}/api/payroll/schedule`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(schedule),
@@ -1538,7 +1539,7 @@ export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'las
 
 /** Manually trigger payslip dispatch immediately (uses server-stored records). */
 export async function triggerManualSend(): Promise<BulkSendResult> {
-  const res = await fetch('http://localhost:3001/api/payroll/trigger-send', {
+  const res = await fetch(`${API_URL}/api/payroll/trigger-send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -1554,7 +1555,7 @@ export async function triggerManualSend(): Promise<BulkSendResult> {
  */
 export async function syncPayrollToServer(records: PayrollRecord[]): Promise<void> {
   try {
-    await fetch('http://localhost:3001/api/payroll/records', {
+    await fetch(`${API_URL}/api/payroll/records`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ records }),

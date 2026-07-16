@@ -26,10 +26,10 @@
       "components": {
         "basic": 13000,
         "hra": 6500,
-        "pfEmployee": 1560,
-        "pfEmployer": 1560,
+        "pfEmployee": 0,
+        "pfEmployer": 0,
         "esi": 0,
-        "pt": 200,
+        "pt": 0,
         "tds": 0,
         "specialAllowance": 4217,
         "medical": 1083,
@@ -41,8 +41,8 @@
         "otherDeductions": 0
       },
       "netPay": 17000,
-      "hasPf": true,
-      "hasPt": true,
+      "hasPf": false,
+      "hasPt": false,
       "attendanceBreakdown": {
         "present": 20,
         "weekOff": 5,
@@ -87,10 +87,10 @@
         0
       ],
       "deductionValues": [
-        1560,
-        1560,
         0,
-        200,
+        0,
+        0,
+        0,
         0,
         13000,
         0,
@@ -98,9 +98,11 @@
         0,
         0
       ],
-      "finalPay": 13680,
-      "gross": 30000,
-      "deduction": 16320
+      "finalPay": 17000,
+      "deduction": 13000,
+      "lopDays": 1,
+      "lopDeduction": 1000,
+      "gross": 30000
     },
     {
       "id": "PAY-85tqb2i",

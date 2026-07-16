@@ -32,3 +32,11 @@ lint-results.*
 
 # Documents
 *.pdf
+
+# PHP backend — credentials and generated files (never commit)
+php-backend/config.php
+php-backend/vendor/
+php-backend/db.json
+php-backend/composer.phar
+php-backend/*.log
+php-backend/error_log
