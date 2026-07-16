@@ -1978,8 +1978,7 @@ const SalaryEngine: React.FC = () => {
   const handleApplyAll = async () => {
     setApplyingAll(true);
     // Apply formulas to each record individually so LOP days are included
-    ewwconst balances = await fetchAllClBalances();
-    setClBalances(balances);
+
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
