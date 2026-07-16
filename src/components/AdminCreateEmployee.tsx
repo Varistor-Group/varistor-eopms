@@ -305,6 +305,30 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
+            {/* Opt outs */}
+            <Field label="Payroll Options">
+              <div className="flex flex-col gap-2 mt-1">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-varistor-limeText focus:ring-varistor-limeText"
+                    checked={form.optOutPF || false}
+                    onChange={(e) => setForm(prev => ({ ...prev, optOutPF: e.target.checked }))}
+                  />
+                  Opt out of PF Deduction
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-varistor-limeText focus:ring-varistor-limeText"
+                    checked={form.optOutPT || false}
+                    onChange={(e) => setForm(prev => ({ ...prev, optOutPT: e.target.checked }))}
+                  />
+                  Opt out of PT Deduction
+                </label>
+              </div>
+            </Field>
+
             {/* Profile Picture URL */}
             <Field label="Profile picture URL">
               <div className="flex items-center gap-3">

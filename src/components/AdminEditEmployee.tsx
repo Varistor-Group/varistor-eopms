@@ -45,6 +45,8 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     shiftEnd: employee.shiftEnd ?? '18:30',
     dateOfBirth: employee.dateOfBirth || '',
     uanNumber: employee.uanNumber || '',
+    optOutPF: employee.optOutPF || false,
+    optOutPT: employee.optOutPT || false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,6 +99,10 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       variPoints: Number(form.variPoints),
       shiftStart: form.shiftStart,
       shiftEnd: form.shiftEnd,
+      dateOfBirth: form.dateOfBirth,
+      uanNumber: form.uanNumber,
+      optOutPF: form.optOutPF,
+      optOutPT: form.optOutPT,
     });
 
     if (!success || error) {
@@ -182,13 +188,36 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             <Field label="Reporting Manager" required error={errors.reportingManager}>
               <input className={inputCls(!!errors.reportingManager)} value={form.reportingManager} onChange={set('reportingManager')} />
             </Field>
-            
+
             <Field label="Shift Start Time" required error={errors.shiftStart}>
               <input type="time" className={inputCls(!!errors.shiftStart)} value={form.shiftStart} onChange={set('shiftStart')} />
             </Field>
 
             <Field label="Shift End Time" required error={errors.shiftEnd}>
               <input type="time" className={inputCls(!!errors.shiftEnd)} value={form.shiftEnd} onChange={set('shiftEnd')} />
+            </Field>
+
+            <Field label="Payroll Options">
+              <div className="flex flex-col gap-2 mt-1">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-varistor-limeText focus:ring-varistor-limeText"
+                    checked={form.optOutPF}
+                    onChange={(e) => setForm(prev => ({ ...prev, optOutPF: e.target.checked }))}
+                  />
+                  Opt out of PF Deduction
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-varistor-limeText focus:ring-varistor-limeText"
+                    checked={form.optOutPT}
+                    onChange={(e) => setForm(prev => ({ ...prev, optOutPT: e.target.checked }))}
+                  />
+                  Opt out of PT Deduction
+                </label>
+              </div>
             </Field>
           </div>
 
