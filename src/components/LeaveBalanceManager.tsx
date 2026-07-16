@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAllEmployeeBalances, updateEmployeeBalance, getLeaveTypes } from '../api/leaves';
+import { getEmployees, type Employee } from '../api/employees';
 import type { EmployeeLeaveBalance, LeaveTypeModel } from '../types';
 
 export const LeaveBalanceManager: React.FC = () => {
@@ -11,6 +12,7 @@ export const LeaveBalanceManager: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTotal, setEditTotal] = useState<number>(0);
   const [editUsed, setEditUsed] = useState<number>(0);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   
   // New balance state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -20,12 +22,14 @@ export const LeaveBalanceManager: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [bals, types] = await Promise.all([
+    const [bals, types, emps] = await Promise.all([
       getAllEmployeeBalances(),
-      getLeaveTypes()
+      getLeaveTypes(),
+      getEmployees()
     ]);
     setBalances(bals);
     setLeaveTypes(types);
+    setEmployees(emps);
     setLoading(false);
   };
 
@@ -69,12 +73,20 @@ export const LeaveBalanceManager: React.FC = () => {
             <label className="block text-xs font-bold text-varistor-muted mb-1.5 uppercase">Employee ID</label>
             <input
               type="text"
+              list="employee-search-list"
               value={newEmployeeId}
               onChange={e => setNewEmployeeId(e.target.value)}
               className="w-full text-sm border border-varistor-border rounded px-3 py-2 bg-varistor-surface"
-              placeholder="e.g. VAR-024"
+              placeholder="e.g. VAR-024 or type name..."
               required
             />
+            <datalist id="employee-search-list">
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.employeeId}>
+                  {emp.fullName}
+                </option>
+              ))}
+            </datalist>
           </div>
           <div className="flex-1">
             <label className="block text-xs font-bold text-varistor-muted mb-1.5 uppercase">Leave Type</label>

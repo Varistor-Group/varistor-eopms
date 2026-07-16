@@ -75,6 +75,8 @@ export interface CreateEmployeeInput {
   uanNumber?: string;
   shiftStart?: string;
   shiftEnd?: string;
+  optOutPF?: boolean;
+  optOutPT?: boolean;
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
@@ -239,12 +241,12 @@ export async function updateEmployee(
       ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
       ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
       ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
-      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth || null }),
+      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
       ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
-      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining || null }),
+      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),
       ...(updates.optOutPF !== undefined && { opt_out_pf: updates.optOutPF }),
       ...(updates.optOutPT !== undefined && { opt_out_pt: updates.optOutPT }),
-    })
+    } as any)
     .eq('id', id)
     .select()
     .single();

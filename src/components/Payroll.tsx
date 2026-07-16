@@ -20,7 +20,6 @@ import {
   sendBulkSlips,
   releaseAndSyncSlips,
   fetchAllClBalances,
-  updateClBalance,
   computeLopDays,
   numberToWords,
   computeNet,
@@ -31,7 +30,6 @@ import {
   type PayrollRecord,
   type SlipRow,
   type BulkSendResult,
-  type ClBalance,
   type PayslipSchedule,
   getDaysInMonth
 } from '../api/payroll';
@@ -123,10 +121,10 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions + (record.lopDeduction ?? 0);
   const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
 
-  let addHeads = record.additionHeads;
-  let dedHeads = record.deductionHeads;
-  let addValues = record.additionValues;
-  let dedValues = record.deductionValues;
+  let addHeads = record.additionHeads ?? [];
+  let dedHeads = record.deductionHeads ?? [];
+  let addValues = record.additionValues ?? [];
+  let dedValues = record.deductionValues ?? [];
 
   // Only re-compute if the record has no saved heads/values at all.
   // If they exist (even partly empty), use them — they were calculated
@@ -1816,7 +1814,7 @@ const SalaryEngine: React.FC = () => {
   const [sortAsc, setSortAsc] = useState(true);
   const [filterDept, setFilterDept] = useState('All');
   /** CL balances map: employeeId -> { total, used } */
-  const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
+  // const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
   const [activeTab, setActiveTab] = useState<'engine' | 'heads' | 'formulas' | 'employees'>('engine');
   const [showFormulaRef, setShowFormulaRef] = useState(false);
 
@@ -1876,7 +1874,6 @@ const SalaryEngine: React.FC = () => {
     });
 
     setRecords(updatedData);
-    setClBalances(balances);
     setLoading(false);
 
     if (needsSync) {
@@ -1981,8 +1978,6 @@ const SalaryEngine: React.FC = () => {
   const handleApplyAll = async () => {
     setApplyingAll(true);
     // Apply formulas to each record individually so LOP days are included
-    const balances = await fetchAllClBalances();
-    setClBalances(balances);
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
