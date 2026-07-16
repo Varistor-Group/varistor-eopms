@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllEmployeeBalances, updateEmployeeBalance, getLeaveTypes } from '../api/leaves';
+import { getAllEmployeeBalances, updateEmployeeBalance, getLeaveTypes, migrateExistingEmployeeBalances } from '../api/leaves';
 import { getEmployees, type Employee } from '../api/employees';
 import type { EmployeeLeaveBalance, LeaveTypeModel } from '../types';
 
@@ -19,6 +19,8 @@ export const LeaveBalanceManager: React.FC = () => {
   const [newEmployeeId, setNewEmployeeId] = useState('');
   const [newLeaveType, setNewLeaveType] = useState('');
   const [newTotal, setNewTotal] = useState<number>(0);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateMsg, setMigrateMsg] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -55,17 +57,42 @@ export const LeaveBalanceManager: React.FC = () => {
     fetchData();
   };
 
+  const handleMigrateAll = async () => {
+    setMigrating(true);
+    setMigrateMsg('');
+    const { seeded, skipped } = await migrateExistingEmployeeBalances();
+    setMigrateMsg(`Done: ${seeded} employee(s) seeded, ${skipped} already had balances.`);
+    setMigrating(false);
+    fetchData();
+  };
+
   return (
     <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
       <div className="flex justify-between items-center mb-6 border-b border-varistor-border pb-4">
         <h3 className="text-lg font-bold text-varistor-dark">Employee Leave Balances</h3>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-varistor-dark text-white rounded-lg hover:bg-gray-800 text-sm font-semibold transition-colors"
-        >
-          {showAddForm ? 'Cancel' : 'Add Employee Balance'}
-        </button>
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={handleMigrateAll}
+            disabled={migrating}
+            className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold transition-colors disabled:opacity-50"
+            title="Auto-seed 12-day balances for employees who have none"
+          >
+            {migrating ? 'Seeding…' : 'Seed Missing Balances'}
+          </button>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="px-4 py-2 bg-varistor-dark text-white rounded-lg hover:bg-gray-800 text-sm font-semibold transition-colors"
+          >
+            {showAddForm ? 'Cancel' : 'Add Employee Balance'}
+          </button>
+        </div>
       </div>
+
+      {migrateMsg && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700 font-semibold">
+          {migrateMsg}
+        </div>
+      )}
 
       {showAddForm && (
         <form onSubmit={handleAddNewBalance} className="mb-6 bg-varistor-surfaceMuted p-4 rounded-lg border border-varistor-border flex gap-4 items-end">

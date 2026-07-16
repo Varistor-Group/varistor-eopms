@@ -188,19 +188,9 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     .eq('employee_id', input.employeeId)
     .single();
 
-  // Create leave balance entry (legacy table, kept for backwards compatibility)
-  await supabase.from('leave_balances').insert({ employee_id: input.employeeId });
-
-  // Auto-initialise the standard 12-day leave balance in the per-type model the
-  // leave module reads. New employees always start at 12; only HR/Admin can
-  // adjust it afterwards via the Leave Balance Manager.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).from('employee_leave_balances').insert({
-    employee_id: input.employeeId,
-    leave_type_name: 'Casual Leave',
-    total: 12,
-    used: 0,
-  });
+  // Create leave balance entries — initialise 12 days per active leave type
+  const { initEmployeeLeaveBalances } = await import('./leaves');
+  await initEmployeeLeaveBalances(input.employeeId);
 
   // Log activity
   await supabase.from('activity_log').insert({

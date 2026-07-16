@@ -4,7 +4,7 @@ import ReactPlayer from 'react-player';
 const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
-import { getDepartments } from '../api/employees';
+import { getDepartments, getEmployees } from '../api/employees';
 import type { TrainingModule, TrainingTrack, UserRole } from '../types';
 
 interface Props {
@@ -51,7 +51,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const [durationError, setDurationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const departments = useMemo(() => getDepartments(), []);
+  const [departments, setDepartments] = useState<string[]>(() => getDepartments());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +63,14 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   }, [file, videoUrl]);
 
   const youtubeId = useMemo(() => extractYouTubeId(videoUrl), [videoUrl]);
+
+  useEffect(() => {
+    getEmployees().then(emps => {
+      const fromDb = [...new Set(emps.map(e => e.department).filter(Boolean))] as string[];
+      const merged = [...new Set([...getDepartments(), ...fromDb])].sort();
+      setDepartments(merged);
+    }).catch(() => { /* keep defaults on error */ });
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

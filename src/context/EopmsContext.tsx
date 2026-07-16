@@ -4,7 +4,6 @@ import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriorit
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore, updateEmployee } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
-import { markAbsentForRange } from '../api/attendance';
 import { API_URL } from '../config/api';
 import { supabase } from '../lib/supabase';
 
@@ -314,17 +313,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
   };
 
-  const rejectLeave = (leaveId: string, comment: string) => {
+  const rejectLeave = async (leaveId: string, comment: string) => {
     const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
-    rejectLeaveRequest(leaveId, reviewerName, comment);
-
-    // A rejected leave means those days are unauthorised absence — mark them Absent
-    // in the attendance record so they reflect in reports and payroll (LOP).
-    const rejected = leaveRequests.find(r => r.id === leaveId);
-    if (rejected) {
-      markAbsentForRange(rejected.employeeId, rejected.from, rejected.to, `Leave rejected: ${comment}`, reviewerName);
-    }
-
+    await rejectLeaveRequest(leaveId, reviewerName, comment);
     setLeaveRequests(prev => prev.map(r => r.id === leaveId ? { ...r, status: 'Rejected', reviewerName, rejectionComment: comment, reviewedAt: new Date().toISOString() } : r));
     addToast('Leave request rejected', 0, 'debit');
   };

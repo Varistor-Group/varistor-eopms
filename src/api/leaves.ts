@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase';
 import type { LeaveRequest, LeaveBalance, LeaveTypeModel, EmployeeLeaveBalance } from '../types';
+import { getEmployees } from './employees';
 
 export const INDIA_HOLIDAYS_2026: string[] = [
   '2026-01-26','2026-03-25','2026-04-02','2026-04-14','2026-04-29',
@@ -99,6 +100,58 @@ export async function getAllEmployeeBalances(): Promise<EmployeeLeaveBalance[]> 
   const { data, error } = await (supabase as any).from('employee_leave_balances').select('*');
   if (error) { console.error('[getAllEmployeeBalances]', error.message); return []; }
   return data ?? [];
+}
+
+/**
+ * Initialises leave balances for a single employee.
+ * Called automatically when a new employee is created.
+ * Seeds one row per active leave type with total = default_allocation (or 12 days fallback), used = 0.
+ */
+export async function initEmployeeLeaveBalances(employeeId: string): Promise<void> {
+  const types = await getLeaveTypes();
+  if (types.length === 0) {
+    // Fallback: create a single Annual Leave entry with 12 days
+    await (supabase as any)
+      .from('employee_leave_balances')
+      .upsert(
+        { employee_id: employeeId, leave_type_name: 'Annual Leave', total: 12, used: 0 },
+        { onConflict: 'employee_id,leave_type_name' }
+      );
+    return;
+  }
+  const rows = types.map(t => ({
+    employee_id: employeeId,
+    leave_type_name: t.name,
+    total: t.default_allocation > 0 ? t.default_allocation : 12,
+    used: 0,
+  }));
+  const { error } = await (supabase as any)
+    .from('employee_leave_balances')
+    .upsert(rows, { onConflict: 'employee_id,leave_type_name' });
+  if (error) console.error('[initEmployeeLeaveBalances]', error.message);
+}
+
+/**
+ * One-time migration: seeds 12-day balances for any employee who has no leave balance rows.
+ * HR/Admin can trigger this from the LeaveBalanceManager UI.
+ * Safe to run multiple times — uses upsert on conflict.
+ */
+export async function migrateExistingEmployeeBalances(): Promise<{ seeded: number; skipped: number }> {
+  const [employees, existingBalances] = await Promise.all([
+    getEmployees(),
+    getAllEmployeeBalances(),
+  ]);
+
+  const employeesWithBalances = new Set(existingBalances.map(b => b.employee_id));
+  const missing = employees.filter(e => e.status === 'Active' && !employeesWithBalances.has(e.employeeId));
+
+  let seeded = 0;
+  for (const emp of missing) {
+    await initEmployeeLeaveBalances(emp.employeeId);
+    seeded++;
+  }
+
+  return { seeded, skipped: employees.length - missing.length };
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -199,7 +252,7 @@ export async function approveLeaveRequest(leaveId: string, reviewerName: string)
   }
 }
 
-export function rejectLeaveRequest(leaveId: string, reviewerName: string, comment: string): void {
+export async function rejectLeaveRequest(leaveId: string, reviewerName: string, comment: string): Promise<void> {
   const request = mockLeaveRequests.find(r => r.id === leaveId);
   if (!request || request.status !== 'Pending') return;
 
@@ -208,14 +261,38 @@ export function rejectLeaveRequest(leaveId: string, reviewerName: string, commen
   request.rejectionComment = comment;
   request.reviewedAt = new Date().toISOString();
 
-  supabase.from('leave_requests').update({
+  // Persist rejection to Supabase
+  const { error } = await supabase.from('leave_requests').update({
     status: 'Rejected',
     reviewer_name: reviewerName,
     rejection_comment: comment,
     reviewed_at: request.reviewedAt,
-  }).eq('id', leaveId).then(({ error }) => {
-    if (error) console.error('[rejectLeaveRequest]', error.message);
-  });
+  }).eq('id', leaveId);
+  if (error) console.error('[rejectLeaveRequest]', error.message);
+
+  // FIX 2: Mark each working day in the rejected leave period as Absent in attendance
+  // Import is deferred to avoid circular deps — attendance module imports from leaves
+  try {
+    const { updateAttendance } = await import('./attendance');
+    const start = new Date(request.from + 'T00:00:00');
+    const end = new Date(request.to + 'T00:00:00');
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const dateStr = cursor.toISOString().split('T')[0];
+      if (!isWeekend(dateStr) && !isHoliday(dateStr)) {
+        const ledgerId = `atl-${request.employeeId}-${dateStr}`;
+        await updateAttendance(
+          ledgerId,
+          { status: 'Absent' },
+          `Leave rejected: ${comment || 'No reason provided'}`,
+          reviewerName
+        );
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } catch (e) {
+    console.error('[rejectLeaveRequest] attendance update failed', e);
+  }
 }
 
 // In-memory cache (populated on first load)
