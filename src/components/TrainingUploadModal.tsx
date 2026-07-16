@@ -244,7 +244,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
             </div>
             <div>
               <label className={labelCls}>Department <span className="normal-case font-normal">(optional)</span></label>
-              <select className={inputCls} value={department} onChange={e => setDepartment(e.target.value)} disabled={track !== 'Department'}>
+              <select className={inputCls} value={department} onChange={e => setDepartment(e.target.value)}>
                 <option value="">All departments</option>
                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
               </select>

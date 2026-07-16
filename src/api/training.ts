@@ -111,7 +111,8 @@ function writeSavedAnswers(data: Record<string, Record<string, number>>) {
 export const trainingApi = {
   async fetchModulesWithStatus(employeeId: string, role?: UserRole, department?: string): Promise<TrainingModuleWithStatus[]> {
     const [{ data: modulesData }, { data: progressData }, { data: attemptsData }] = await Promise.all([
-      supabase.from('training_modules').select('*').order('order', { ascending: true }),
+      // Exclude built-in seed modules — only show real, HR/Admin-uploaded content.
+      supabase.from('training_modules').select('*').eq('is_seed', false).order('order', { ascending: true }),
       supabase.from('training_progress').select('*').eq('employee_id', employeeId),
       supabase.from('quiz_attempts').select('*').eq('employee_id', employeeId),
     ]);

@@ -331,6 +331,14 @@ const TrainingLibrary: React.FC = () => {
             </div>
           ))}
         </div>
+      ) : modules.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <BookOpen size={40} strokeWidth={1.5} className="text-varistor-muted mb-3" />
+          <p className="text-sm font-semibold text-varistor-dark">No training modules yet</p>
+          <p className="text-xs text-varistor-muted mt-1">
+            {isManager ? 'Upload a module to get started.' : 'Check back soon — modules will appear here once published.'}
+          </p>
+        </div>
       ) : (
         <div className="space-y-10">
           {TRACK_ORDER.map(track => {

@@ -149,6 +149,7 @@ export interface LivePunchEvent {
 
 import { getEmployees } from './employees';
 import type { Employee } from './employees';
+import { getAllEmployeeBalances } from './leaves';
 
 export interface RosterEmployee {
   id: string;
@@ -432,6 +433,46 @@ export async function updateAttendance(
 }
 
 /**
+ * Marks an employee Absent for every working day in [from, to] (inclusive).
+ * Used when a leave request is rejected: the requested days become Absent so they
+ * surface in the attendance reports and payroll (Loss of Pay). Weekends (Sunday)
+ * and holidays are skipped. Writes to the same override store HR edits use.
+ */
+export function markAbsentForRange(
+  employeeId: string,
+  from: string,
+  to: string,
+  reason: string,
+  editorId: string
+): void {
+  if (!from || !to) return;
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return;
+
+  const holidayDates = _holidayDates();
+  const now = new Date().toISOString();
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const iso = cursor.toISOString().split('T')[0];
+    const isWeekOff = cursor.getDay() === 0; // Sunday = week-off (matches generator)
+    if (!isWeekOff && !holidayDates.includes(iso)) {
+      const ledgerId = `atl-${employeeId}-${iso}`;
+      const existing = _overrides.get(ledgerId) || {};
+      _overrides.set(ledgerId, {
+        ...existing,
+        status: 'Absent',
+        source: 'hr_override',
+        override_reason: reason,
+        editor_id: editorId,
+        edited_at: now,
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+/**
  * Aggregates present/leave/WO/holiday/total hrs/payable days per employee for a month.
  * TODO: supabase.from('attendance_ledger').select('*').eq('date', ...) with aggregation
  */
@@ -446,24 +487,40 @@ export async function getMonthlyReport(
     ? fullRoster.filter(e => employeeIds.includes(e.id))
     : fullRoster;
 
+  // Paid-leave pool per employee — an approved-leave day only stays "Leave" (paid)
+  // while the balance lasts; once exhausted it becomes Absent (Loss of Pay).
+  const allBalances = await getAllEmployeeBalances();
+
   return roster.map((emp, empIndex) => {
     let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
     const dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[] = [];
+
+    const empBalances = allBalances.filter(b => b.employee_id === emp.id);
+    let remainingLeave = empBalances.length > 0
+      ? empBalances.reduce((sum, b) => sum + (b.total - b.used), 0)
+      : 12; // default 12-day standard entitlement when no balance recorded
 
     dates.forEach((date, di) => {
       const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());
       const override = _overrides.get(entry.id);
       const final = override ? { ...entry, ...override } : entry;
 
+      // Resolve leave against the remaining paid balance (LOP rules 2, 3 & 4).
+      let effStatus: AttendanceStatus = final.status;
+      if (final.status === 'Leave') {
+        if (remainingLeave > 0) remainingLeave--;
+        else effStatus = 'Absent'; // balance exhausted → Absent (Loss of Pay)
+      }
+
       dailyRecords.push({
         date: final.date,
         punch_in: final.punch_in,
         punch_out: final.punch_out,
         work_hours: final.work_hours ?? undefined,
-        status: final.status,
+        status: effStatus,
       });
 
-      switch (final.status) {
+      switch (effStatus) {
         case 'Present': present++; break;
         case 'Late': late++; present++; break;
         case 'Half-day': halfDay++; break;

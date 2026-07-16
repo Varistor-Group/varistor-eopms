@@ -132,20 +132,35 @@ export async function sendPasswordReset(email: string): Promise<{ success: boole
     return { success: false, error: 'Please enter a valid email address.' };
   }
 
+  const redirectTo = `${window.location.origin}/reset-password`;
+
+  // Primary path: the backend generates a Supabase recovery link and emails it
+  // via the company SMTP (branded email). Parse defensively — a misconfigured
+  // API_URL can return non-JSON (e.g. a 404/500 HTML page).
   try {
     const res = await fetch(`${API_URL}/api/send-password-reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    const data = await res.json();
-    if (!data.success) {
-      return { success: false, error: data.error || 'Failed to send reset link.' };
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success) {
+      return { success: true, message: 'Reset link sent — check your inbox.' };
     }
-    return { success: true, message: 'Reset link sent — check your inbox.' };
+    // Backend reachable but did not generate/send the link — fall through to
+    // Supabase's built-in reset so the user still receives a working link.
+    console.warn('[sendPasswordReset] backend did not send link:', data?.error ?? `HTTP ${res.status}`);
   } catch (err) {
-    return { success: false, error: 'Could not reach the server. Make sure the backend is running.' };
+    console.warn('[sendPasswordReset] backend unreachable:', err);
   }
+
+  // Fallback path: Supabase Auth generates its own recovery token + link and
+  // emails it directly. This guarantees a proper reset token is always produced.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) {
+    return { success: false, error: 'Could not generate a reset link. Please contact HR/Admin.' };
+  }
+  return { success: true, message: 'Reset link sent — check your inbox.' };
 }
 
 export async function updatePassword(password: string): Promise<{ success: boolean; error?: string }> {

@@ -1399,6 +1399,11 @@ const POLL_INTERVAL_MS = 60000;
 const lastPunchTs = new Map();
 const DEDUP_WINDOW_MS = 30000; // 30-second guard
 
+// Per-day scan tracker: key `${employeeId}-${YYYY-MM-DD}` → { punchIn, punchOut }
+// Rule: first scan of the day = Punch IN, last scan = Punch OUT, anything in
+// between is ignored. A single scan is Punch IN only (Punch OUT stays null).
+const dailyPunches = new Map();
+
 let _liveFeed = [];
 let _deviceStatus = {
   ipAddress: DEVICE_IP,
@@ -1530,21 +1535,43 @@ function markDeviceOffline() {
 }
 
 /**
- * Process a parsed punch event from the device.
- * Guards against duplicate punches within 30 seconds.
+ * Process a parsed scan event from the device.
+ * Guards against duplicate scans within 30 seconds, then classifies the scan by
+ * its order within the day (the raw in/out flag from the device is ignored):
+ *   - First scan of the day  → Punch IN
+ *   - Any later scan         → Punch OUT (last one wins; intermediate scans just
+ *                              move the OUT time forward and are otherwise ignored)
+ *   - A single scan          → Punch IN only, Punch OUT stays null
  */
-function processPunchEvent(employeeId, type, confidence) {
+function processPunchEvent(employeeId, _deviceFlag, confidence) {
   const now = Date.now();
   const lastTs = lastPunchTs.get(employeeId);
   if (lastTs && now - lastTs < DEDUP_WINDOW_MS) {
-    console.log(`[Device Bridge] Dedup: ignored punch for ${employeeId} (within 30s window)`);
+    console.log(`[Device Bridge] Dedup: ignored scan for ${employeeId} (within 30s window)`);
     return;
   }
   lastPunchTs.set(employeeId, now);
 
+  const nowIso = new Date().toISOString();
+  const date = nowIso.slice(0, 10);
+  const key = `${employeeId}-${date}`;
+
+  const dayRec = dailyPunches.get(key);
+  let type;
+  if (!dayRec) {
+    // First scan of the day → Punch IN
+    type = 'in';
+    dailyPunches.set(key, { punchIn: nowIso, punchOut: null });
+  } else {
+    // Every subsequent scan → Punch OUT; the latest one wins, so a scan in the
+    // middle of the day simply becomes the new (tentative) OUT time.
+    type = 'out';
+    dayRec.punchOut = nowIso;
+  }
+
   const event = {
     id: `pev-${now}-${employeeId}`,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso,
     employeeId,
     employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
     type,

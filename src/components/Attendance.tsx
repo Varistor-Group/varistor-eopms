@@ -311,9 +311,14 @@ export const Attendance: React.FC = () => {
     if (result.success) {
       addToast('Attendance updated. Audit record created.', 0, 'credit');
       setEditingEntry(null);
-      // Refresh daily data
-      const refreshed = await getAttendanceByDate(selectedDate);
+      // Refresh daily data AND the monthly report below it so the edit reflects
+      // immediately in both views (both read from the same override store).
+      const [refreshed, refreshedReport] = await Promise.all([
+        getAttendanceByDate(selectedDate),
+        getMonthlyReport(reportMonth),
+      ]);
       setDailyData(refreshed);
+      setMonthlyReport(refreshedReport);
     } else {
       addToast(result.error || 'Update failed.', 0, 'debit');
     }
