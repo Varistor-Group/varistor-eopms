@@ -448,7 +448,7 @@ export async function getMonthlyReport(
 
   return roster.map((emp, empIndex) => {
     let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
-    const dailyRecords: { date: string; punch_in?: string; punch_out?: string }[] = [];
+    const dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[] = [];
 
     dates.forEach((date, di) => {
       const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());

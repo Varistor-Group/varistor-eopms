@@ -20,7 +20,6 @@ import {
   sendBulkSlips,
   releaseAndSyncSlips,
   fetchAllClBalances,
-  updateClBalance,
   computeLopDays,
   numberToWords,
   computeNet,
@@ -31,7 +30,6 @@ import {
   type PayrollRecord,
   type SlipRow,
   type BulkSendResult,
-  type ClBalance,
   type PayslipSchedule,
   getDaysInMonth
 } from '../api/payroll';
@@ -162,14 +160,14 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const deductions: { label: string; val: number | null }[] = [];
 
   for (let i = 0; i < 10; i++) {
-    const addName = addHeads[i]?.trim();
+    const addName = (addHeads ?? [])[i]?.trim();
     if (addName) {
       earnings.push({ label: addName, val: addValues?.[i] ?? null });
     } else {
       earnings.push({ label: '', val: null });
     }
 
-    const dedName = dedHeads[i]?.trim();
+    const dedName = (dedHeads ?? [])[i]?.trim();
     if (dedName) {
       deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
     } else {
@@ -1815,8 +1813,6 @@ const SalaryEngine: React.FC = () => {
   const [sortField, setSortField] = useState<keyof PayrollRecord>('employeeName');
   const [sortAsc, setSortAsc] = useState(true);
   const [filterDept, setFilterDept] = useState('All');
-  /** CL balances map: employeeId -> { total, used } */
-  const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
   const [activeTab, setActiveTab] = useState<'engine' | 'heads' | 'formulas' | 'employees'>('engine');
   const [showFormulaRef, setShowFormulaRef] = useState(false);
 
@@ -1876,7 +1872,6 @@ const SalaryEngine: React.FC = () => {
     });
 
     setRecords(updatedData);
-    setClBalances(balances);
     setLoading(false);
 
     if (needsSync) {
@@ -1981,8 +1976,7 @@ const SalaryEngine: React.FC = () => {
   const handleApplyAll = async () => {
     setApplyingAll(true);
     // Apply formulas to each record individually so LOP days are included
-    const balances = await fetchAllClBalances();
-    setClBalances(balances);
+    await fetchAllClBalances(); // Ensure they are fetched and stored in backend cache
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
