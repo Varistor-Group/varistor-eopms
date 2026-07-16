@@ -274,3 +274,18 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #salary-slip-overlay, #salary-slip-overlay * {
+    visibility: visible;
+  }
+  #salary-slip-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

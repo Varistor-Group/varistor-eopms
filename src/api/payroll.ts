@@ -15,6 +15,7 @@
  *  - Approved rows locked via DB trigger
  */
 import { getEmployees } from './employees';
+import { getMonthlyReport } from './attendance';
 
 
 
@@ -77,6 +78,8 @@ export interface PayrollRecord {
     absent: number;
   };
   deduction?: number;
+  lopDays?: number;
+  lopDeduction?: number;
 }
 
 export interface PayrollAuditEntry {
@@ -176,7 +179,7 @@ function evaluateFormula(equation: string, context: Record<string, number>): num
     for (const key of sortedKeys) {
       const val = context[key];
       const escapedKey = key.replace(/\$/g, '\\$');
-      const regex = new RegExp(escapedKey + '\\b', 'g');
+      const regex = new RegExp(escapedKey + '\\b', 'gi');
       sanitized = sanitized.replace(regex, String(val));
     }
 
@@ -284,12 +287,39 @@ export function computeNet(params: {
       { code: "F3", name: "MEDICAL ALLOWANCE", equation: "Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))" },
       { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
       { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
-      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "$BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)" },
-      { code: "F7", name: "PF", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
-      { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
-      { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
+      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "$Prorata - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)" },
+      { code: "F7", name: "PF", equation: "($Basic >= 15000 ? 1800 : Math.round($Basic * 12%)) * $haspf" },
+      { code: "F8", name: "ESI", equation: "($Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)) * $hasesi" },
+      { code: "F9", name: "PT", equation: "($Gross >= 15001 ? 200 : 0) * $haspt" }
     ];
-    formulas = formulasRaw ? JSON.parse(formulasRaw) : [];
+    if (formulasRaw) {
+      formulas = JSON.parse(formulasRaw);
+      let migrated = false;
+      formulas = formulas.map((f: any) => {
+        const isPf = /(^|[^a-z])pf([^a-z]|$)/i.test(f.name || '') || /provident/i.test(f.name || '');
+        const isEsi = /(^|[^a-z])esi([^a-z]|$)/i.test(f.name || '');
+        const isPt = /(^|[^a-z])pt([^a-z]|$)/i.test(f.name || '') || /professional\s*tax/i.test(f.name || '');
+
+        if (isPf && !f.equation.toLowerCase().includes('$haspf')) {
+          f.equation = `(${f.equation}) * $haspf`;
+          migrated = true;
+        }
+        if (isEsi && !f.equation.toLowerCase().includes('$hasesi')) {
+          f.equation = `(${f.equation}) * $hasesi`;
+          migrated = true;
+        }
+        if (isPt && !f.equation.toLowerCase().includes('$haspt')) {
+          f.equation = `(${f.equation}) * $haspt`;
+          migrated = true;
+        }
+        return f;
+      });
+      if (migrated) {
+        localStorage.setItem('eopms_salary_formulas', JSON.stringify(formulas));
+      }
+    } else {
+      formulas = [];
+    }
     if (formulas.length < 9) {
       formulas = defaultFormulas;
       localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaultFormulas));
@@ -312,11 +342,11 @@ export function computeNet(params: {
           migrated = true;
           return { ...f, equation: 'Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))' };
         }
-        // Migrate old pro-rata or clamped special allowance formula to raw CTC-based formula
+        // Migrate old pro-rata or clamped special allowance formula to prorata-based formula
         if ((f.code === 'F6' || f.name?.toUpperCase().includes('SPECIAL')) &&
-            (f.equation?.includes('Math.max(0') || (f.equation?.includes('$DIM') && f.equation?.includes('$SP')))) {
+            (f.equation?.includes('Math.max(0') || f.equation?.includes('$BS -'))) {
           migrated = true;
-          return { ...f, equation: '$BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)' };
+          return { ...f, equation: '$Prorata - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)' };
         }
         return f;
       });
@@ -349,7 +379,10 @@ export function computeNet(params: {
     '$SP': present,
     '$SW': weekOff,
     '$SL': leaves,
-    '$SH': holidays
+    '$SH': holidays,
+    '$haspf': params.hasPf !== false ? 1 : 0,
+    '$hasesi': params.hasEsi !== false ? 1 : 0,
+    '$haspt': params.hasPt !== false ? 1 : 0,
   };
 
   const additionValues = Array(10).fill(0);
@@ -423,17 +456,29 @@ export function computeNet(params: {
     if (!headName) continue;
 
     const formula = formulas.find(f => f.name?.trim().toLowerCase() === headName.toLowerCase());
+    const isPf = /(^|[^a-z])pf([^a-z]|$)/i.test(headName) || /provident/i.test(headName);
+    const isEsi = /(^|[^a-z])esi([^a-z]|$)/i.test(headName);
+    const isPt = /(^|[^a-z])pt([^a-z]|$)/i.test(headName) || /professional\s*tax/i.test(headName);
+
     if (formula?.equation) {
-      deductionValues[i] = evaluateFormula(formula.equation, context);
+      if (isPf && params.hasPf === false) {
+        deductionValues[i] = 0;
+      } else if (isEsi && params.hasEsi === false) {
+        deductionValues[i] = 0;
+      } else if (isPt && params.hasPt === false) {
+        deductionValues[i] = 0;
+      } else {
+        deductionValues[i] = evaluateFormula(formula.equation, context);
+      }
     } else {
       // Fallback
-      if (['pf', 'pf employee', 'pf employer'].includes(headName.toLowerCase())) {
+      if (isPf) {
         const rawPf = basic >= 15000 ? 1800 : Math.round(basic * (pfPct / 100));
         deductionValues[i] = (params.hasPf !== false) ? rawPf : 0;
-      } else if (headName.toLowerCase() === 'esi') {
+      } else if (isEsi) {
         const rawEsi = ctc > 21000 ? 0 : Math.ceil(gross * (esiPct / 100 || 0.0325));
         deductionValues[i] = (params.hasEsi !== false) ? rawEsi : 0;
-      } else if (headName.toLowerCase() === 'pt') {
+      } else if (isPt) {
         const rawPt = getPTAmount(gross, ptRanges);
         deductionValues[i] = (params.hasPt !== false) ? rawPt : 0;
       } else if (headName.toLowerCase() === 'tds') {
@@ -446,7 +491,7 @@ export function computeNet(params: {
     }
 
     // Populate context
-    const cleanName = headName.replace(/[^a-zA-Z0-9]/g, '');
+    const cleanName = headName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     context['$' + cleanName] = deductionValues[i];
     context['$' + cleanName.toLowerCase()] = deductionValues[i];
     context['$' + cleanName.toUpperCase()] = deductionValues[i];
@@ -455,9 +500,9 @@ export function computeNet(params: {
   }
 
   // 7. LOP deduction
-  const lopDays = Math.max(0, params.lopDays ?? 0);
-  const dailyRate = Math.round(monthlySalary / totalDays);
-  const lopDeduction = lopDays * dailyRate;
+  const lopDays = Math.max(0, params.lopDays ?? params.attendanceBreakdown?.absent ?? 0);
+  const dailyRate = monthlySalary / totalDays;
+  const lopDeduction = Math.round(lopDays * dailyRate);
 
   if (lopDeduction > 0) {
     const emptyIdx = dedHeads.findIndex(h => !h || h.trim() === '');
@@ -467,11 +512,16 @@ export function computeNet(params: {
     }
   }
 
-  const totalDeductions = deductionValues.reduce((a, b) => a + b, 0);
+  const pfEmployee = context['$pfemployee'] ?? context['$pf'] ?? 0;
+  const pfEmployer = context['$pfemployer'] ?? 0;
+  const esi = context['$esi'] ?? 0;
+  const pt = context['$pt'] ?? 0;
+  const otherDeductionsVal = params.otherDeductions ?? context['$otherdeductions'] ?? context['$advancesalaryadjut'] ?? 0;
+  
+  const totalDeductionsExcludingLop = pfEmployee + pfEmployer + esi + pt + otherDeductionsVal;
+  const totalDeductions = totalDeductionsExcludingLop + lopDeduction;
   const netPay = monthlySalary - lopDeduction;
   
-  // Calculate total statutory and other deductions (excluding LOP)
-  const totalDeductionsExcludingLop = totalDeductions - lopDeduction;
   const finalPay = netPay - totalDeductionsExcludingLop + (params.reimbursement ?? 0) + (params.overtime ?? 0) + (params.incentives ?? 0);
 
   // Return standard fields for compatibility
@@ -479,7 +529,7 @@ export function computeNet(params: {
   const ta = context['$ta'] ?? context['$travelallowance'] ?? 2500;
   const lta = context['$lta'] ?? 3500;
   const specialAllowance = context['$specialallowance'] ?? context['$SPECIALALLOWANCE'] ??
-    (monthlySalary - (basic + (context['$hra'] ?? 0) + medical + ta + lta));
+    (prorata - (basic + (context['$hra'] ?? 0) + medical + ta + lta));
 
   return {
     monthlySalary,
@@ -713,9 +763,91 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
     const targetMonth = 'Jun 2026';
     let modified = false;
 
+    let attendanceReports: any[] = [];
+    try {
+      attendanceReports = await getMonthlyReport('2026-06');
+    } catch (e) {
+      console.warn('Could not fetch attendance reports for payroll', e);
+    }
+
+    // Sync existing unapproved records with latest employee opt-out settings
+    _records = _records.map(r => {
+      if (r.status === 'approved') return r;
+      const emp = employees.find(e => e.employeeId === r.employeeId);
+      if (emp) {
+        const expectedHasPf = !emp.optOutPF;
+        const expectedHasPt = !emp.optOutPT;
+        const expectedUan = emp.uanNumber || '—';
+        const attendance = attendanceReports.find(a => a.employee_id === emp.employeeId || a.id === emp.employeeId);
+        const latestAttendanceBreakdown = attendance ? {
+          present: attendance.present || 0,
+          weekOff: attendance.weekOff || 0,
+          leaves: attendance.leaves || 0,
+          holidays: attendance.holidays || 0,
+          absent: attendance.absent || 0,
+        } : r.attendanceBreakdown;
+
+        if (r.hasPf !== expectedHasPf || r.hasPt !== expectedHasPt || r.pfUan !== expectedUan || JSON.stringify(r.attendanceBreakdown) !== JSON.stringify(latestAttendanceBreakdown)) {
+          modified = true;
+          const comp = computeNet({
+            monthlySalary: r.monthlySalary,
+            monthlyCtc: r.ctc,
+            totalDays: r.totalDays,
+            payDays: r.payDays,
+            medical: r.components.medical,
+            ta: r.components.ta,
+            lta: r.components.lta,
+            reimbursement: r.components.reimbursement,
+            incentives: r.components.incentives,
+            overtime: r.components.overtime,
+            tds: r.components.tds,
+            otherDeductions: r.components.otherDeductions,
+            hasPf: expectedHasPf,
+            hasEsi: r.hasEsi,
+            hasPt: expectedHasPt,
+            employeeId: r.employeeId,
+            attendanceBreakdown: latestAttendanceBreakdown,
+          });
+          return {
+            ...r,
+            hasPf: expectedHasPf,
+            hasPt: expectedHasPt,
+            pfUan: expectedUan,
+            attendanceBreakdown: latestAttendanceBreakdown,
+            additionHeads: comp.additionHeads,
+            deductionHeads: comp.deductionHeads,
+            additionValues: comp.additionValues,
+            deductionValues: comp.deductionValues,
+            components: {
+              ...r.components,
+              pfEmployee: comp.pfEmployee,
+              pfEmployer: comp.pfEmployer,
+              pt: comp.pt,
+              basic: comp.basic,
+              hra: comp.hra,
+              esi: comp.esi,
+              specialAllowance: comp.specialAllowance,
+            },
+            netPay: comp.netPay,
+            finalPay: comp.finalPay,
+          };
+        }
+      }
+      return r;
+    });
+
     for (const emp of employees) {
       const exists = _records.some(r => r.employeeId === emp.employeeId && r.month === targetMonth);
       if (!exists) {
+        const attendance = attendanceReports.find(a => a.employee_id === emp.employeeId || a.id === emp.employeeId);
+        const newAttendanceBreakdown = attendance ? {
+          present: attendance.present || 0,
+          weekOff: attendance.weekOff || 0,
+          leaves: attendance.leaves || 0,
+          holidays: attendance.holidays || 0,
+          absent: attendance.absent || 0,
+        } : undefined;
+
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
@@ -729,10 +861,11 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           overtime: 0,
           tds: 0,
           otherDeductions: 0,
-          hasPf: true,
+          hasPf: !emp.optOutPF,
           hasEsi: true,
-          hasPt: true,
+          hasPt: !emp.optOutPT,
           employeeId: emp.employeeId,
+          attendanceBreakdown: newAttendanceBreakdown,
         });
 
         const newRec: PayrollRecord = {
@@ -769,15 +902,18 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           totalDays: getDaysInMonth('June 2026'),
           payDays: 30,
           clBalance: 12,
-          pfUan: '—',
-          hasPf: true,
+          pfUan: emp.uanNumber || '—',
+          hasPf: !emp.optOutPF,
           hasEsi: true,
-          hasPt: true,
+          hasPt: !emp.optOutPT,
           slipReleased: false,
           additionHeads: comp.additionHeads,
           deductionHeads: comp.deductionHeads,
           additionValues: comp.additionValues,
           deductionValues: comp.deductionValues,
+          attendanceBreakdown: newAttendanceBreakdown,
+          lopDays: comp.lopDays,
+          lopDeduction: comp.lopDeduction,
         };
         _records.push(newRec);
         modified = true;
@@ -848,7 +984,7 @@ export async function updatePayrollRecord(
       incentives: updated.components.incentives,
       overtime: updated.components.overtime,
       tds: updated.components.tds,
-      otherDeductions: updated.components.otherDeductions,
+      otherDeductions: updated.deduction ?? updated.components.otherDeductions,
       hasPf: updated.hasPf,
       hasEsi: updated.hasEsi,
       hasPt: updated.hasPt,
@@ -878,18 +1014,21 @@ export async function updatePayrollRecord(
     updated.deductionHeads = comp.deductionHeads;
     updated.additionValues = comp.additionValues;
     updated.deductionValues = comp.deductionValues;
-  } else if (patch.components) {
+    updated.lopDays = comp.lopDays;
+    updated.lopDeduction = comp.lopDeduction;
+  } else if (patch.components || patch.deduction !== undefined) {
     const c = updated.components;
     const monthlySalary = updated.monthlySalary ?? updated.ctc;
     const totalDays = updated.totalDays || 30;
-    const payDays = updated.payDays || 30;
-    const lopDays = Math.max(0, totalDays - payDays);
+    const lopDays = updated.lopDays ?? updated.attendanceBreakdown?.absent ?? 0;
     const lopDeduction = Math.round((monthlySalary / totalDays) * lopDays);
 
-    const totalDeductionsExcludingLop = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + c.otherDeductions;
+    const totalDeductionsExcludingLop = c.pfEmployee + c.pfEmployer + c.esi + c.pt + c.tds + (updated.deduction ?? c.otherDeductions ?? 0);
     
     updated.netPay = monthlySalary - lopDeduction;
     updated.finalPay = updated.netPay - totalDeductionsExcludingLop + (c.reimbursement ?? 0) + (c.overtime ?? 0) + (c.incentives ?? 0);
+    updated.lopDays = lopDays;
+    updated.lopDeduction = lopDeduction;
   }
   _records[idx] = updated;
   savePayrollRecords(_records);
@@ -953,8 +1092,12 @@ export async function createRevision(id: string, approverEmail: string): Promise
 export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
   await delay(600);
   _records = loadPayrollRecords();
+  const employees = await getEmployees();
+  
   _records = _records.map(r => {
     if (r.status === 'approved') return r;
+    const emp = employees.find(e => e.employeeId === r.employeeId);
+    
     const monthlySalary = ctcMultiplier ? Math.round(r.monthlySalary * ctcMultiplier) : r.monthlySalary;
     const comp = computeNet({
       monthlySalary,
@@ -968,11 +1111,16 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
       overtime: r.components.overtime,
       tds: r.components.tds,
       otherDeductions: r.components.otherDeductions,
+      hasPf: emp ? !emp.optOutPF : r.hasPf,
+      hasEsi: r.hasEsi,
+      hasPt: emp ? !emp.optOutPT : r.hasPt,
       employeeId: r.employeeId,
       attendanceBreakdown: r.attendanceBreakdown,
     });
     return {
       ...r,
+      hasPf: emp ? !emp.optOutPF : r.hasPf,
+      hasPt: emp ? !emp.optOutPT : r.hasPt,
       ctc: monthlySalary,
       monthlySalary,
       autoFormula: true,
@@ -1129,7 +1277,7 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
   reportRows.forEach(row => {
     const emp = employees.find(e => e.employeeId === row.employee_id || e.id === row.employee_id);
     const clBal = clBalances[row.employee_id] ?? { total: 12, used: 0 };
-    const lopDays = Math.max(0, clBal.used - clBal.total);
+    const lopDays = row.absent || 0;
 
     const existingIdx = _records.findIndex(r => r.employeeId === row.employee_id && r.month === displayMonth);
 
@@ -1221,7 +1369,9 @@ export async function syncPayrollFromAttendance(monthStr: string, reportRows: an
         incentives: comp.incentives,
         overtime: comp.overtime,
         otherDeductions: comp.otherDeductions,
-      }
+      },
+      lopDays: comp.lopDays,
+      lopDeduction: comp.lopDeduction,
     };
 
     if (existingIdx !== -1) {
