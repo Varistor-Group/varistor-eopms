@@ -774,11 +774,11 @@
         ""
       ],
       "deductionHeads": [
-        "PF Employee",
-        "PF Employer",
+        "PF",
         "ESI",
         "PT",
         "Advance salary adjut",
+        "",
         "",
         "",
         "",
@@ -960,12 +960,12 @@
         ""
       ],
       "deductionHeads": [
-        "PF Employee",
-        "PF Employer",
+        "PF",
         "ESI",
         "PT",
         "Advance salary adjut",
         "Loss of Pay",
+        "",
         "",
         "",
         "",

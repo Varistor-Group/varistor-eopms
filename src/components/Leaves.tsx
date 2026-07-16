@@ -245,10 +245,10 @@ const Leaves: React.FC = () => {
         <div className={`${currentRole === 'Employee' ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
           
           {(currentRole === 'Admin' || currentRole === 'HR') && (
-            <>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <LeaveTypeManager />
               <LeaveBalanceManager />
-            </>
+            </div>
           )}
 
           <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor overflow-hidden">

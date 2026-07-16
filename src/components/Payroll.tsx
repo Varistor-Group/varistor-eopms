@@ -121,10 +121,10 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const totalDeductions = pfEmployee + pfEmployer + esi + pt + tds + otherDeductions + (record.lopDeduction ?? 0);
   const totalCtc = basic + hra + medical + ta + lta + specialAllowance; // gross/prorata
 
-  let addHeads = record.additionHeads;
-  let dedHeads = record.deductionHeads;
-  let addValues = record.additionValues;
-  let dedValues = record.deductionValues;
+  let addHeads = record.additionHeads ?? [];
+  let dedHeads = record.deductionHeads ?? [];
+  let addValues = record.additionValues ?? [];
+  let dedValues = record.deductionValues ?? [];
 
   // Only re-compute if the record has no saved heads/values at all.
   // If they exist (even partly empty), use them — they were calculated
@@ -1813,6 +1813,8 @@ const SalaryEngine: React.FC = () => {
   const [sortField, setSortField] = useState<keyof PayrollRecord>('employeeName');
   const [sortAsc, setSortAsc] = useState(true);
   const [filterDept, setFilterDept] = useState('All');
+  /** CL balances map: employeeId -> { total, used } */
+  // const [clBalances, setClBalances] = useState<Record<string, ClBalance>>({});
   const [activeTab, setActiveTab] = useState<'engine' | 'heads' | 'formulas' | 'employees'>('engine');
   const [showFormulaRef, setShowFormulaRef] = useState(false);
 
@@ -1976,7 +1978,8 @@ const SalaryEngine: React.FC = () => {
   const handleApplyAll = async () => {
     setApplyingAll(true);
     // Apply formulas to each record individually so LOP days are included
-    await fetchAllClBalances(); // Ensure they are fetched and stored in backend cache
+    ewwconst balances = await fetchAllClBalances();
+    setClBalances(balances);
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
@@ -2176,8 +2179,8 @@ const SalaryEngine: React.FC = () => {
                 onClick={handleApprove}
                 disabled={approving || selectedIds.size === 0}
                 className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${selectedIds.size > 0
-                    ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
-                    : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
+                  ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
+                  : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
                   } disabled:opacity-60`}
               >
                 {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
