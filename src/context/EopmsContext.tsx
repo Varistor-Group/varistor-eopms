@@ -313,9 +313,9 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
   };
 
-  const rejectLeave = (leaveId: string, comment: string) => {
+  const rejectLeave = async (leaveId: string, comment: string) => {
     const reviewerName = currentRole === 'HR' ? 'HR Team' : currentRole === 'Admin' ? 'Admin' : 'Reporting Manager';
-    rejectLeaveRequest(leaveId, reviewerName, comment);
+    await rejectLeaveRequest(leaveId, reviewerName, comment);
     setLeaveRequests(prev => prev.map(r => r.id === leaveId ? { ...r, status: 'Rejected', reviewerName, rejectionComment: comment, reviewedAt: new Date().toISOString() } : r));
     addToast('Leave request rejected', 0, 'debit');
   };

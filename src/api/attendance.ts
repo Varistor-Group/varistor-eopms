@@ -12,6 +12,49 @@
 
 import { API_URL } from '../config/api';
 
+// Lazy import to avoid circular deps (leaves imports from attendance for rejection)
+async function getApprovedLeavesForMonth(month: string): Promise<{ employeeId: string; date: string }[]> {
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const [year, mon] = month.split('-');
+    const startDate = `${year}-${mon}-01`;
+    const daysInMonth = new Date(Number(year), Number(mon), 0).getDate();
+    const endDate = `${year}-${mon}-${String(daysInMonth).padStart(2, '0')}`;
+    const { data } = await supabase
+      .from('leave_requests')
+      .select('employee_id, from_date, to_date')
+      .eq('status', 'Approved')
+      .lte('from_date', endDate)
+      .gte('to_date', startDate);
+    const result: { employeeId: string; date: string }[] = [];
+    for (const row of data ?? []) {
+      const start = new Date(row.from_date + 'T00:00:00');
+      const end = new Date(row.to_date + 'T00:00:00');
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const d = cursor.toISOString().split('T')[0];
+        if (d >= startDate && d <= endDate) result.push({ employeeId: row.employee_id, date: d });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    return result;
+  } catch { return []; }
+}
+
+async function getAllBalancesMap(): Promise<Map<string, number>> {
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const { data } = await (supabase as any).from('employee_leave_balances').select('employee_id,total,used');
+    const map = new Map<string, number>();
+    for (const row of data ?? []) {
+      const empId: string = row.employee_id;
+      const remaining = (row.total as number) - (row.used as number);
+      map.set(empId, (map.get(empId) ?? 0) + Math.max(0, remaining));
+    }
+    return map;
+  } catch { return new Map(); }
+}
+
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -446,6 +489,14 @@ export async function getMonthlyReport(
     ? fullRoster.filter(e => employeeIds.includes(e.id))
     : fullRoster;
 
+  // FIX 3: fetch approved leaves and remaining balances for LOP rules
+  const [approvedLeaves, balancesMap] = await Promise.all([
+    getApprovedLeavesForMonth(month),
+    getAllBalancesMap(),
+  ]);
+  // Build a Set<string> of 'employeeId|date' for O(1) lookup
+  const approvedLeaveSet = new Set(approvedLeaves.map(l => `${l.employeeId}|${l.date}`));
+
   return roster.map((emp, empIndex) => {
     let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
     const dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[] = [];
@@ -453,7 +504,28 @@ export async function getMonthlyReport(
     dates.forEach((date, di) => {
       const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());
       const override = _overrides.get(entry.id);
-      const final = override ? { ...entry, ...override } : entry;
+      let final = override ? { ...entry, ...override } : entry;
+
+      // FIX 3: Apply LOP rules on working days
+      const isWorking = final.status !== 'W.O' && final.status !== 'Holiday';
+      if (isWorking) {
+        const hasApprovedLeave = approvedLeaveSet.has(`${emp.id}|${date}`);
+        const remainingBalance = balancesMap.get(emp.id) ?? 0;
+        const hasPunchIn = !!final.punch_in;
+
+        if (hasApprovedLeave) {
+          // Rule 2: approved leave but balance = 0 → Absent (LOP)
+          // Rule 3: approved leave and balance > 0 → Leave (paid)
+          if (remainingBalance <= 0) {
+            final = { ...final, status: 'Absent', punch_in: undefined, punch_out: undefined };
+          } else {
+            final = { ...final, status: 'Leave', punch_in: undefined, punch_out: undefined };
+          }
+        } else if (!hasPunchIn && final.status !== 'Leave' && final.status !== 'Absent' && final.status !== 'Half-day') {
+          // Rule 1: no punch in, no approved leave → Absent (LOP)
+          final = { ...final, status: 'Absent', punch_in: undefined, punch_out: undefined };
+        }
+      }
 
       dailyRecords.push({
         date: final.date,
@@ -476,6 +548,7 @@ export async function getMonthlyReport(
     });
 
     const workingDays = dates.length - weekOff - holidays;
+    // Rule 4: Absent days = LOP — NOT counted in payableDays
     const payableDays = present + late + halfDay * 0.5;
 
     return {

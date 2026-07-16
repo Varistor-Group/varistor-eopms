@@ -188,8 +188,9 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     .eq('employee_id', input.employeeId)
     .single();
 
-  // Create leave balance entry
-  await supabase.from('leave_balances').insert({ employee_id: input.employeeId });
+  // Create leave balance entries — initialise 12 days per active leave type
+  const { initEmployeeLeaveBalances } = await import('./leaves');
+  await initEmployeeLeaveBalances(input.employeeId);
 
   // Log activity
   await supabase.from('activity_log').insert({

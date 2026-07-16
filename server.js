@@ -104,6 +104,28 @@ app.post('/api/send-password-reset', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
+    // FIX 8: Verify the employee exists in the employees table first
+    const { data: empRow } = await supabaseAdmin
+      .from('employees')
+      .select('id, full_name, auth_id')
+      .eq('personal_email', email)
+      .maybeSingle();
+
+    if (!empRow) {
+      // Security: do not reveal whether the email exists — return a generic success
+      // so we don't leak employee email information
+      return res.json({ success: true });
+    }
+
+    if (!empRow.auth_id) {
+      // Employee exists in DB but has no Supabase Auth account
+      // This means they were created via a legacy path without create_employee_with_auth
+      return res.status(400).json({
+        success: false,
+        error: `Employee account for this email has no login credentials yet. Please contact HR/Admin to regenerate credentials.`,
+      });
+    }
+
     // Generate a real Supabase password reset link via Admin API
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
@@ -115,7 +137,10 @@ app.post('/api/send-password-reset', async (req, res) => {
 
     if (linkError) {
       console.error('[send-password-reset] generateLink error:', linkError);
-      return res.status(400).json({ success: false, error: linkError.message || 'Could not generate reset link. Check that this email exists in the system.' });
+      return res.status(400).json({
+        success: false,
+        error: `Could not generate reset link: ${linkError.message}. Please contact your administrator.`,
+      });
     }
 
     const resetLink = linkData.properties?.action_link;
@@ -134,6 +159,7 @@ app.post('/api/send-password-reset', async (req, res) => {
           </div>
           <div style="background: #ffffff; padding: 32px; border: 1px solid #D8DED2; border-radius: 0 0 8px 8px;">
             <h2 style="font-size: 18px; font-weight: 600; color: #111;">Password Reset Requested</h2>
+            <p style="color: #444; line-height: 1.6;">Hi ${empRow.full_name},</p>
             <p style="color: #444; line-height: 1.6;">We received a request to reset the password for your Varistor EOPMS account.</p>
             <a href="${resetLink}" style="display: inline-block; background: #84CC16; color: #000; font-weight: 600; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">Reset My Password →</a>
             <p style="color: #444; line-height: 1.6; margin-top: 24px;">If you did not request this, please ignore this email. Your password will not be changed.</p>
@@ -1399,6 +1425,30 @@ const POLL_INTERVAL_MS = 60000;
 const lastPunchTs = new Map();
 const DEDUP_WINDOW_MS = 30000; // 30-second guard
 
+// FIX 5: Daily punch tracker — groups all scans by 'employeeId|YYYY-MM-DD'
+// Structure: Map<'empId|date', { first: Date, last: Date, firstTs: string, lastTs: string }>
+const dailyPunches = new Map();
+
+function todayDateStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// Reset daily punch map at midnight
+function scheduleMidnightReset() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setDate(nextMidnight.getDate() + 1);
+  nextMidnight.setHours(0, 0, 0, 100);
+  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+  setTimeout(() => {
+    dailyPunches.clear();
+    lastPunchTs.clear();
+    console.log('[Device Bridge] Daily punch map reset at midnight');
+    scheduleMidnightReset();
+  }, msUntilMidnight);
+}
+scheduleMidnightReset();
+
 let _liveFeed = [];
 let _deviceStatus = {
   ipAddress: DEVICE_IP,
@@ -1530,34 +1580,67 @@ function markDeviceOffline() {
 }
 
 /**
- * Process a parsed punch event from the device.
- * Guards against duplicate punches within 30 seconds.
+ * FIX 5: Process a parsed scan event from the Bio Park D-01 device.
+ * Rules:
+ *   - First scan of the day for an employee  = punch IN
+ *   - Last scan of the day for an employee   = punch OUT  
+ *   - Middle scans                            = ignored (not added to feed)
+ * Dedup guard: scans within 30 seconds of each other are silently dropped.
  */
-function processPunchEvent(employeeId, type, confidence) {
+function processPunchEvent(employeeId, _rawType, confidence) {
   const now = Date.now();
+  const nowTs = new Date().toISOString();
+  const dateStr = todayDateStr();
+  const key = `${employeeId}|${dateStr}`;
+
+  // 30-second dedup guard
   const lastTs = lastPunchTs.get(employeeId);
   if (lastTs && now - lastTs < DEDUP_WINDOW_MS) {
-    console.log(`[Device Bridge] Dedup: ignored punch for ${employeeId} (within 30s window)`);
+    console.log(`[Device Bridge] Dedup: ignored scan for ${employeeId} (within 30s window)`);
     return;
   }
   lastPunchTs.set(employeeId, now);
 
-  const event = {
-    id: `pev-${now}-${employeeId}`,
-    timestamp: new Date().toISOString(),
-    employeeId,
-    employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
-    type,
-    confidence: parseFloat(confidence.toFixed(1)),
-    success: true,
-  };
+  const existing = dailyPunches.get(key);
 
-  _liveFeed.unshift(event);
-  if (_liveFeed.length > MAX_FEED_EVENTS) {
-    _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
+  if (!existing) {
+    // First scan of the day → punch IN
+    dailyPunches.set(key, { firstTs: nowTs, lastTs: nowTs });
+
+    const event = {
+      id: `pev-${now}-${employeeId}`,
+      timestamp: nowTs,
+      employeeId,
+      employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
+      type: 'in',
+      confidence: parseFloat(confidence.toFixed(1)),
+      success: true,
+    };
+    _liveFeed.unshift(event);
+    if (_liveFeed.length > MAX_FEED_EVENTS) _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
+    console.log(`[Device Bridge] FIRST PUNCH IN — ${employeeId} @ ${nowTs}`);
+  } else {
+    // Subsequent scan → update last-seen timestamp
+    // Remove the previous 'out' event from feed (it will be replaced)
+    _liveFeed = _liveFeed.filter(
+      e => !(e.employeeId === employeeId && e.type === 'out' && e.timestamp === existing.lastTs)
+    );
+    dailyPunches.set(key, { ...existing, lastTs: nowTs });
+
+    // Add/update the OUT event in the feed (always represents latest scan)
+    const outEvent = {
+      id: `pev-out-${now}-${employeeId}`,
+      timestamp: nowTs,
+      employeeId,
+      employeeName: MOCK_EMPLOYEE_NAMES[employeeId] || employeeId,
+      type: 'out',
+      confidence: parseFloat(confidence.toFixed(1)),
+      success: true,
+    };
+    _liveFeed.unshift(outEvent);
+    if (_liveFeed.length > MAX_FEED_EVENTS) _liveFeed = _liveFeed.slice(0, MAX_FEED_EVENTS);
+    console.log(`[Device Bridge] UPDATED LAST PUNCH OUT — ${employeeId} @ ${nowTs}`);
   }
-
-  console.log(`[Device Bridge] ✓ ${employeeId} ${type.toUpperCase()} confidence=${confidence}%`);
 }
 
 // Start polling on server boot
