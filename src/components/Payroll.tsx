@@ -160,14 +160,14 @@ const SalarySlip: React.FC<{ record: PayrollRecord; onClose?: () => void }> = ({
   const deductions: { label: string; val: number | null }[] = [];
 
   for (let i = 0; i < 10; i++) {
-    const addName = addHeads[i]?.trim();
+    const addName = (addHeads ?? [])[i]?.trim();
     if (addName) {
       earnings.push({ label: addName, val: addValues?.[i] ?? null });
     } else {
       earnings.push({ label: '', val: null });
     }
 
-    const dedName = dedHeads[i]?.trim();
+    const dedName = (dedHeads ?? [])[i]?.trim();
     if (dedName) {
       deductions.push({ label: dedName, val: dedValues?.[i] ?? null });
     } else {
@@ -1978,6 +1978,8 @@ const SalaryEngine: React.FC = () => {
   const handleApplyAll = async () => {
     setApplyingAll(true);
     // Apply formulas to each record individually so LOP days are included
+    ewwconst balances = await fetchAllClBalances();
+    setClBalances(balances);
     await applyFormulaToAll();
     await load();
     setApplyingAll(false);
@@ -2177,8 +2179,8 @@ const SalaryEngine: React.FC = () => {
                 onClick={handleApprove}
                 disabled={approving || selectedIds.size === 0}
                 className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${selectedIds.size > 0
-                    ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
-                    : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
+                  ? 'bg-varistor-lime text-white hover:bg-[#65a30d] cursor-pointer'
+                  : 'bg-varistor-limeLight text-varistor-muted border border-varistor-border cursor-not-allowed'
                   } disabled:opacity-60`}
               >
                 {approving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}

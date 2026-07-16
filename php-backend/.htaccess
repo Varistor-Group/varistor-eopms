@@ -1,0 +1,29 @@
+# Apache configuration for EOPMS PHP backend
+# Protects sensitive files and enables clean URL routing
+
+Options -Indexes
+
+# ── Protect sensitive files from direct HTTP access ────────────────────────────
+<FilesMatch "^(config\.php|db\.json|composer\.json|composer\.lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ── Route all requests to index.php (excluding real files) ────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /eopms-api/
+
+    # Allow direct access to real files (vendor assets etc.)
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Send everything else to index.php
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# ── Security headers ──────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+</IfModule>
