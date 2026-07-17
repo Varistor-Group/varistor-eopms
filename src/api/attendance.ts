@@ -374,16 +374,40 @@ const _overrides = new Map<string, Partial<AttendanceLedgerEntry>>();
  * TODO: supabase.from('attendance_ledger').select('*').eq('date', date)
  */
 export async function getAttendanceByDate(date: string): Promise<AttendanceLedgerEntry[]> {
-  await delay(180);
-  const roster = await fetchAttendanceRoster();
-  const entries = roster.map((emp, i) =>
-    generateEntryForEmployee(emp, date, i, _holidayDates())
-  );
-  // Apply any HR overrides
-  return entries.map(e => {
-    const override = _overrides.get(e.id);
-    return override ? { ...e, ...override } : e;
-  });
+  try {
+    const { data: dbEntries, error } = await supabase
+      .from('attendance_ledger')
+      .select('*')
+      .eq('date', date);
+
+    if (error) {
+      console.error('Error fetching attendance_ledger by date:', error);
+    }
+
+    const roster = await fetchAttendanceRoster();
+    const dbMap = new Map((dbEntries || []).map(e => [e.employee_id, e]));
+
+    return roster.map((emp, i) => {
+      const dbEntry = dbMap.get(emp.id);
+      if (dbEntry) {
+        return {
+          ...dbEntry,
+          status: dbEntry.status as AttendanceStatus,
+          source: dbEntry.source as AttendanceSource,
+          employeeName: emp.name,
+          department: emp.dept,
+        } as AttendanceLedgerEntry;
+      }
+      
+      // Fallback to generated mock data for empty slots
+      const generated = generateEntryForEmployee(emp, date, i, _holidayDates());
+      const override = _overrides.get(generated.id);
+      return override ? { ...generated, ...override } : generated;
+    });
+  } catch (err) {
+    console.error('Unexpected error fetching attendance by date:', err);
+    return [];
+  }
 }
 
 /**
@@ -652,11 +676,12 @@ export async function uploadFieldPhoto(
   punchType: PunchType,
   _file: File,
   confidenceScore: number,
-  location?: { lat: number; lng: number; accuracy: number }
+  _location?: { lat: number; lng: number; accuracy: number }
 ): Promise<{ success: boolean; photoUrl?: string; error: string | null }> {
   try {
-    // 1. Upload photo to Supabase Storage (no PHP filesystem involved)
     const { supabase } = await import('../lib/supabase');
+
+    // 1. Upload photo to Supabase Storage
     const fileName = `${employeeId}/${date}_${punchType}_${Date.now()}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from('attendance-photos')
@@ -672,32 +697,61 @@ export async function uploadFieldPhoto(
       .getPublicUrl(fileName);
     const photoUrl = urlData.publicUrl;
 
-    // 3. Send punch record to PHP backend with just the URL (no file upload)
-    const body: Record<string, string> = {
-      employeeId,
-      date,
-      punchType,
-      photoUrl,
-      confidenceScore: confidenceScore.toString(),
-    };
-    if (location) {
-      body.lat = location.lat.toString();
-      body.lng = location.lng.toString();
-      body.accuracy = location.accuracy.toString();
-    }
+    const now = new Date().toISOString();
 
-    const res = await fetch(`${API_URL}/api/attendance/field-punch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    // 3. Check for existing record today
+    const { data: existing } = await supabase
+      .from('attendance_ledger')
+      .select('id, punch_in')
+      .eq('employee_id', employeeId)
+      .eq('date', date)
+      .maybeSingle();
 
-    let data: any = null;
-    try { data = await res.json(); } catch {
-      throw new Error(`Server returned ${res.status}: ${res.statusText}`);
-    }
-    if (!res.ok || data?.success === false) {
-      throw new Error(data?.error || `Server error ${res.status}`);
+    if (punchType === 'in') {
+      if (existing) {
+        const { error: updErr } = await supabase.from('attendance_ledger').update({
+          punch_in: now,
+          photo_url: photoUrl,
+          status: 'Present',
+          confidence: confidenceScore,
+        }).eq('id', existing.id);
+        if (updErr) throw new Error(updErr.message);
+      } else {
+        const { error: insErr } = await supabase.from('attendance_ledger').insert({
+          employee_id: employeeId,
+          date,
+          punch_in: now,
+          photo_url: photoUrl,
+          status: 'Present',
+          source: 'field_photo',
+          is_field_employee: true,
+          confidence: confidenceScore,
+        });
+        if (insErr) throw new Error(insErr.message);
+      }
+    } else {
+      const punchInTime = existing?.punch_in ? new Date(existing.punch_in).getTime() : null;
+      const workHours = punchInTime ? Math.round(((Date.now() - punchInTime) / 3600000) * 100) / 100 : null;
+      if (existing) {
+        const { error: updErr } = await supabase.from('attendance_ledger').update({
+          punch_out: now,
+          photo_url: photoUrl,
+          work_hours: workHours,
+        }).eq('id', existing.id);
+        if (updErr) throw new Error(updErr.message);
+      } else {
+        const { error: insErr } = await supabase.from('attendance_ledger').insert({
+          employee_id: employeeId,
+          date,
+          punch_out: now,
+          photo_url: photoUrl,
+          status: 'Present',
+          source: 'field_photo',
+          is_field_employee: true,
+          confidence: confidenceScore,
+        });
+        if (insErr) throw new Error(insErr.message);
+      }
     }
 
     return { success: true, photoUrl, error: null };
@@ -711,10 +765,15 @@ export async function uploadFieldPhoto(
  */
 export async function isFieldEmployeePunchedIn(employeeId: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/api/attendance/field-punch/status?employeeId=${employeeId}`);
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data.punchedIn || false;
+    const { supabase } = await import('../lib/supabase');
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('attendance_ledger')
+      .select('id, punch_in, punch_out')
+      .eq('employee_id', employeeId)
+      .eq('date', today)
+      .maybeSingle();
+    return !!data?.punch_in && !data?.punch_out;
   } catch {
     return false;
   }

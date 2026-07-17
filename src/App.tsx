@@ -29,11 +29,7 @@ import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
 import { mockEmployeeStore } from './api/employees';
 import { FieldPunch } from './components/FieldPunch';
-<<<<<<< HEAD
-import { getCurrentUser } from './api/auth';
-=======
-import { signOut } from './api/auth';
->>>>>>> 33d32b4cfb56fbc2c45f81b775ee788cb1f32d81
+import { getCurrentUser, signOut } from './api/auth';
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
