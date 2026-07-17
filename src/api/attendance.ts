@@ -374,16 +374,63 @@ const _overrides = new Map<string, Partial<AttendanceLedgerEntry>>();
  * TODO: supabase.from('attendance_ledger').select('*').eq('date', date)
  */
 export async function getAttendanceByDate(date: string): Promise<AttendanceLedgerEntry[]> {
-  await delay(180);
-  const roster = await fetchAttendanceRoster();
-  const entries = roster.map((emp, i) =>
-    generateEntryForEmployee(emp, date, i, _holidayDates())
-  );
-  // Apply any HR overrides
-  return entries.map(e => {
-    const override = _overrides.get(e.id);
-    return override ? { ...e, ...override } : e;
-  });
+  try {
+    const { data, error } = await supabase
+      .from('attendance_ledger')
+      .select('*')
+      .eq('date', date);
+
+    if (error) {
+      console.error('Error fetching daily attendance from Supabase:', error);
+      return [];
+    }
+
+    const roster = await fetchAttendanceRoster();
+    const ledgerMap = new Map<string, any>();
+    for (const row of (data || [])) {
+      ledgerMap.set(row.employee_id, row);
+    }
+
+    const holidaysList = _holidayDates();
+    const dateObj = new Date(date);
+    const isSunday = dateObj.getDay() === 0;
+    const isHoliday = holidaysList.includes(date);
+
+    return roster.map(emp => {
+      const dbEntry = ledgerMap.get(emp.id);
+      
+      let finalStatus: AttendanceStatus = 'Absent';
+      if (dbEntry) {
+        finalStatus = dbEntry.status as AttendanceStatus;
+      } else {
+        if (isSunday) finalStatus = 'W.O';
+        else if (isHoliday) finalStatus = 'Holiday';
+      }
+
+      return {
+        id: dbEntry?.id || `atl-${emp.id}-${date}`, // Provide composite ID if no record exists so HR can update it
+        employee_id: emp.id,
+        employeeName: emp.name,
+        department: emp.dept,
+        date: date,
+        punch_in: dbEntry?.punch_in,
+        punch_out: dbEntry?.punch_out,
+        work_hours: dbEntry?.work_hours,
+        status: finalStatus,
+        source: (dbEntry?.source || 'device') as AttendanceSource,
+        confidence: dbEntry?.confidence,
+        photo_url: dbEntry?.photo_url,
+        override_reason: dbEntry?.override_reason,
+        editor_id: dbEntry?.editor_id,
+        edited_at: dbEntry?.edited_at,
+        is_field_employee: emp.isField,
+        created_at: dbEntry?.created_at || new Date().toISOString(),
+      };
+    }) as AttendanceLedgerEntry[];
+  } catch (err) {
+    console.error('Unexpected error fetching daily attendance:', err);
+    return [];
+  }
 }
 
 /**
@@ -436,59 +483,67 @@ export async function updateAttendance(
   reason: string,
   editorId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  await delay(300);
   if (!reason.trim()) {
     return { success: false, error: 'Reason is required for attendance edits.' };
   }
 
-  // Find existing entry via overrides or generate
-  const existing = await (async () => {
-    // id format: atl-{empId}-{YYYY-MM-DD}
-    const dateMatch = ledgerId.match(/(\d{4}-\d{2}-\d{2})$/);
-    if (!dateMatch) return null;
-    const date = dateMatch[1];
-    const empId = ledgerId.replace('atl-', '').replace(`-${date}`, '');
-    const roster = await fetchAttendanceRoster();
-    const empIndex = roster.findIndex(e => e.id === empId);
-    if (empIndex === -1) return null;
-    return generateEntryForEmployee(roster[empIndex], date, empIndex, _holidayDates());
-  })();
+  try {
+    let existingRecord: any = null;
+    let employeeId = '';
+    let date = '';
+    let isNew = false;
 
-  if (!existing) return { success: false, error: 'Attendance record not found.' };
+    if (ledgerId.startsWith('atl-')) {
+      isNew = true;
+      const dateMatch = ledgerId.match(/(\d{4}-\d{2}-\d{2})$/);
+      if (!dateMatch) return { success: false, error: 'Invalid record ID format.' };
+      date = dateMatch[1];
+      employeeId = ledgerId.replace('atl-', '').replace(`-${date}`, '');
+    } else {
+      const { data, error } = await supabase.from('attendance_ledger').select('*').eq('id', ledgerId).single();
+      if (error || !data) return { success: false, error: 'Attendance record not found.' };
+      existingRecord = data;
+      employeeId = data.employee_id;
+      date = data.date;
+    }
 
-  const newWorkHours = calcWorkHours(
-    updates.punch_in ?? existing.punch_in,
-    updates.punch_out ?? existing.punch_out
-  );
+    const newWorkHours = calcWorkHours(
+      updates.punch_in ?? existingRecord?.punch_in,
+      updates.punch_out ?? existingRecord?.punch_out
+    );
 
-  const updatedFields: Partial<AttendanceLedgerEntry> = {
-    ...updates,
-    work_hours: newWorkHours,
-    source: 'hr_override',
-    override_reason: reason,
-    editor_id: editorId,
-    edited_at: new Date().toISOString(),
-  };
+    const updatedFields = {
+      punch_in: updates.punch_in ?? existingRecord?.punch_in,
+      punch_out: updates.punch_out ?? existingRecord?.punch_out,
+      status: updates.status ?? existingRecord?.status,
+      work_hours: newWorkHours,
+      source: 'hr_override',
+      override_reason: reason,
+      editor_id: editorId,
+      edited_at: new Date().toISOString(),
+    };
 
-  _overrides.set(ledgerId, updatedFields);
+    if (isNew) {
+      const roster = await fetchAttendanceRoster();
+      const emp = roster.find(e => e.id === employeeId);
+      
+      const { error: insertError } = await supabase.from('attendance_ledger').insert({
+        employee_id: employeeId,
+        date: date,
+        ...updatedFields,
+        is_field_employee: emp?.isField || false,
+      });
+      if (insertError) throw insertError;
+    } else {
+      const { error: updateError } = await supabase.from('attendance_ledger').update(updatedFields).eq('id', ledgerId);
+      if (updateError) throw updateError;
+    }
 
-  // Audit trail
-  _attendanceEdits.push({
-    id: `edit-${Date.now()}`,
-    ledger_id: ledgerId,
-    employee_id: existing.employee_id,
-    editor_id: editorId,
-    old_punch_in: existing.punch_in,
-    old_punch_out: existing.punch_out,
-    old_status: existing.status,
-    new_punch_in: updates.punch_in ?? existing.punch_in,
-    new_punch_out: updates.punch_out ?? existing.punch_out,
-    new_status: updates.status ?? existing.status,
-    reason,
-    edited_at: new Date().toISOString(),
-  });
-
-  return { success: true, error: null };
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error('Error updating attendance:', err);
+    return { success: false, error: err.message || 'Failed to update attendance' };
+  }
 }
 
 /**
@@ -499,92 +554,130 @@ export async function getMonthlyReport(
   month: string,
   employeeIds?: string[]
 ): Promise<MonthlyReportRow[]> {
-  await delay(250);
-  const dates = getDatesInMonth(month);
-  const fullRoster = await fetchAttendanceRoster();
-  const roster = employeeIds
-    ? fullRoster.filter(e => employeeIds.includes(e.id))
-    : fullRoster;
+  try {
+    const dates = getDatesInMonth(month);
+    const fullRoster = await fetchAttendanceRoster();
+    const roster = employeeIds
+      ? fullRoster.filter(e => employeeIds.includes(e.id))
+      : fullRoster;
 
-  // FIX 3: fetch approved leaves and remaining balances for LOP rules
-  const [approvedLeaves, balancesMap] = await Promise.all([
-    getApprovedLeavesForMonth(month),
-    getAllBalancesMap(),
-  ]);
-  // Build a Set<string> of 'employeeId|date' for O(1) lookup
-  const approvedLeaveSet = new Set(approvedLeaves.map(l => `${l.employeeId}|${l.date}`));
+    const [approvedLeaves, balancesMap] = await Promise.all([
+      getApprovedLeavesForMonth(month),
+      getAllBalancesMap(),
+    ]);
+    const approvedLeaveSet = new Set(approvedLeaves.map(l => `${l.employeeId}|${l.date}`));
 
-  return roster.map((emp, empIndex) => {
-    let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
-    const dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[] = [];
+    let query = supabase
+      .from('attendance_ledger')
+      .select('*')
+      .gte('date', `${month}-01`)
+      .lte('date', `${month}-31`);
 
-    dates.forEach((date, di) => {
-      const entry = generateEntryForEmployee(emp, date, empIndex * 100 + di, _holidayDates());
-      const override = _overrides.get(entry.id);
-      let final = override ? { ...entry, ...override } : entry;
+    if (employeeIds && employeeIds.length > 0) {
+      query = query.in('employee_id', employeeIds);
+    }
 
-      // FIX 3: Apply LOP rules on working days
-      const isWorking = final.status !== 'W.O' && final.status !== 'Holiday';
-      if (isWorking) {
-        const hasApprovedLeave = approvedLeaveSet.has(`${emp.id}|${date}`);
-        const remainingBalance = balancesMap.get(emp.id) ?? 0;
-        const hasPunchIn = !!final.punch_in;
+    const { data: rawData, error } = await query;
+    if (error) {
+      console.error('Error fetching monthly report data:', error);
+    }
+    const data = rawData || [];
+    
+    const ledgerMap = new Map<string, any>();
+    for (const row of data) {
+      ledgerMap.set(`${row.employee_id}|${row.date}`, row);
+    }
+    
+    const holidaysList = _holidayDates();
 
-        if (hasApprovedLeave) {
-          // Rule 2: approved leave but balance = 0 → Absent (LOP)
-          // Rule 3: approved leave and balance > 0 → Leave (paid)
-          if (remainingBalance <= 0) {
-            final = { ...final, status: 'Absent', punch_in: undefined, punch_out: undefined };
-          } else {
-            final = { ...final, status: 'Leave', punch_in: undefined, punch_out: undefined };
-          }
-        } else if (!hasPunchIn && final.status !== 'Leave' && final.status !== 'Absent' && final.status !== 'Half-day') {
-          // Rule 1: no punch in, no approved leave → Absent (LOP)
-          final = { ...final, status: 'Absent', punch_in: undefined, punch_out: undefined };
+    return roster.map((emp) => {
+      let present = 0, late = 0, leaves = 0, weekOff = 0, holidays = 0, halfDay = 0, absent = 0, totalHrs = 0;
+      const dailyRecords: { date: string; punch_in?: string; punch_out?: string; work_hours?: number; status?: string }[] = [];
+
+      dates.forEach((date) => {
+        const dbEntry = ledgerMap.get(`${emp.id}|${date}`);
+        let finalStatus: AttendanceStatus = 'Absent';
+        
+        const dateObj = new Date(date);
+        const isSunday = dateObj.getDay() === 0;
+        const isHoliday = holidaysList.includes(date);
+
+        if (dbEntry) {
+          finalStatus = dbEntry.status as AttendanceStatus;
+        } else {
+          if (isSunday) finalStatus = 'W.O';
+          else if (isHoliday) finalStatus = 'Holiday';
         }
-      }
 
-      dailyRecords.push({
-        date: final.date,
-        punch_in: final.punch_in,
-        punch_out: final.punch_out,
-        work_hours: final.work_hours ?? undefined,
-        status: final.status,
+        const final = {
+          date,
+          punch_in: dbEntry?.punch_in,
+          punch_out: dbEntry?.punch_out,
+          work_hours: dbEntry?.work_hours,
+          status: finalStatus,
+        };
+
+        const isWorking = final.status !== 'W.O' && final.status !== 'Holiday';
+        if (isWorking) {
+          const hasApprovedLeave = approvedLeaveSet.has(`${emp.id}|${date}`);
+          const remainingBalance = balancesMap.get(emp.id) ?? 0;
+          const hasPunchIn = !!final.punch_in;
+
+          if (hasApprovedLeave) {
+            if (remainingBalance <= 0) {
+              final.status = 'Absent';
+            } else {
+              final.status = 'Leave';
+            }
+          } else if (!hasPunchIn && final.status !== 'Leave' && final.status !== 'Absent' && final.status !== 'Half-day') {
+            final.status = 'Absent';
+          }
+        }
+
+        dailyRecords.push({
+          date: final.date,
+          punch_in: final.punch_in,
+          punch_out: final.punch_out,
+          work_hours: final.work_hours ?? undefined,
+          status: final.status,
+        });
+
+        switch (final.status) {
+          case 'Present': present++; break;
+          case 'Late': late++; present++; break;
+          case 'Half-day': halfDay++; break;
+          case 'Holiday': holidays++; break;
+          case 'W.O': weekOff++; break;
+          case 'Leave': leaves++; break;
+          case 'Absent': absent++; break;
+        }
+        if (final.work_hours) totalHrs += final.work_hours;
       });
 
-      switch (final.status) {
-        case 'Present': present++; break;
-        case 'Late': late++; present++; break;
-        case 'Half-day': halfDay++; break;
-        case 'Holiday': holidays++; break;
-        case 'W.O': weekOff++; break;
-        case 'Leave': leaves++; break;
-        case 'Absent': absent++; break;
-      }
-      if (final.work_hours) totalHrs += final.work_hours;
+      const workingDays = dates.length - weekOff - holidays;
+      const payableDays = present + late + halfDay * 0.5;
+
+      return {
+        employee_id: emp.id,
+        employeeName: emp.name,
+        department: emp.dept,
+        present,
+        late,
+        leaves,
+        weekOff,
+        holidays,
+        halfDay,
+        absent,
+        totalHrs: parseFloat(totalHrs.toFixed(1)),
+        payableDays: parseFloat(payableDays.toFixed(1)),
+        workingDays,
+        dailyRecords,
+      };
     });
-
-    const workingDays = dates.length - weekOff - holidays;
-    // Rule 4: Absent days = LOP — NOT counted in payableDays
-    const payableDays = present + late + halfDay * 0.5;
-
-    return {
-      employee_id: emp.id,
-      employeeName: emp.name,
-      department: emp.dept,
-      present,
-      late,
-      leaves,
-      weekOff,
-      holidays,
-      halfDay,
-      absent,
-      totalHrs: parseFloat(totalHrs.toFixed(1)),
-      payableDays: parseFloat(payableDays.toFixed(1)),
-      workingDays,
-      dailyRecords,
-    };
-  });
+  } catch (err) {
+    console.error('Unexpected error fetching monthly report:', err);
+    return [];
+  }
 }
 
 // ─── Holidays ──────────────────────────────────────────────────────────────
