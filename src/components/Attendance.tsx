@@ -153,7 +153,7 @@ export const Attendance: React.FC = () => {
   // ── Self-view ──────────────────────────────────────────────────────────────
   const [selfData, setSelfData] = useState<AttendanceLedgerEntry[]>([]);
   const [selfLoading, setSelfLoading] = useState(false);
-  const MOCK_SELF_ID = '2131';
+  const activeUserId = currentUser?.id || '2131';
 
   // ── Monthly report ─────────────────────────────────────────────────────────
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReportRow[]>([]);
@@ -197,7 +197,7 @@ export const Attendance: React.FC = () => {
   const [fieldHistory, setFieldHistory] = useState<FieldPhotoEntry[]>([]);
 
   // ── Week-off config ────────────────────────────────────────────────────────
-  const [woEmployee, setWoEmployee] = useState(MOCK_SELF_ID);
+  const [woEmployee, setWoEmployee] = useState(activeUserId);
   const [weekOffDay, setWeekOffDay] = useState('Sun');
   const [satHalfDay, setSatHalfDay] = useState(true);
   const [savedWo, setSavedWo] = useState(false);
@@ -246,11 +246,11 @@ export const Attendance: React.FC = () => {
   // ── Load self-view ─────────────────────────────────────────────────────────
   useEffect(() => {
     setSelfLoading(true);
-    getAttendanceByEmployee(MOCK_SELF_ID, selectedMonth).then(data => {
+    getAttendanceByEmployee(activeUserId, selectedMonth).then(data => {
       setSelfData(data);
       setSelfLoading(false);
     });
-  }, [selectedMonth]);
+  }, [selectedMonth, activeUserId]);
 
   // ── Load monthly report ────────────────────────────────────────────────────
   useEffect(() => {
@@ -305,7 +305,7 @@ export const Attendance: React.FC = () => {
         status: editStatus,
       },
       editReason,
-      MOCK_SELF_ID
+      activeUserId
     );
     setSaving(false);
     if (result.success) {
@@ -499,7 +499,7 @@ export const Attendance: React.FC = () => {
   // ── Field photo verification ──────────────────────────────────────────────
   async function handleVerify(photoId: string, status: 'Verified' | 'Rejected') {
     setVerifyingId(photoId);
-    const result = await verifyFieldPhoto(photoId, status, MOCK_SELF_ID);
+    const result = await verifyFieldPhoto(photoId, status, activeUserId);
     setVerifyingId(null);
     if (result.success) {
       addToast(`Photo ${status.toLowerCase()} successfully.`, 0, status === 'Verified' ? 'credit' : 'debit');
@@ -515,7 +515,7 @@ export const Attendance: React.FC = () => {
       addToast('Please fill in date and occasion.', 0, 'debit'); return;
     }
     setSavingHoliday(true);
-    const result = await addHoliday(holidayForm, MOCK_SELF_ID);
+    const result = await addHoliday(holidayForm, activeUserId);
     setSavingHoliday(false);
     if (result.success) {
       addToast('Holiday added. All employee attendance auto-marked.', 0, 'credit');
@@ -578,35 +578,37 @@ export const Attendance: React.FC = () => {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          label="Present today"
-          value={`${presentToday}/${dailyData.length}`}
-          sub={`${dailyData.length > 0 ? Math.round(presentToday / dailyData.length * 100) : 0}% attendance`}
-          icon={<Users size={18} strokeWidth={1.5} className="text-varistor-lime" />}
-        />
-        <KpiCard
-          label="On leave"
-          value={onLeaveToday}
-          sub="employees today"
-          icon={<Calendar size={18} strokeWidth={1.5} className="text-amber-500" />}
-          accent="bg-amber-50"
-        />
-        <KpiCard
-          label="Week-off"
-          value={weekOffToday}
-          icon={<TrendingUp size={18} strokeWidth={1.5} className="text-blue-500" />}
-          accent="bg-blue-50"
-          sub="not counted today"
-        />
-        <KpiCard
-          label="Avg. work hrs"
-          value={avgWorkHrs === '—' ? '—' : `${avgWorkHrs}h`}
-          sub="this month (self)"
-          icon={<Clock size={18} strokeWidth={1.5} className="text-purple-500" />}
-          accent="bg-purple-50"
-        />
-      </div>
+      {isHR && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Present today"
+            value={`${presentToday}/${dailyData.length}`}
+            sub={`${dailyData.length > 0 ? Math.round(presentToday / dailyData.length * 100) : 0}% attendance`}
+            icon={<Users size={18} strokeWidth={1.5} className="text-varistor-lime" />}
+          />
+          <KpiCard
+            label="On leave"
+            value={onLeaveToday}
+            sub="employees today"
+            icon={<Calendar size={18} strokeWidth={1.5} className="text-amber-500" />}
+            accent="bg-amber-50"
+          />
+          <KpiCard
+            label="Week-off"
+            value={weekOffToday}
+            icon={<TrendingUp size={18} strokeWidth={1.5} className="text-blue-500" />}
+            accent="bg-blue-50"
+            sub="not counted today"
+          />
+          <KpiCard
+            label="Avg. work hrs"
+            value={avgWorkHrs === '—' ? '—' : `${avgWorkHrs}h`}
+            sub="this month (self)"
+            icon={<Clock size={18} strokeWidth={1.5} className="text-purple-500" />}
+            accent="bg-purple-50"
+          />
+        </div>
+      )}
 
       {/* ── Main tab switcher — only shown to HR/Admin who can see both ── */}
       {isHR && (

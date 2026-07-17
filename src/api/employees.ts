@@ -6,6 +6,7 @@
 import { supabase } from '../lib/supabase';
 import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
 import { API_URL } from '../config/api';
+import { initEmployeeLeaveBalances } from './leaves';
 
 export interface Employee {
   id: string;
@@ -189,7 +190,6 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     .single();
 
   // Create leave balance entries — initialise 12 days per active leave type
-  const { initEmployeeLeaveBalances } = await import('./leaves');
   await initEmployeeLeaveBalances(input.employeeId);
 
   // Log activity

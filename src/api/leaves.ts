@@ -6,6 +6,7 @@
 import { supabase } from '../lib/supabase';
 import type { LeaveRequest, LeaveBalance, LeaveTypeModel, EmployeeLeaveBalance } from '../types';
 import { getEmployees } from './employees';
+import { updateAttendance } from './attendance';
 
 export const INDIA_HOLIDAYS_2026: string[] = [
   '2026-01-26','2026-03-25','2026-04-02','2026-04-14','2026-04-29',
@@ -271,9 +272,7 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
   if (error) console.error('[rejectLeaveRequest]', error.message);
 
   // FIX 2: Mark each working day in the rejected leave period as Absent in attendance
-  // Import is deferred to avoid circular deps — attendance module imports from leaves
   try {
-    const { updateAttendance } = await import('./attendance');
     const start = new Date(request.from + 'T00:00:00');
     const end = new Date(request.to + 'T00:00:00');
     const cursor = new Date(start);

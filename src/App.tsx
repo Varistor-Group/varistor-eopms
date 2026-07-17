@@ -29,6 +29,7 @@ import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
 import { mockEmployeeStore } from './api/employees';
 import { FieldPunch } from './components/FieldPunch';
+import { signOut } from './api/auth';
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
@@ -196,7 +197,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Clear all session data
     localStorage.removeItem('eopms_current_user');
     localStorage.removeItem('eopms_role');
@@ -204,6 +205,9 @@ const AppContent: React.FC = () => {
     setCurrentUser(null);
     setActiveTab('dashboard');
     setIsLoggedIn(false);
+    
+    // Ensure Supabase session is also cleared securely
+    await signOut();
   };
 
   useEffect(() => {
