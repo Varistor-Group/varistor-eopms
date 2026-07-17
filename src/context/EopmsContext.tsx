@@ -4,6 +4,7 @@ import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriorit
 import { announcementsApi } from '../api/announcements';
 import { mockEmployeeStore, updateEmployee } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
+import { tasksApi } from '../api/tasks';
 import { API_URL } from '../config/api';
 import { supabase } from '../lib/supabase';
 
@@ -81,138 +82,6 @@ const POINT_MATRIX: Record<TaskPriority, { onTime: number; missed: number; weigh
   low: { onTime: 25, missed: 30, weight: 1 }
 };
 
-const initialTasks: Task[] = [
-  {
-    id: 'task-1',
-    title: 'Client demo deck',
-    description: 'Prepare the client demonstration deck for the upcoming product review. Ensure styling matches the client guidelines and includes the latest user statistics.',
-    dueDate: '2026-06-30',
-    priority: 'critical', // Changed to critical to demonstrate new priority
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [
-      { id: 'c1', text: 'Gather feedback from marketing', completed: false },
-      { id: 'c2', text: 'Format financial graphs and charts', completed: true },
-      { id: 'c3', text: 'Update partner logo in slide master', completed: false }
-    ],
-    comments: [
-      { id: 'comm-1', text: 'Please make sure to focus on the performance metrics slide.', author: 'akash kumar (Admin)', authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60', timestamp: '2026-06-29T14:30:00Z' }
-    ],
-    attachments: [
-      { id: 'a1', name: 'demo_template_v1.pptx', size: '2.4 MB', type: 'presentation', url: '#' }
-    ]
-  },
-  {
-    id: 'task-2',
-    title: 'Inventory reconciliation',
-    description: 'Perform a full audit on warehouse inventories. Cross-check log files with inventory database records and report any discrepancy exceeding 1%.',
-    dueDate: '2026-07-02',
-    priority: 'medium',
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [
-      { id: 'c4', text: 'Count warehouse box items in Zone A', completed: false },
-      { id: 'c5', text: 'Verify log entries with manager approvals', completed: false }
-    ],
-    comments: [],
-    attachments: []
-  },
-  {
-    id: 'task-3',
-    title: 'Vendor onboarding',
-    description: 'Finalize agreements and terms with external logistics vendor. Upload onboarding certificates to document vault once finished.',
-    dueDate: '2026-06-28', // Past due date!
-    priority: 'medium',
-    status: 'in_progress',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [
-      { id: 'c6', text: 'Collect signed agreements', completed: true },
-      { id: 'c7', text: 'Request company certificate', completed: false }
-    ],
-    comments: [
-      { id: 'comm-2', text: 'Vendor is asking for a grace period on the SLA terms.', author: 'sathvik', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-28T09:15:00Z' }
-    ],
-    attachments: []
-  },
-  {
-    id: 'task-4',
-    title: 'Client report v2',
-    description: 'Review and compile feedback for the client report release. Must align all formatting, metrics tables, and obtain management signoff.',
-    dueDate: '2026-06-28', // Past due date!
-    priority: 'high',
-    status: 'awaiting_approval',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [
-      { id: 'c8', text: 'Review formatting checklist', completed: true },
-      { id: 'c9', text: 'Obtain initial draft feedback from team leads', completed: true }
-    ],
-    comments: [
-      { id: 'comm-3', text: 'Ready for COO review and approval.', author: 'sathvik', authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60', timestamp: '2026-06-29T17:40:00Z' }
-    ],
-    attachments: [
-      { id: 'a2', name: 'client_report_draft_v2.pdf', size: '1.8 MB', type: 'pdf', url: '#' }
-    ]
-  },
-  {
-    id: 'task-5',
-    title: 'Vendor follow-up',
-    description: 'Follow up on the logistics delivery schedules for next month. Send weekly progress tables to management.',
-    dueDate: '2026-07-05',
-    priority: 'low',
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [],
-    comments: [],
-    attachments: []
-  },
-  {
-    id: 'task-6',
-    title: 'Prepare Q3 sales pitch',
-    description: 'Design the core slide outline for Q3 corporate services expansion pitch. Key focuses are pricing grids and vendor SLAs.',
-    dueDate: '2026-06-28', // Past due date!
-    priority: 'high',
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [],
-    comments: [],
-    attachments: []
-  },
-  {
-    id: 'task-7',
-    title: 'Checklist Bug Test Task',
-    description: 'Use this task to verify the checkbox visual state sync. Open this task in the detail drawer, click on checkboxes, and confirm the checkbox visually changes immediately.',
-    dueDate: '2026-07-04',
-    priority: 'medium',
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [
-      { id: 'c10', text: 'Toggle this item and verify visual checkbox update', completed: false },
-      { id: 'c11', text: 'Another checklist item to test toggle behavior', completed: false }
-    ],
-    comments: [],
-    attachments: []
-  },
-  {
-    id: 'task-8',
-    title: 'Drag and Drop Order Test',
-    description: 'Drag this task from TO DO and drop it into IN PROGRESS. It should automatically jump to the top of the In Progress column.',
-    dueDate: '2026-07-06',
-    priority: 'low',
-    status: 'todo',
-    assigneeId: '2',
-    assignee: { name: 'sathvik', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
-    checklist: [],
-    comments: [],
-    attachments: []
-  }
-];
 
 const initialLedger: LedgerEntry[] = [
   {
@@ -242,10 +111,7 @@ const initialLedger: LedgerEntry[] = [
 ];
 
 export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('eopms_tasks_refactored');
-    return saved ? JSON.parse(saved) : initialTasks;
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const [ledger, setLedger] = useState<LedgerEntry[]>(() => {
     const saved = localStorage.getItem('eopms_ledger_refactored');
@@ -281,6 +147,42 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
     getLeaveRequestsAsync(currentRole === 'Admin' || currentRole === 'HR' ? undefined : empId).then(setLeaveRequests).catch(console.error);
   }, [currentUser, currentRole, MOCK_USER_ID]);
+
+  // Tasks Fetch and Realtime Subscription
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        const fetchedTasks = await tasksApi.fetchTasks();
+        // Map assignees using mockEmployeeStore
+        const mappedTasks = fetchedTasks.map(t => {
+          const employee = mockEmployeeStore.find(e => e.id === t.assigneeId);
+          if (employee) {
+            t.assignee = { name: employee.fullName, avatarUrl: employee.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
+          }
+          return t;
+        });
+        setTasks(mappedTasks);
+      } catch (err) {
+        console.error('Failed to load tasks', err);
+      }
+    };
+    loadTasks();
+
+    const channel = supabase.channel('public:tasks')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        () => {
+          // Re-fetch tasks on any DB event to ensure consistent UI
+          loadTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const submitLeave = (input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>) => {
     const optimistic = submitLeaveRequest(input);
@@ -490,10 +392,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return { newLedgerEntry, pointsValue, pointType, completedOnTime };
   };
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem('eopms_tasks_refactored', JSON.stringify(tasks));
-  }, [tasks]);
+  // Legacy Sync to localStorage for ledger
 
   useEffect(() => {
     localStorage.setItem('eopms_ledger_refactored', JSON.stringify(ledger));
@@ -578,6 +477,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     });
 
+    tasksApi.updateTaskStatus(taskId, statusToSet, awardResult ? true : task.pointsProcessed).catch(console.error);
+
     if (awardResult) {
       setLedger((prevLedger) => [awardResult.newLedgerEntry, ...prevLedger]);
       addToast(
@@ -614,6 +515,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           t.id === taskId ? { ...t, status: 'done', pointsProcessed: awardResult ? true : t.pointsProcessed } : t
         )
       );
+      tasksApi.updateTaskStatus(taskId, 'done', awardResult ? true : task.pointsProcessed).catch(console.error);
 
       if (awardResult) {
         setLedger((prevLedger) => [awardResult.newLedgerEntry, ...prevLedger]);
@@ -649,6 +551,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         t.id === taskId ? { ...t, status: 'in_progress' } : t
       )
     );
+    tasksApi.updateTaskStatus(taskId, 'in_progress').catch(console.error);
 
     addToast(`Rejected: "${task.title}" returned to In Progress`, 0, 'debit');
   };
@@ -678,6 +581,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
+    tasksApi.createTask(newTask).catch(console.error);
     addToast(`Task assigned: "${title}"`, 0, 'credit');
 
     // Dispatch real-time notification
@@ -690,6 +594,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === taskId ? { ...t, title, description, priority, dueDate } : t))
     );
+    tasksApi.updateTaskDetails(taskId, title, description, priority, dueDate).catch(console.error);
   };
 
   const addComment = (taskId: string, text: string) => {
@@ -703,9 +608,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60',
           timestamp: new Date().toISOString()
         };
+        const updatedComments = [...t.comments, newComment];
+        tasksApi.updateTaskComments(taskId, updatedComments).catch(console.error);
         return {
           ...t,
-          comments: [...t.comments, newComment]
+          comments: updatedComments
         };
       })
     );
@@ -724,7 +631,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     let newStatus = task.status;
     let autoTransitioned = false;
-    if (task.status === 'in_progress' && allCompleted) {
+    if ((task.status === 'in_progress' || task.status === 'todo') && allCompleted) {
       newStatus = 'awaiting_approval';
       autoTransitioned = true;
     }
@@ -734,6 +641,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         t.id === taskId ? { ...t, checklist: updatedChecklist, status: newStatus } : t
       )
     );
+    tasksApi.updateTaskChecklist(taskId, updatedChecklist, newStatus).catch(console.error);
 
     if (autoTransitioned) {
       addToast(
@@ -753,9 +661,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           text,
           completed: false
         };
+        const updatedChecklist = [...t.checklist, newItem];
+        tasksApi.updateTaskChecklist(taskId, updatedChecklist).catch(console.error);
         return {
           ...t,
-          checklist: [...t.checklist, newItem]
+          checklist: updatedChecklist
         };
       })
     );
@@ -772,9 +682,11 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           type,
           url: '#'
         };
+        const updatedAttachments = [...t.attachments, newAttachment];
+        tasksApi.updateTaskAttachments(taskId, updatedAttachments).catch(console.error);
         return {
           ...t,
-          attachments: [...t.attachments, newAttachment]
+          attachments: updatedAttachments
         };
       })
     );

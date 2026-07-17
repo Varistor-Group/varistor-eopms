@@ -11,11 +11,11 @@
  */
 
 import { API_URL } from '../config/api';
+import { supabase } from '../lib/supabase';
 
 // Lazy import to avoid circular deps (leaves imports from attendance for rejection)
 async function getApprovedLeavesForMonth(month: string): Promise<{ employeeId: string; date: string }[]> {
   try {
-    const { supabase } = await import('../lib/supabase');
     const [year, mon] = month.split('-');
     const startDate = `${year}-${mon}-01`;
     const daysInMonth = new Date(Number(year), Number(mon), 0).getDate();
@@ -43,7 +43,6 @@ async function getApprovedLeavesForMonth(month: string): Promise<{ employeeId: s
 
 async function getAllBalancesMap(): Promise<Map<string, number>> {
   try {
-    const { supabase } = await import('../lib/supabase');
     const { data } = await (supabase as any).from('employee_leave_balances').select('employee_id,total,used');
     const map = new Map<string, number>();
     for (const row of data ?? []) {
@@ -395,16 +394,34 @@ export async function getAttendanceByEmployee(
   employeeId: string,
   month: string
 ): Promise<AttendanceLedgerEntry[]> {
-  await delay(150);
-  const roster = await fetchAttendanceRoster();
-  const emp = roster.find(e => e.id === employeeId) || roster[0];
-  const empIndex = roster.findIndex(e => e.id === employeeId);
-  const dates = getDatesInMonth(month);
-  return dates.map((date, i) => {
-    const entry = generateEntryForEmployee(emp, date, empIndex * 100 + i, _holidayDates());
-    const override = _overrides.get(entry.id);
-    return override ? { ...entry, ...override } : entry;
-  });
+  try {
+    const { data, error } = await supabase
+      .from('attendance_ledger')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .gte('date', `${month}-01`)
+      .lte('date', `${month}-31`)
+      .order('date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching employee attendance from Supabase:', error);
+      return [];
+    }
+
+    const roster = await fetchAttendanceRoster();
+    const emp = roster.find(e => e.id === employeeId);
+
+    return (data || []).map(row => ({
+      ...row,
+      status: row.status as AttendanceStatus,
+      source: row.source as AttendanceSource,
+      employeeName: emp?.name || 'Unknown',
+      department: emp?.dept || 'Unknown',
+    })) as AttendanceLedgerEntry[];
+  } catch (err) {
+    console.error('Unexpected error fetching attendance:', err);
+    return [];
+  }
 }
 
 /**

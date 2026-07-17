@@ -1013,6 +1013,62 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          due_date: string
+          priority: string
+          status: string
+          assignee_id: string | null
+          checklist: Json | null
+          comments: Json | null
+          attachments: Json | null
+          points_processed: boolean | null
+          is_overdue_swept: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id: string
+          title: string
+          description: string
+          due_date: string
+          priority?: string
+          status?: string
+          assignee_id?: string | null
+          checklist?: Json | null
+          comments?: Json | null
+          attachments?: Json | null
+          points_processed?: boolean | null
+          is_overdue_swept?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          due_date?: string
+          priority?: string
+          status?: string
+          assignee_id?: string | null
+          checklist?: Json | null
+          comments?: Json | null
+          attachments?: Json | null
+          points_processed?: boolean | null
+          is_overdue_swept?: boolean | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
