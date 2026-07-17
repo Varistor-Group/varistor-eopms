@@ -14,6 +14,7 @@ export interface AuthUser {
   department: string;
   avatarUrl: string;
   role: UserRole;
+  is_field_employee?: boolean;
 }
 
 // ─── Rate limiter (client-side, mirrors previous mock behaviour) ──────────────
@@ -62,7 +63,7 @@ export async function mockLogin(email: string, password: string): Promise<{ user
   // Load the employee profile for this auth user
   const { data: emp, error: empError } = await supabase
     .from('employees')
-    .select('id, full_name, personal_email, department, role, avatar_url')
+    .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
     .eq('auth_id', data.user.id)
     .single();
 
@@ -79,6 +80,7 @@ export async function mockLogin(email: string, password: string): Promise<{ user
       department: emp.department ?? '',
       avatarUrl: emp.avatar_url ?? '',
       role: emp.role as UserRole,
+      is_field_employee: emp.is_field_employee,
     },
     error: null,
   };
@@ -98,7 +100,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   const { data: emp } = await supabase
     .from('employees')
-    .select('id, full_name, personal_email, department, role, avatar_url')
+    .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
     .eq('auth_id', data.session.user.id)
     .single();
 
@@ -111,6 +113,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     department: emp.department ?? '',
     avatarUrl: emp.avatar_url ?? '',
     role: emp.role as UserRole,
+    is_field_employee: emp.is_field_employee,
   };
 }
 
@@ -181,7 +184,7 @@ export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
     }
     const { data: emp } = await supabase
       .from('employees')
-      .select('id, full_name, personal_email, department, role, avatar_url')
+      .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
       .eq('auth_id', session.user.id)
       .single();
 
@@ -193,6 +196,7 @@ export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
         department: emp.department ?? '',
         avatarUrl: emp.avatar_url ?? '',
         role: emp.role as UserRole,
+        is_field_employee: emp.is_field_employee,
       });
     } else {
       callback(null);

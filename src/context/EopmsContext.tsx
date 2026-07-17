@@ -19,6 +19,7 @@ export interface CurrentUser {
   avatarUrl: string;
   role: UserRole;
   dob?: string;
+  is_field_employee?: boolean;
 }
 
 interface EopmsContextType {

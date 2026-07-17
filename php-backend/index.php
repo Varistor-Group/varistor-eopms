@@ -69,6 +69,14 @@ $routes = [
     ['GET',  '#^/api/attendance/live-feed$#',       'attendance_stubs.php'],
     ['GET',  '#^/api/attendance/device-status$#',   'attendance_stubs.php'],
     ['POST', '#^/api/attendance/force-resync$#',    'attendance_stubs.php'],
+
+    // Field Attendance
+    ['POST', '#^/api/attendance/field-punch$#',       'field_punch.php'],
+    ['GET',  '#^/api/attendance/field-punch/status$#', 'field_punch.php'],
+    ['GET',  '#^/api/attendance/field-photos/pending$#', 'field_photos_hr.php'],
+    ['POST', '#^/api/attendance/field-photos/verify$#', 'field_photos_hr.php'],
+    ['POST', '#^/api/employees/location$#',           'field_locations.php'],
+    ['GET',  '#^/api/employees/locations$#',          'field_locations.php'],
 ];
 
 $params = [];
