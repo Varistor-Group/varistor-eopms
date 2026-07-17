@@ -133,3 +133,49 @@ function supabase_admin_post(string $endpoint, array $payload): array {
     $json['__http_code'] = $code;
     return $json;
 }
+
+function supabase_admin_get(string $endpoint): array {
+    $url = rtrim(SUPABASE_URL, '/') . $endpoint;
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPGET        => true,
+        CURLOPT_HTTPHEADER     => [
+            'apikey: '         . SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization: Bearer ' . SUPABASE_SERVICE_ROLE_KEY,
+        ],
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT        => 15,
+    ]);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $json = json_decode($body, true) ?? [];
+    if (!is_array($json)) $json = ['raw' => $body];
+    $json['__http_code'] = $code;
+    return $json;
+}
+
+function supabase_admin_patch(string $endpoint, array $payload): array {
+    $url = rtrim(SUPABASE_URL, '/') . $endpoint;
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST  => 'PATCH',
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'apikey: '         . SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization: Bearer ' . SUPABASE_SERVICE_ROLE_KEY,
+        ],
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT        => 15,
+    ]);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $json = json_decode($body, true) ?? [];
+    if (!is_array($json)) $json = ['raw' => $body];
+    $json['__http_code'] = $code;
+    return $json;
+}

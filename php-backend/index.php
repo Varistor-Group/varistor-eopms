@@ -77,6 +77,9 @@ $routes = [
     ['POST', '#^/api/attendance/field-photos/verify$#', 'field_photos_hr.php'],
     ['POST', '#^/api/employees/location$#',           'field_locations.php'],
     ['GET',  '#^/api/employees/locations$#',          'field_locations.php'],
+    
+    // Biometric ADMS
+    ['POST', '#^/api/biometric$#',                    'biometric.php'],
 ];
 
 $params = [];
