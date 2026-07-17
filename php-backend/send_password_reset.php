@@ -16,9 +16,9 @@ if (!$email) {
 $resetRedirect = APP_URL . '/reset-password';
 
 $supaResponse = supabase_admin_post('/auth/v1/admin/generate_link', [
-    'type'       => 'recovery',
-    'email'      => $email,
-    'options'    => ['redirectTo' => $resetRedirect],
+    'type'        => 'recovery',
+    'email'       => $email,
+    'redirect_to' => $resetRedirect,
 ]);
 
 if (($supaResponse['__http_code'] ?? 0) >= 400) {

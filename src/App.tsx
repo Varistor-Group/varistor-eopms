@@ -29,7 +29,11 @@ import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
 import { mockEmployeeStore } from './api/employees';
 import { FieldPunch } from './components/FieldPunch';
+<<<<<<< HEAD
+import { getCurrentUser } from './api/auth';
+=======
 import { signOut } from './api/auth';
+>>>>>>> 33d32b4cfb56fbc2c45f81b775ee788cb1f32d81
 
 const FieldTrackerBackground: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
@@ -163,6 +167,18 @@ const AppContent: React.FC = () => {
         setCurrentUser(user);
         setCurrentRole(savedRole as import('./types').UserRole);
         setIsLoggedIn(true);
+        
+        // Background refresh to get latest fields (e.g., is_field_employee)
+        getCurrentUser().then(freshUser => {
+          if (freshUser) {
+             setCurrentUser({
+               ...user,
+               ...freshUser,
+             });
+             setCurrentRole(freshUser.role);
+             localStorage.setItem('eopms_role', freshUser.role);
+          }
+        }).catch(() => {});
       }
     } catch {
       // Corrupted data – clear and force re-login

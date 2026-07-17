@@ -116,8 +116,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
+  } else if (currentRole === 'Field Employee' || currentUser?.is_field_employee) {
+    // Field Employee: same as Employee but with Punch In/Out tab
+    menuItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
+      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
+      { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true },
+      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
+      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
+      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
+      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
+      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
+      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
+      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
+    ];
   } else {
-    // Employee
+    // Regular Employee
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
@@ -131,11 +147,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
-    
-    // Add Field Punch tab if the role is Field Employee
-    if (currentRole === 'Field Employee') {
-      menuItems.splice(3, 0, { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
-    }
   }
 
 

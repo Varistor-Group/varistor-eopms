@@ -747,78 +747,70 @@ export async function uploadFieldPhoto(
   confidenceScore: number,
   location?: { lat: number; lng: number; accuracy: number }
 ): Promise<{ success: boolean; photoUrl?: string; error: string | null }> {
-  await delay(800);
+  try {
+    // 1. Upload photo to Supabase Storage (no PHP filesystem involved)
+    const { supabase } = await import('../lib/supabase');
+    const fileName = `${employeeId}/${date}_${punchType}_${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from('attendance-photos')
+      .upload(fileName, _file, { contentType: 'image/jpeg', upsert: true });
 
-  const roster = await fetchAttendanceRoster();
-  const emp = roster.find(e => e.id === employeeId);
-  if (!emp) return { success: false, error: 'Employee not found.' };
+    if (uploadError) {
+      throw new Error(`Photo storage error: ${uploadError.message}`);
+    }
 
-  const photoUrl = `attendance-photos/${employeeId}/${date}/${punchType}.jpg`;
-  const now = new Date().toISOString();
+    // 2. Get public URL
+    const { data: urlData } = supabase.storage
+      .from('attendance-photos')
+      .getPublicUrl(fileName);
+    const photoUrl = urlData.publicUrl;
 
-  const existing = _fieldPhotos.find(
-    fp => fp.employee_id === employeeId && fp.date === date && fp.punch_type === punchType
-  );
-
-  if (existing) {
-    existing.photo_url = photoUrl;
-    existing.uploaded_at = now;
-    existing.verification_status = 'Pending';
-    existing.confidence_score = confidenceScore;
-    existing.latitude = location?.lat;
-    existing.longitude = location?.lng;
-    existing.location_accuracy = location?.accuracy;
-    existing.punch_time = now;
-  } else {
-    _fieldPhotos.push({
-      id: `fp-${Date.now()}`,
-      employee_id: employeeId,
-      employeeName: emp.name,
-      department: emp.dept,
+    // 3. Send punch record to PHP backend with just the URL (no file upload)
+    const body: Record<string, string> = {
+      employeeId,
       date,
-      photo_url: photoUrl,
-      uploaded_at: now,
-      punch_type: punchType,
-      verification_status: 'Pending',
-      confidence_score: confidenceScore,
-      latitude: location?.lat,
-      longitude: location?.lng,
-      location_accuracy: location?.accuracy,
-      punch_time: now,
+      punchType,
+      photoUrl,
+      confidenceScore: confidenceScore.toString(),
+    };
+    if (location) {
+      body.lat = location.lat.toString();
+      body.lng = location.lng.toString();
+      body.accuracy = location.accuracy.toString();
+    }
+
+    const res = await fetch(`${API_URL}/api/attendance/field-punch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
+
+    let data: any = null;
+    try { data = await res.json(); } catch {
+      throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+    }
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.error || `Server error ${res.status}`);
+    }
+
+    return { success: true, photoUrl, error: null };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
-
-  // Upsert ledger entry
-  const ledgerId = `atl-${employeeId}-${date}`;
-  const existingOverride = _overrides.get(ledgerId) || {};
-  _overrides.set(ledgerId, {
-    ...existingOverride,
-    status: 'Present',
-    source: 'field_photo',
-    photo_url: photoUrl,
-    confidence: confidenceScore,
-    ...(punchType === 'in'
-      ? { punch_in: now }
-      : { punch_out: now }),
-  });
-
-  // TODO: Supabase implementation:
-  //   const { data, error } = await supabase.storage.from('attendance-photos').upload(path, file);
-  //   await supabase.from('field_attendance_photos').upsert({ ...entry, latitude, longitude, location_accuracy });
-  //   await supabase.from('attendance_ledger').upsert({ ...ledgerRow }, { onConflict: 'employee_id,date' });
-
-  return { success: true, photoUrl, error: null };
 }
 
 /**
  * Checks if a field employee is currently punched in for today without a punch out.
  */
 export async function isFieldEmployeePunchedIn(employeeId: string): Promise<boolean> {
-  await delay(100);
-  const date = new Date().toISOString().split('T')[0];
-  const ledgerId = `atl-${employeeId}-${date}`;
-  const override = _overrides.get(ledgerId);
-  return !!(override && override.punch_in && !override.punch_out);
+  try {
+    const res = await fetch(`${API_URL}/api/attendance/field-punch/status?employeeId=${employeeId}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.punchedIn || false;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -826,8 +818,14 @@ export async function isFieldEmployeePunchedIn(employeeId: string): Promise<bool
  * TODO: supabase.from('field_attendance_photos').select('*').eq('verification_status', 'Pending')
  */
 export async function getFieldPendingVerifications(): Promise<FieldPhotoEntry[]> {
-  await delay(150);
-  return _fieldPhotos.filter(fp => fp.verification_status === 'Pending');
+  try {
+    const res = await fetch(`${API_URL}/api/attendance/field-photos/pending`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -840,28 +838,17 @@ export async function verifyFieldPhoto(
   status: 'Verified' | 'Rejected',
   verifiedBy: string
 ): Promise<{ success: boolean; error: string | null }> {
-  await delay(250);
-  const photo = _fieldPhotos.find(fp => fp.id === photoId);
-  if (!photo) return { success: false, error: 'Photo record not found.' };
-
-  photo.verification_status = status;
-  photo.verified_by = verifiedBy;
-  photo.verified_at = new Date().toISOString();
-
-  // If rejected, mark ledger as Absent
-  if (status === 'Rejected') {
-    const ledgerId = `atl-${photo.employee_id}-${photo.date}`;
-    const existing = _overrides.get(ledgerId) || {};
-    _overrides.set(ledgerId, {
-      ...existing,
-      status: 'Absent',
-      override_reason: 'Field photo rejected by HR',
-      editor_id: verifiedBy,
-      edited_at: new Date().toISOString(),
+  try {
+    const res = await fetch(`${API_URL}/api/attendance/field-photos/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoId, status, verifiedBy })
     });
+    if (!res.ok) throw new Error('Failed to verify photo');
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
-
-  return { success: true, error: null };
 }
 
 // ─── Payroll Sync ──────────────────────────────────────────────────────────

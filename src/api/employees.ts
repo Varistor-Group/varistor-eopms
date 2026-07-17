@@ -143,6 +143,11 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
 
   const tempPassword = generateTempPassword(input.fullName);
 
+  let finalAvatarUrl = input.avatarUrl;
+  if (!finalAvatarUrl) {
+    finalAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=random`;
+  }
+
   const { data: rpcData, error: rpcError } = await supabase.rpc('create_employee_with_auth', {
     p_employee_id: input.employeeId,
     p_full_name: input.fullName,
@@ -154,7 +159,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     p_role: input.role,
     p_temp_password: tempPassword,
     p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: input.avatarUrl ?? undefined,
+    p_avatar_url: finalAvatarUrl,
   });
 
   if (rpcError) {
@@ -300,40 +305,36 @@ export const mockFieldLocations: FieldEmployeeLocation[] = [
   { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716, 77.5946], [13.0067, 77.5890]] },
 ];
 
-let mockLocationHistory: LocationEntry[] = [];
+
 
 export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void> {
-  const newEntry: LocationEntry = { ...data, id: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
-  mockLocationHistory.push(newEntry);
-  const employeeEntries = mockLocationHistory.filter(e => e.employeeId === data.employeeId);
-  if (employeeEntries.length > 100) {
-    const toRemove = employeeEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).slice(0, employeeEntries.length - 100).map(e => e.id);
-    mockLocationHistory = mockLocationHistory.filter(e => !toRemove.includes(e.id));
-  }
+  try {
+    await fetch(`${API_URL}/api/employees/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch {}
 }
 
 export async function getLatestLocations(): Promise<LatestLocation[]> {
-  const employees = await getEmployees();
-  const latestMap = new Map<string, LocationEntry>();
-  mockLocationHistory.forEach(entry => {
-    const current = latestMap.get(entry.employeeId);
-    if (!current || new Date(entry.timestamp).getTime() > new Date(current.timestamp).getTime()) {
-      latestMap.set(entry.employeeId, entry);
-    }
-  });
-  const result: LatestLocation[] = [];
-  employees.forEach(emp => {
-    if (emp.is_field_employee) {
-      const empId = emp.employeeId || emp.id;
-      const entry = latestMap.get(empId) ?? { id: 'temp-' + empId, employeeId: empId, latitude: 12.9716, longitude: 77.5946, accuracy: 50, timestamp: new Date().toISOString() };
-      result.push({ ...entry, employeeName: emp.fullName, department: emp.department });
-    }
-  });
-  return result;
+  try {
+    const res = await fetch(`${API_URL}/api/employees/locations`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function getLocationHistory(employeeId: string, from: Date, to: Date): Promise<LocationEntry[]> {
-  return mockLocationHistory.filter(e => e.employeeId === employeeId && new Date(e.timestamp).getTime() >= from.getTime() && new Date(e.timestamp).getTime() <= to.getTime()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  try {
+    const res = await fetch(`${API_URL}/api/employees/locations?history=true&employeeId=${employeeId}&from=${from.toISOString()}&to=${to.toISOString()}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function getFieldLocations(): Promise<FieldEmployeeLocation[]> {

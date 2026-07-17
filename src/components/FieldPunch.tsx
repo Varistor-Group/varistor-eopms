@@ -97,8 +97,19 @@ export const FieldPunch: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // 1. Convert Canvas to File
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+      // 1. Convert Canvas to File — resize to max 800px wide to stay under PHP upload limits
+      const MAX_W = 800;
+      let drawW = video.videoWidth;
+      let drawH = video.videoHeight;
+      if (drawW > MAX_W) {
+        drawH = Math.round((MAX_W / drawW) * drawH);
+        drawW = MAX_W;
+      }
+      canvas.width = drawW;
+      canvas.height = drawH;
+      ctx.drawImage(video, 0, 0, drawW, drawH);
+
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
       if (!blob) throw new Error('Failed to capture photo');
       const file = new File([blob], `punch_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
