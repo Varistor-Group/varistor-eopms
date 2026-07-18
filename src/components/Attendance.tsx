@@ -7,6 +7,7 @@ import {
   ToggleLeft, ToggleRight, MapPin
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
 import { Modal } from './shared/Modal';
 import { Button } from './shared/Button';
 import * as XLSX from 'xlsx';
@@ -131,14 +132,20 @@ export const Attendance: React.FC = () => {
   const isAdmin = currentRole === 'Admin';
   const isManager = currentRole === 'Reporting Manager';
   // Employee self-view: regular employee, field employee, or reporting manager
-  const isFieldEmployee = currentRole === 'Field Employee';
-  const isOfficeEmployee = currentRole === 'Employee' || currentRole === 'Reporting Manager';
+  const isFieldEmployee = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
+  const isOfficeEmployee = (currentRole === 'Employee' || currentRole === 'Reporting Manager') && !currentUser?.is_field_employee;
   const canEdit = isHR;
   const canDownload = isHR;
 
   // Field employees are locked to field tab; office employees/managers to office tab; HR/Admin can switch
   const defaultTab: 'office' | 'field' = isFieldEmployee ? 'field' : 'office';
   const [mainTab, setMainTab] = useState<'office' | 'field'>(defaultTab);
+
+  useEffect(() => {
+    if (isFieldEmployee && mainTab === 'office' && !isHR) {
+      setMainTab('field');
+    }
+  }, [isFieldEmployee, isHR, mainTab]);
 
   // ── Date/month selectors ───────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(todayISO());
@@ -407,7 +414,20 @@ export const Attendance: React.FC = () => {
 
     // Capture GPS location simultaneously
     setGeoLoading(true);
-    navigator.geolocation.getCurrentPosition(
+    try {
+      const perm = await CapGeolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        await CapGeolocation.requestPermissions();
+      }
+    } catch (e) {
+      console.warn('Capacitor Geolocation permission check skipped:', e);
+    }
+
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation is not supported by your browser');
+      setGeoLoading(false);
+    } else {
+      navigator.geolocation.getCurrentPosition(
       (pos) => {
         setGeoLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) });
         setGeoLoading(false);
@@ -416,8 +436,9 @@ export const Attendance: React.FC = () => {
         setGeoError(`Location unavailable: ${err.message}`);
         setGeoLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
 
     // Run face similarity in background
     setFaceLoading(true);

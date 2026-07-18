@@ -287,6 +287,19 @@ const AppContent: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
+  const isField = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
+  let allowedRoutes = currentRole === 'Admin' 
+    ? ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training']
+    : currentRole === 'HR' 
+    ? ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training']
+    : currentRole === 'Reporting Manager' 
+    ? ['dashboard', 'task-management', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training']
+    : ['dashboard', 'kanban', 'attendance', 'field-tracker', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
+
+  if (isField) {
+    allowedRoutes.push('field-punch');
+  }
+
   return (
     <div className={`min-h-[100dvh] bg-varistor-pageBg text-varistor-dark flex font-sans w-full max-w-[100vw] overflow-x-hidden ${isLandscape && window.innerWidth < 768 ? 'landscape-mobile' : ''}`}>
       <FieldTrackerBackground />
@@ -367,24 +380,7 @@ const AppContent: React.FC = () => {
         {/* Dynamic Inner Page Content */}
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-[fadeInPage_250ms_ease-out]">
           {(() => {
-            const getAllowedTabs = () => {
-              if (currentRole === 'Admin') {
-                // Admin has access to everything
-                return ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
-              } else if (currentRole === 'HR') {
-                // HR does not have Vari Points (ledger)
-                return ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training'];
-              } else if (currentRole === 'Reporting Manager') {
-                // All employee tabs (minus vault & attendance) + task-management
-                return ['dashboard', 'task-management', 'kanban', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training'];
-              } else {
-                // Employee and Field Employee
-                return ['dashboard', 'kanban', 'attendance', 'field-tracker', 'field-punch', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
-              }
-            };
-
-            const allowedTabs = getAllowedTabs();
-            if (!allowedTabs.includes(activeTab)) {
+            if (!allowedRoutes.includes(activeTab)) {
               return (
                 <div className="flex flex-col items-center justify-center h-64 bg-varistor-surface rounded-varistor border border-varistor-dangerBorder shadow-sm animate-[fadeInPage_250ms_ease-out]">
                   <div className="text-red-500 font-bold text-6xl mb-4">403</div>

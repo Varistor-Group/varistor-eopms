@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, CheckCircle2, Clock, Loader2, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { isFieldEmployeePunchedIn, uploadFieldPhoto } from '../api/attendance';
+import { Camera as CapCamera } from '@capacitor/camera';
+import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
 
 export const FieldPunch: React.FC = () => {
   const { currentUser } = useVariPoints();
@@ -36,6 +38,17 @@ export const FieldPunch: React.FC = () => {
   const startCamera = async () => {
     setCameraError('');
     try {
+      // Request native camera permission using Capacitor explicitly
+      try {
+        const perm = await CapCamera.checkPermissions();
+        if (perm.camera !== 'granted') {
+          await CapCamera.requestPermissions({ permissions: ['camera'] });
+        }
+      } catch (e) {
+        // Ignored, might be running in browser without capacitor plugins properly initialized
+        console.warn('Capacitor Camera permission check skipped:', e);
+      }
+
       // Prefer front camera for selfies if available on mobile
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user' } 
@@ -56,17 +69,26 @@ export const FieldPunch: React.FC = () => {
     setStream(null);
   };
 
-  const getLocation = (): Promise<GeolocationPosition> => {
+  const getLocation = async (): Promise<GeolocationPosition> => {
+    try {
+      const perm = await CapGeolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        await CapGeolocation.requestPermissions();
+      }
+    } catch (e) {
+      console.warn('Capacitor Geolocation permission check skipped:', e);
+    }
+
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by your browser"));
-      } else {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
       }
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
     });
   };
 

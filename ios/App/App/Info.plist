@@ -47,5 +47,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera for face punch-in.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to verify your punch-in location.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need your location to verify your punch-in location.</string>
 </dict>
 </plist>

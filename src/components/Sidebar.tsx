@@ -66,7 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let menuItems: any[] = [];
 
   if (currentRole === 'Admin') {
@@ -108,32 +107,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'task-management', label: 'Task Management', icon: ListChecks, enabled: true },
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true }, // Managers probably need to see attendance too
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
-      { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
-      { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
-      { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
-      { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
-    ];
-  } else if (currentRole === 'Field Employee' || currentUser?.is_field_employee) {
-    // Field Employee: same as Employee but with Punch In/Out tab
-    menuItems = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
-      { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
-      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, enabled: true },
-      { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true },
-      { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
-      { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
-      { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
-      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
   } else {
-    // Regular Employee
+    // Employee & Field Employee base
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, enabled: true },
       { id: 'kanban', label: 'My Tasks', icon: Kanban, enabled: true },
@@ -147,6 +131,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
       { id: 'training', label: 'Training', icon: BookOpen, enabled: true }
     ];
+  }
+
+  const isField = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
+  if (isField && !menuItems.find(m => m.id === 'field-punch')) {
+    const attIdx = menuItems.findIndex(m => m.id === 'attendance');
+    if (attIdx >= 0) {
+      menuItems.splice(attIdx + 1, 0, { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
+    } else {
+      menuItems.push({ id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
+    }
   }
 
 
