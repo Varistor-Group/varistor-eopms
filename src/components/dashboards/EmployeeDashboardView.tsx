@@ -95,19 +95,14 @@ export const EmployeeDashboardView: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-varistor-dark">{getGreeting()} {currentUser?.name ?? mockStoreUser?.fullName ?? 'Employee'}{isBirthday() ? '! 🎉' : ''}</h1>
             <p className="text-xs text-varistor-muted mt-0.5">{currentUser?.department ?? mockStoreUser?.department ?? 'General'} Team · {currentUser?.role ?? mockStoreUser?.role ?? 'Employee'}</p>
-            <div className="mt-2 flex items-center">
-              {isTracking ? (
+            {isTracking && (
+              <div className="mt-2 flex items-center">
                 <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-varistor-limeTint border border-varistor-lime/20 text-[10px] font-bold text-varistor-limeText uppercase tracking-wider">
                   <MapPin size={12} />
                   Location sharing active
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                  <AlertCircle size={12} />
-                  Location sharing unavailable
-                </span>
-              )}
-            </div>
+              </div>
+            )}
             {/* Inline avatar URL editor */}
             {editingAvatar && (
               <ProfilePictureEditor

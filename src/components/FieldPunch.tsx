@@ -1,26 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, CheckCircle2, Clock, Loader2, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { isFieldEmployeePunchedIn, uploadFieldPhoto } from '../api/attendance';
+import { isFieldEmployeePunchedIn } from '../api/attendance';
+import { API_URL } from '../config/api';
 import { Camera as CapCamera } from '@capacitor/camera';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
+import { WfhApprovalDashboard } from './WfhApprovalDashboard';
 
 export const FieldPunch: React.FC = () => {
-  const { currentUser } = useVariPoints();
+  const { currentUser, currentRole } = useVariPoints();
   const [isPunchedIn, setIsPunchedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+  const cameraRequestId = useRef<number>(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
     checkPunchStatus();
     startCamera();
-    return () => stopCamera();
+    return () => {
+      isMountedRef.current = false;
+      stopCamera();
+    };
   }, [currentUser]);
 
   const checkPunchStatus = async () => {
@@ -37,6 +46,7 @@ export const FieldPunch: React.FC = () => {
 
   const startCamera = async () => {
     setCameraError('');
+    const currentRequestId = ++cameraRequestId.current;
     try {
       // Request native camera permission using Capacitor explicitly
       try {
@@ -53,6 +63,13 @@ export const FieldPunch: React.FC = () => {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user' } 
       });
+
+      if (currentRequestId !== cameraRequestId.current || !isMountedRef.current) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -63,8 +80,13 @@ export const FieldPunch: React.FC = () => {
   };
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    cameraRequestId.current++;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setStream(null);
   };
@@ -100,70 +122,57 @@ export const FieldPunch: React.FC = () => {
   const handlePunch = async () => {
     if (!currentUser) return;
     
-    // Capture Photo
-    if (!videoRef.current || !canvasRef.current) {
-      showToast('Camera not ready', 'error');
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Draw current frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
     setIsProcessing(true);
-
     try {
-      // 1. Convert Canvas to File — resize to max 800px wide to stay under PHP upload limits
-      const MAX_W = 800;
-      let drawW = video.videoWidth;
-      let drawH = video.videoHeight;
-      if (drawW > MAX_W) {
-        drawH = Math.round((MAX_W / drawW) * drawH);
-        drawW = MAX_W;
-      }
-      canvas.width = drawW;
-      canvas.height = drawH;
-      ctx.drawImage(video, 0, 0, drawW, drawH);
-
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
-      if (!blob) throw new Error('Failed to capture photo');
-      const file = new File([blob], `punch_${Date.now()}.jpg`, { type: 'image/jpeg' });
-
-      // 2. Get Location
+      // Get Location
       const pos = await getLocation();
       const locationData = {
         lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy
+        lng: pos.coords.longitude
       };
 
-      // 3. Upload and Register Punch
-      const date = new Date().toISOString().split('T')[0];
       const punchType = isPunchedIn ? 'out' : 'in';
-      const confidenceScore = 95; // Assuming a successful face match for mock purposes
       
-      const res = await uploadFieldPhoto(currentUser.id, date, punchType, file, confidenceScore, locationData);
+      const response = await fetch(`${API_URL}/api/attendance/punch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: currentUser.id,
+          employeeName: currentUser.name,
+          latitude: locationData.lat,
+          longitude: locationData.lng,
+          action: punchType
+        })
+      });
+
+      const res = await response.json();
       
       if (res.success) {
-        setIsPunchedIn(!isPunchedIn);
-        showToast(`Successfully punched ${punchType}!`, 'success');
+        if (res.status === 'Present') {
+          setIsPunchedIn(!isPunchedIn);
+          showToast(res.message, 'success');
+        } else if (res.status === 'WFH') {
+          showToast(res.message, 'success'); // Shows the WFH trigger message
+        }
       } else {
         throw new Error(res.error || 'Failed to punch');
       }
 
     } catch (err: any) {
       console.error(err);
-      showToast(err.message || 'An error occurred during punch in/out.', 'error');
+      if (err.message.includes('User denied Geolocation')) {
+        showToast('Location permission denied. You must allow location to punch in.', 'error');
+      } else {
+        showToast(err.message || 'An error occurred during punch in/out.', 'error');
+      }
     } finally {
       setIsProcessing(false);
     }
   };
+
+  if (currentRole === 'Admin' || currentRole === 'HR') {
+    return <WfhApprovalDashboard />;
+  }
 
   if (loading) {
     return (
@@ -179,8 +188,8 @@ export const FieldPunch: React.FC = () => {
         
         {/* Header */}
         <div className="bg-varistor-surface p-6 border-b border-varistor-border text-center">
-          <h2 className="text-2xl font-bold text-brand-ink">Field Attendance</h2>
-          <p className="text-sm text-varistor-muted mt-1">Capture a photo to log your attendance</p>
+          <h2 className="text-2xl font-bold text-brand-ink">Universal Attendance</h2>
+          <p className="text-sm text-varistor-muted mt-1">Punch in using your verified location</p>
         </div>
 
         {/* Current Status */}

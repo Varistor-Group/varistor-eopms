@@ -1943,6 +1943,92 @@ app.post('/api/activity', async (req, res) => {
   res.json({ success: true });
 });
 
+// Haversine distance calculation in meters
+function getDistanceFromLatLonInm(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Radius of the earth in m
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Universal Punch Endpoint
+app.post('/api/attendance/punch', async (req, res) => {
+  try {
+    const { employeeId, employeeName, latitude, longitude, action } = req.body;
+    if (!employeeId || !latitude || !longitude || !action) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const OFFICE_LAT = 12.993004331624428;
+    const OFFICE_LNG = 77.71575650158682;
+
+    const distance = getDistanceFromLatLonInm(OFFICE_LAT, OFFICE_LNG, latitude, longitude);
+    const date = new Date().toISOString().split('T')[0];
+    const punchTime = new Date().toISOString();
+
+    if (distance <= 200) {
+      // Mark as Present
+      const { data: existing, error: fetchError } = await supabaseAdmin
+        .from('attendance_ledger')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('date', date)
+        .single();
+
+      let upsertError = null;
+      if (existing) {
+        // Update existing
+        const updateData = action === 'in' 
+          ? { punch_in: existing.punch_in || punchTime, status: 'Present' } 
+          : { punch_out: Math.max(new Date(existing.punch_out || 0).getTime(), new Date(punchTime).getTime()) === new Date(punchTime).getTime() ? punchTime : existing.punch_out, status: 'Present' };
+        const { error } = await supabaseAdmin.from('attendance_ledger').update(updateData).eq('id', existing.id);
+        upsertError = error;
+      } else {
+        // Insert new
+        const insertData = {
+          employee_id: employeeId,
+          date: date,
+          punch_in: action === 'in' ? punchTime : null,
+          punch_out: action === 'out' ? punchTime : null,
+          status: 'Present',
+          source: 'device'
+        };
+        const { error } = await supabaseAdmin.from('attendance_ledger').insert([insertData]);
+        upsertError = error;
+      }
+
+      if (upsertError) throw upsertError;
+
+      return res.json({ success: true, status: 'Present', message: 'Successfully punched in as Present.', distance: Math.round(distance) });
+    } else {
+      // Automatically create a WFH request
+      const { error: leaveError } = await supabaseAdmin.from('leave_requests').insert([{
+        employee_id: employeeId,
+        employee_name: employeeName || 'Unknown',
+        type: 'WFH',
+        from_date: date,
+        to_date: date,
+        days: 1,
+        reason: 'Auto-generated WFH request based on remote punch-in (Distance: ' + Math.round(distance) + 'm)',
+        status: 'Pending',
+        submitted_at: punchTime
+      }]);
+
+      if (leaveError) throw leaveError;
+
+      return res.json({ success: true, status: 'WFH', message: 'You are outside the office range. A WFH request has been automatically submitted.', distance: Math.round(distance) });
+    }
+  } catch (error) {
+    console.error('[Punch Endpoint Error]', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`[Email Server] running on port ${port}`);
 });

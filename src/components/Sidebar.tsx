@@ -133,13 +133,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ];
   }
 
-  const isField = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
-  if (isField && !menuItems.find(m => m.id === 'field-punch')) {
+  if (!menuItems.find(m => m.id === 'field-punch')) {
+    const isAdminOrHR = currentRole === 'Admin' || currentRole === 'HR';
+    const punchLabel = isAdminOrHR ? 'WFH Approval' : 'Punch In/Out';
     const attIdx = menuItems.findIndex(m => m.id === 'attendance');
     if (attIdx >= 0) {
-      menuItems.splice(attIdx + 1, 0, { id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
+      menuItems.splice(attIdx + 1, 0, { id: 'field-punch', label: punchLabel, icon: Camera, enabled: true });
     } else {
-      menuItems.push({ id: 'field-punch', label: 'Punch In/Out', icon: Camera, enabled: true });
+      menuItems.push({ id: 'field-punch', label: punchLabel, icon: Camera, enabled: true });
     }
   }
 

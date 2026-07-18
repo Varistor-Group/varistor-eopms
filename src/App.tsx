@@ -287,7 +287,6 @@ const AppContent: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
-  const isField = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
   let allowedRoutes = currentRole === 'Admin' 
     ? ['dashboard', 'admin', 'task-management', 'kanban', 'attendance', 'field-tracker', 'ledger', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training']
     : currentRole === 'HR' 
@@ -296,9 +295,7 @@ const AppContent: React.FC = () => {
     ? ['dashboard', 'task-management', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training']
     : ['dashboard', 'kanban', 'attendance', 'field-tracker', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
 
-  if (isField) {
-    allowedRoutes.push('field-punch');
-  }
+  allowedRoutes.push('field-punch');
 
   return (
     <div className={`min-h-[100dvh] bg-varistor-pageBg text-varistor-dark flex font-sans w-full max-w-[100vw] overflow-x-hidden ${isLandscape && window.innerWidth < 768 ? 'landscape-mobile' : ''}`}>

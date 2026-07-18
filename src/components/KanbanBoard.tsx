@@ -242,9 +242,17 @@ export const KanbanBoard: React.FC = () => {
 
     const taskId = active.id as string;
     const targetStatus = over.id as TaskStatus;
+    
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
 
     // Do not allow dragging to 'done' directly (requires clicking Approve in awaiting_approval column)
     if (targetStatus === 'done') return;
+    
+    // Do not allow dragging directly from 'todo' to 'awaiting_approval'
+    if (task.status === 'todo' && targetStatus === 'awaiting_approval') {
+      return;
+    }
 
     moveTask(taskId, targetStatus);
   };
