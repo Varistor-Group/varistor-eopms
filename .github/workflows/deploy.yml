@@ -38,7 +38,7 @@ jobs:
           
       - name: 📦 Install PHP Dependencies (Composer)
         run: |
-          cd php-backend
+          cd backend
           composer install --no-dev --optimize-autoloader
 
       # ─── DEPLOYMENT ──────────────────────────────────────────────────
@@ -58,7 +58,7 @@ jobs:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./php-backend/
+          local-dir: ./backend/
           server-dir: /public_html/eopms.ytbhai.com/eopms-api/
           exclude: |
             **/.git*
