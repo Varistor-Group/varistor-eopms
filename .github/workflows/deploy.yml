@@ -1,73 +1,126 @@
 name: Deploy to cPanel
-
+ 
 on:
+
   push:
+
     branches:
+
       - main      # Will trigger every time you push to the 'main' branch
+
       - master    # Also triggers on 'master' just in case
-
+ 
 jobs:
+
   build-and-deploy:
+
     runs-on: ubuntu-latest
-    
+
     steps:
+
       - name: 🚚 Checkout Code
+
         uses: actions/checkout@v4
-
+ 
       # ─── FRONTEND BUILD ──────────────────────────────────────────────
+
       - name: 🟢 Setup Node.js
+
         uses: actions/setup-node@v4
+
         with:
-          node-version: '20'
+
+          node-version: '22'  # Upgraded from 20 to clear deprecation warning
+
           cache: 'npm'
-
+ 
       - name: 📦 Install NPM Dependencies
+
         run: npm ci || npm install
-
+ 
       - name: 🔨 Build Frontend (React/Vite)
+
         run: npm run build
+
         env:
-          # You can define build-time env variables here if needed
+
           VITE_API_URL: https://eopms.ytbhai.com/eopms-api
-
+ 
       # ─── BACKEND BUILD ───────────────────────────────────────────────
+
       - name: 🐘 Setup PHP
+
         uses: shivammathur/setup-php@v2
+
         with:
+
           php-version: '8.2'
-          
+
       - name: 📦 Install PHP Dependencies (Composer)
+
         run: |
+
           cd backend
+
           composer install --no-dev --optimize-autoloader
-
+ 
       # ─── DEPLOYMENT ──────────────────────────────────────────────────
-      - name: 🚀 Deploy Frontend to cPanel
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./dist/
-          server-dir: /public_html/eopms.ytbhai.com/
-          # Only uploads what has changed to save time
 
-      - name: 🚀 Deploy PHP Backend to cPanel
+      - name: 🚀 Deploy Frontend to cPanel
+
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+
         with:
+
           server: ${{ secrets.FTP_HOST }}
+
           username: ${{ secrets.FTP_USERNAME }}
+
           password: ${{ secrets.FTP_PASSWORD }}
+
           protocol: ftps
+
+          port: 21
+
+          security: loose
+
+          local-dir: ./dist/
+
+          server-dir: /public_html/eopms.ytbhai.com/
+ 
+      - name: 🚀 Deploy PHP Backend to cPanel
+
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+
+        with:
+
+          server: ${{ secrets.FTP_HOST }}
+
+          username: ${{ secrets.FTP_USERNAME }}
+
+          password: ${{ secrets.FTP_PASSWORD }}
+
+          protocol: ftps
+
+          port: 21
+
+          security: loose
+
           local-dir: ./backend/
+
           server-dir: /public_html/eopms.ytbhai.com/eopms-api/
+
           exclude: |
+
             **/.git*
+
             **/.git*/**
+
             config.php
+
             config.example.php
+
             DEPLOYMENT.md
+
             db.json
-          # Note: db.json is excluded so we NEVER overwrite the live database with the local one
-          # config.php is excluded so we don't mess up the live server credentials
+ 
