@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+
+# Uploaded training videos (served locally, never committed)
+server_uploads/
+dist-ssr
+*.local
+.env
+.env.*
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Lint results
+lint-results.*
+
+# Documents
+*.pdf
+
+# PHP backend — credentials and generated files (never commit)
+php-backend/config.php
+php-backend/vendor/
+php-backend/db.json
+php-backend/composer.phar
+php-backend/*.log
+php-backend/error_log
