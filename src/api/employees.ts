@@ -1,9 +1,10 @@
 /**
- * EMPLOYEES SERVICE — Supabase
- * Replaces the localStorage-backed mock store.
+ * EMPLOYEES SERVICE — MySQL (via PHP backend)
+ * Converted from Supabase. See HANDOVER notes: Task 2 (Authentication)
+ * not yet built, so login-account creation/deletion is stubbed — flagged below.
  */
 
-import { supabase } from '../lib/supabase';
+import { apiFetch } from './httpClient';
 import type { UserRole, FieldEmployeeLocation, LocationEntry, LatestLocation } from '../types';
 import { API_URL } from '../config/api';
 import { initEmployeeLeaveBalances } from './leaves';
@@ -37,14 +38,8 @@ export interface Employee {
 export type Department = string;
 
 const DEFAULT_DEPARTMENTS = [
-  'Finance',
-  'Sales',
-  'Operations',
-  'Ops Heads',
-  'Tech',
-  'Digital Marketing',
-  'Management',
-  'Human Resources'
+  'Finance', 'Sales', 'Operations', 'Ops Heads', 'Tech',
+  'Digital Marketing', 'Management', 'Human Resources'
 ];
 
 export function getDepartments(): string[] {
@@ -81,6 +76,8 @@ export interface CreateEmployeeInput {
 }
 
 // ─── DB row ↔ domain mapper ──────────────────────────────────────────────────
+// NOTE: MySQL TINYINT(1) columns come back as 0/1 numbers via PHP's JSON encode,
+// not true booleans like Postgres gave us — wrapped in Boolean() below to fix.
 
 function rowToEmployee(row: Record<string, unknown>): Employee {
   return {
@@ -97,31 +94,40 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     createdAt: row.created_at as string,
     status: row.status as 'Active' | 'Inactive',
     variPoints: (row.vari_points as number) ?? 0,
-    is_field_employee: (row.is_field_employee as boolean) ?? false,
+    is_field_employee: Boolean(row.is_field_employee),
     avatarUrl: (row.avatar_url as string) ?? '',
     shiftStart: (row.shift_start as string) ?? undefined,
     shiftEnd: (row.shift_end as string) ?? undefined,
     dateOfJoining: (row.date_of_joining as string) ?? new Date().toISOString().split('T')[0],
     dateOfBirth: (row.date_of_birth as string) ?? undefined,
     uanNumber: (row.uan_number as string) ?? undefined,
-    optOutPF: (row.opt_out_pf as boolean) ?? false,
-    optOutPT: (row.opt_out_pt as boolean) ?? false,
+    optOutPF: Boolean(row.opt_out_pf),
+    optOutPT: Boolean(row.opt_out_pt),
   };
 }
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
 export async function getEmployees(): Promise<Employee[]> {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('*')
-    .order('status', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) {
-    console.error('[getEmployees]', error.message);
+  try {
+    const res = await apiFetch('/api/employees');
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      console.error('[getEmployees]', err?.error || res.statusText);
+      return [];
+    }
+    const rows = await res.json();
+    const employees = (rows ?? []).map(rowToEmployee);
+    // PHP doesn't sort server-side — replicate the old Supabase ordering here
+    employees.sort((a: Employee, b: Employee) => {
+      if (a.status !== b.status) return a.status.localeCompare(b.status);
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    return employees;
+  } catch (e) {
+    console.error('[getEmployees]', e);
     return [];
   }
-  return (data ?? []).map(rowToEmployee);
 }
 
 function generateTempPassword(name: string): string {
@@ -148,61 +154,47 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     finalAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=random`;
   }
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc('create_employee_with_auth', {
-    p_employee_id: input.employeeId,
-    p_full_name: input.fullName,
-    p_username: input.username,
-    p_personal_email: input.personalEmail,
-    p_phone: input.phone,
-    p_department: input.department,
-    p_reporting_manager: input.reportingManager,
-    p_role: input.role,
-    p_temp_password: tempPassword,
-    p_is_field_employee: input.is_field_employee ?? false,
-    p_avatar_url: finalAvatarUrl,
+  // TODO Task 2 (Authentication): Supabase's create_employee_with_auth RPC used to
+  // also create a login account here. PHP has no /api/auth/* yet, so the employee
+  // row is created in MySQL but CANNOT log in until Task 2 ships. Flagging clearly
+  // rather than silently dropping this — revisit once login endpoints exist.
+
+  const res = await apiFetch('/api/employees', {
+    method: 'POST',
+    body: JSON.stringify({
+      employeeId: input.employeeId,
+      fullName: input.fullName,
+      username: input.username,
+      personalEmail: input.personalEmail,
+      phone: input.phone,
+      department: input.department,
+      reportingManager: input.reportingManager,
+      role: input.role,
+      tempPassword,
+      status: 'Active',
+      variPoints: 0,
+      isFieldEmployee: input.is_field_employee ?? false,
+      avatarUrl: finalAvatarUrl,
+      dateOfJoining: input.dateOfJoining,
+      dateOfBirth: input.dateOfBirth,
+      uanNumber: input.uanNumber,
+      shiftStart: input.shiftStart,
+      shiftEnd: input.shiftEnd,
+      optOutPF: input.optOutPF ?? false,
+      optOutPT: input.optOutPT ?? false,
+    }),
   });
 
-  if (rpcError) {
-    return { success: false, employee: null, error: rpcError.message };
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) {
+    return { success: false, employee: null, error: result?.error || 'Failed to create employee.' };
   }
 
-  // The RPC returns a JSON object. We typecast it to check success.
-  const result = rpcData as unknown as { success: boolean; error?: string; employee_id?: string };
-
-  if (!result.success) {
-    return { success: false, employee: null, error: result.error || 'Failed to create employee.' };
-  }
-
-  // Update additional fields via a direct update since RPC doesn't handle them
-  const extraUpdates: any = {};
-  if (input.dateOfJoining) extraUpdates.date_of_joining = input.dateOfJoining;
-  if (input.dateOfBirth) extraUpdates.date_of_birth = input.dateOfBirth;
-  if (input.uanNumber) extraUpdates.uan_number = input.uanNumber;
-  if (input.shiftStart) extraUpdates.shift_start = input.shiftStart;
-  if (input.shiftEnd) extraUpdates.shift_end = input.shiftEnd;
-  if (input.optOutPF !== undefined) extraUpdates.opt_out_pf = input.optOutPF;
-  if (input.optOutPT !== undefined) extraUpdates.opt_out_pt = input.optOutPT;
-
-  if (Object.keys(extraUpdates).length > 0) {
-    await supabase.from('employees').update(extraUpdates).eq('employee_id', input.employeeId);
-  }
-
-  // Fetch the newly created employee row to return it
-  const { data: empRow } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('employee_id', input.employeeId)
-    .single();
-
-  // Create leave balance entries — initialise 12 days per active leave type
+  // Leave balance init — still Supabase-backed until leaves.ts is converted next
   await initEmployeeLeaveBalances(input.employeeId);
 
-  // Log activity
-  await supabase.from('activity_log').insert({
-    action: 'CREATE_EMPLOYEE',
-    performed_by: input.employeeId,
-    details: `Created employee ${input.fullName} (${input.employeeId})`,
-  });
+  // NOTE: activity_log insert removed here — employees.php already logs
+  // CREATE_EMPLOYEE server-side now, so this would have been a duplicate.
 
   let emailErrorMsg: string | null = null;
   try {
@@ -216,9 +208,9 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
         tempPassword,
       }),
     });
-    const result = await emailRes.json().catch(() => null);
-    if (!result?.success) {
-      emailErrorMsg = result?.error || 'Failed to send welcome email.';
+    const emailResult = await emailRes.json().catch(() => null);
+    if (!emailResult?.success) {
+      emailErrorMsg = emailResult?.error || 'Failed to send welcome email.';
       console.error('[Email]', emailErrorMsg);
     }
   } catch (e: any) {
@@ -226,55 +218,55 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     console.error('[Email Exception]', e);
   }
 
-  return { success: true, employee: empRow ? rowToEmployee(empRow) : null, error: null, emailError: emailErrorMsg };
+  return {
+    success: true,
+    employee: result.employee ? rowToEmployee(result.employee) : null,
+    error: null,
+    emailError: emailErrorMsg,
+  };
 }
 
 export async function updateEmployee(
   id: string,
   updates: Partial<Employee>
 ): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('employees')
-    .update({
-      ...(updates.fullName !== undefined && { full_name: updates.fullName }),
-      ...(updates.phone !== undefined && { phone: updates.phone }),
-      ...(updates.department !== undefined && { department: updates.department }),
-      ...(updates.reportingManager !== undefined && { reporting_manager: updates.reportingManager }),
-      ...(updates.role !== undefined && { role: updates.role }),
-      ...(updates.status !== undefined && { status: updates.status }),
-      ...(updates.variPoints !== undefined && { vari_points: updates.variPoints }),
-      ...(updates.is_field_employee !== undefined && { is_field_employee: updates.is_field_employee }),
-      ...(updates.avatarUrl !== undefined && { avatar_url: updates.avatarUrl }),
-      ...(updates.shiftStart !== undefined && { shift_start: updates.shiftStart }),
-      ...(updates.shiftEnd !== undefined && { shift_end: updates.shiftEnd }),
-      ...(updates.dateOfBirth !== undefined && { date_of_birth: updates.dateOfBirth }),
-      ...(updates.uanNumber !== undefined && { uan_number: updates.uanNumber }),
-      ...(updates.dateOfJoining !== undefined && { date_of_joining: updates.dateOfJoining }),
-      ...(updates.optOutPF !== undefined && { opt_out_pf: updates.optOutPF }),
-      ...(updates.optOutPT !== undefined && { opt_out_pt: updates.optOutPT }),
-    } as any)
-    .eq('id', id)
-    .select()
-    .single();
+  const body: Record<string, unknown> = {};
+  if (updates.fullName !== undefined) body.fullName = updates.fullName;
+  if (updates.phone !== undefined) body.phone = updates.phone;
+  if (updates.department !== undefined) body.department = updates.department;
+  if (updates.reportingManager !== undefined) body.reportingManager = updates.reportingManager;
+  if (updates.role !== undefined) body.role = updates.role;
+  if (updates.status !== undefined) body.status = updates.status;
+  if (updates.variPoints !== undefined) body.variPoints = updates.variPoints;
+  if (updates.is_field_employee !== undefined) body.isFieldEmployee = updates.is_field_employee;
+  if (updates.avatarUrl !== undefined) body.avatarUrl = updates.avatarUrl;
+  if (updates.shiftStart !== undefined) body.shiftStart = updates.shiftStart;
+  if (updates.shiftEnd !== undefined) body.shiftEnd = updates.shiftEnd;
+  if (updates.dateOfBirth !== undefined) body.dateOfBirth = updates.dateOfBirth;
+  if (updates.uanNumber !== undefined) body.uanNumber = updates.uanNumber;
+  if (updates.dateOfJoining !== undefined) body.dateOfJoining = updates.dateOfJoining;
+  if (updates.optOutPF !== undefined) body.optOutPF = updates.optOutPF;
+  if (updates.optOutPT !== undefined) body.optOutPT = updates.optOutPT;
 
-  if (error) return { success: false, employee: null, error: error.message };
-  return { success: true, employee: rowToEmployee(data as Record<string, unknown>), error: null };
+  const res = await apiFetch(`/api/employees/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) {
+    return { success: false, employee: null, error: result?.error || 'Failed to update employee.' };
+  }
+  return { success: true, employee: result.employee ? rowToEmployee(result.employee) : null, error: null };
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { data, error } = await supabase.rpc('delete_employee_with_auth' as any, { p_employee_id: id });
-
-  if (error) {
-    return { success: false, error: error.message };
+  // TODO Task 2: won't clean up a Supabase Auth login — that system is being
+  // retired anyway, so this is fine short-term, just flagging for awareness.
+  const res = await apiFetch(`/api/employees/${id}`, { method: 'DELETE' });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) {
+    return { success: false, error: result?.error || 'Failed to delete employee.' };
   }
-
-  // The RPC returns a JSON object. We typecast it to check success.
-  const result = data as unknown as { success: boolean; error?: string };
-
-  if (!result.success) {
-    return { success: false, error: result.error || 'Failed to delete employee.' };
-  }
-
   return { success: true, error: null };
 }
 
@@ -282,15 +274,18 @@ export async function updateFieldStatus(
   employeeId: string,
   isField: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employees')
-    .update({ is_field_employee: isField })
-    .eq('id', employeeId);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employees/${employeeId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ isFieldEmployee: isField }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) {
+    return { success: false, error: result?.error || 'Failed to update field status.' };
+  }
   return { success: true, error: null };
 }
 
-// ─── Field location tracking (still in-memory, real-time TBD) ─────────────────
+// ─── Field location tracking (unchanged — already used fetch(), not Supabase) ─
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 const todayAt = (h: number, min: number) => {
@@ -304,8 +299,6 @@ export const mockFieldLocations: FieldEmployeeLocation[] = [
   { employeeId: 'VAR-032', employeeName: 'Kavya Iyer', department: 'Operations', lat: 12.9345, lng: 77.5820, accuracy: 12, batteryLevel: 57, status: 'Active', lastUpdated: minutesAgo(5), todayCheckIn: todayAt(8, 50), distanceTravelledKm: 9.8, routeHistory: [[12.9081, 77.6010], [12.9345, 77.5820]] },
   { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716, 77.5946], [13.0067, 77.5890]] },
 ];
-
-
 
 export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void> {
   try {
@@ -354,15 +347,12 @@ export function updateFieldLocation(employeeId: string, patch: Partial<FieldEmpl
 }
 
 export async function getFieldEmployees(): Promise<Employee[]> {
-  const { data, error } = await supabase.from('employees').select('*').eq('is_field_employee', true);
-  if (error) return [];
-  return (data ?? []).map(rowToEmployee);
+  const employees = await getEmployees();
+  return employees.filter(e => e.is_field_employee);
 }
 
 export const mockActivityLog: { timestamp: string; action: string; by: string; details: string }[] = [];
-// Kept for backwards compatibility — writes now go to Supabase activity_log table
 export let mockEmployeeStore: Employee[] = [];
-// Lazy sync: populate on first access
 getEmployees().then(emps => { mockEmployeeStore.splice(0, mockEmployeeStore.length, ...emps); });
 
 export async function sendRecoveryEmail(employee: Employee): Promise<{ success: boolean; error: string | null }> {

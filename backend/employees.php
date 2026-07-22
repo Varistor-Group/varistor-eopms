@@ -1,82 +1,140 @@
 <?php
 /**
- * GET  /api/employees          — list all
- * POST /api/employees          — create
- * PUT  /api/employees/:id      — update
- * DELETE /api/employees/:id    — (not used by frontend currently, but included)
+ * GET    /api/employees          — list all
+ * POST   /api/employees          — create
+ * PUT    /api/employees/:id      — update
+ * DELETE /api/employees/:id      — (not used by frontend currently, but included)
+ *
+ * MIGRATION NOTE: previously read/wrote db.json exclusively (employees key),
+ * never touched Supabase — same pattern found in leaves.php and cl_balances.php.
+ * Rebuilt here against MySQL. Field names below convert the frontend's
+ * camelCase (employeeId, fullName, ...) to the table's snake_case columns.
  */
 
+$db = get_db();
+
+// camelCase (frontend) -> snake_case (MySQL column) for employees fields
+const EMPLOYEE_FIELD_MAP = [
+    'employeeId'       => 'employee_id',
+    'personalEmail'    => 'personal_email',
+    'fullName'         => 'full_name',
+    'username'         => 'username',
+    'phone'            => 'phone',
+    'department'       => 'department',
+    'reportingManager' => 'reporting_manager',
+    'role'             => 'role',
+    'tempPassword'     => 'temp_password',
+    'status'           => 'status',
+    'variPoints'       => 'vari_points',
+    'isFieldEmployee'  => 'is_field_employee',
+    'avatarUrl'        => 'avatar_url',
+    'dateOfJoining'    => 'date_of_joining',
+    'dateOfBirth'      => 'date_of_birth',
+    'uanNumber'        => 'uan_number',
+    'shiftStart'       => 'shift_start',
+    'shiftEnd'         => 'shift_end',
+    'optOutPF'         => 'opt_out_pf',
+    'optOutPT'         => 'opt_out_pt',
+];
+
 if ($method === 'GET') {
-    $db = read_db();
-    json_ok($db['employees'] ?? []);
+    if (currentEmployeeId() === null) json_error('Unauthorized', 401);
+    $rows = $db->query('SELECT * FROM employees')->fetchAll();
+    json_ok($rows);
 }
 
 if ($method === 'POST') {
-    $db       = read_db();
+    requireRole(['HR', 'Admin']);
     $employee = request_body();
-    if (!isset($db['employees'])) $db['employees'] = [];
 
-    // Duplicate check
-    foreach ($db['employees'] as $e) {
-        if ($e['employeeId'] === ($employee['employeeId'] ?? '') ||
-            $e['personalEmail'] === ($employee['personalEmail'] ?? '')) {
-            json_error('Employee ID or email already exists.', 400);
+    $empId = $employee['employeeId'] ?? '';
+    $email = $employee['personalEmail'] ?? '';
+
+    $dupCheck = $db->prepare('SELECT id FROM employees WHERE employee_id = ? OR personal_email = ? LIMIT 1');
+    $dupCheck->execute([$empId, $email]);
+    if ($dupCheck->fetch()) {
+        json_error('Employee ID or email already exists.', 400);
+    }
+
+    $columns = ['id'];
+    $placeholders = ['?'];
+    $values = [$employee['id'] ?? ('VAR-' . substr(bin2hex(random_bytes(4)), 0, 6))];
+
+    foreach (EMPLOYEE_FIELD_MAP as $jsKey => $col) {
+        if (array_key_exists($jsKey, $employee)) {
+            $columns[]      = $col;
+            $placeholders[] = '?';
+            $values[]       = $employee[$jsKey];
         }
     }
 
-    $db['employees'][] = $employee;
+    $sql = 'INSERT INTO employees (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
+    $insert = $db->prepare($sql);
+    $insert->execute($values);
 
-    if (!isset($db['activity_log'])) $db['activity_log'] = [];
-    $db['activity_log'][] = [
-        'id'        => (string)(time() * 1000),
-        'action'    => 'CREATE_EMPLOYEE',
-        'by'        => 'admin@varistor.in',
-        'details'   => 'Created employee ' . ($employee['fullName'] ?? '') . ' (' . ($employee['employeeId'] ?? '') . ')',
-        'timestamp' => date('c'),
-    ];
+    $myId = currentEmployeeId();
+    $log = $db->prepare('INSERT INTO activity_log (action, performed_by, details) VALUES (?, ?, ?)');
+    $log->execute([
+        'CREATE_EMPLOYEE',
+        $myId,
+        'Created employee ' . ($employee['fullName'] ?? '') . ' (' . $empId . ')',
+    ]);
 
-    write_db($db);
-    json_ok(['success' => true, 'employee' => $employee]);
+    $fetch = $db->prepare('SELECT * FROM employees WHERE id = ? LIMIT 1');
+    $fetch->execute([$values[0]]);
+    json_ok(['success' => true, 'employee' => $fetch->fetch()]);
 }
 
 if ($method === 'PUT') {
     $id = $params['id'] ?? '';
-    $db  = read_db();
-    if (!isset($db['employees'])) $db['employees'] = [];
+    requireOwnOrRole($id, ['HR', 'Admin']);
 
-    $index = -1;
-    foreach ($db['employees'] as $k => $e) {
-        if ($e['id'] === $id) { $index = $k; break; }
-    }
-    if ($index === -1) {
-        json_error('Employee not found.', 404);
-    }
+    $find = $db->prepare('SELECT * FROM employees WHERE id = ? LIMIT 1');
+    $find->execute([$id]);
+    $existing = $find->fetch();
+    if (!$existing) json_error('Employee not found.', 404);
 
     $updates = request_body();
-    // Protect immutable fields
+    // Protect immutable fields — same list as the original db.json version
     foreach (['id', 'employeeId', 'personalEmail', 'createdAt', 'tempPassword'] as $f) {
         unset($updates[$f]);
     }
 
-    $db['employees'][$index] = array_merge($db['employees'][$index], $updates);
+    $setClauses = [];
+    $values = [];
+    foreach (EMPLOYEE_FIELD_MAP as $jsKey => $col) {
+        if (array_key_exists($jsKey, $updates)) {
+            $setClauses[] = "$col = ?";
+            $values[]     = $updates[$jsKey];
+        }
+    }
 
-    if (!isset($db['activity_log'])) $db['activity_log'] = [];
-    $db['activity_log'][] = [
-        'id'        => (string)(time() * 1000),
-        'action'    => 'UPDATE_EMPLOYEE',
-        'by'        => 'admin@varistor.in',
-        'details'   => 'Updated employee ' . ($db['employees'][$index]['fullName'] ?? '') . ' (' . $id . ')',
-        'timestamp' => date('c'),
-    ];
+    if (!empty($setClauses)) {
+        $values[] = $id;
+        $sql = 'UPDATE employees SET ' . implode(', ', $setClauses) . ' WHERE id = ?';
+        $db->prepare($sql)->execute($values);
+    }
 
-    write_db($db);
-    json_ok(['success' => true, 'employee' => $db['employees'][$index]]);
+    $myId = currentEmployeeId();
+    $refetch = $db->prepare('SELECT * FROM employees WHERE id = ? LIMIT 1');
+    $refetch->execute([$id]);
+    $updated = $refetch->fetch();
+
+    $log = $db->prepare('INSERT INTO activity_log (action, performed_by, details) VALUES (?, ?, ?)');
+    $log->execute([
+        'UPDATE_EMPLOYEE',
+        $myId,
+        'Updated employee ' . ($updated['full_name'] ?? '') . ' (' . $id . ')',
+    ]);
+
+    json_ok(['success' => true, 'employee' => $updated]);
 }
 
 if ($method === 'DELETE') {
+    requireRole(['Admin']);
     $id = $params['id'] ?? '';
-    $db  = read_db();
-    $db['employees'] = array_values(array_filter($db['employees'] ?? [], fn($e) => $e['id'] !== $id));
-    write_db($db);
+    $db->prepare('DELETE FROM employees WHERE id = ?')->execute([$id]);
     json_ok(['success' => true]);
 }
+
+json_error("Method not allowed: {$method}", 405);

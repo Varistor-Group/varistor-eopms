@@ -2,13 +2,24 @@
 /**
  * EOPMS PHP Backend — Shared Helpers
  * Included by index.php before dispatching to handlers.
+ *
+ * MIGRATION NOTE: Supabase forwarding functions (supabase_admin_post/get/patch)
+ * have been removed and replaced with a direct MySQL (PDO) connection, plus
+ * the access-control helpers that replace Postgres RLS (see
+ * rls_to_php_mapping.md / rls_to_php_mapping_remaining7.md).
+ *
+ * AUTH NOTE: currentEmployeeId() / currentUserRole() below use a PLACEHOLDER
+ * mechanism (an X-Employee-Id request header) until Task 2 (Authentication)
+ * builds real login/session/token handling. Everything calling these two
+ * functions does not need to change when Task 2 lands — only the internals
+ * of these two functions do.
  */
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 function cors_headers(): void {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Headers: Content-Type, X-Employee-Id');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         http_response_code(200);
         exit;
@@ -35,18 +46,77 @@ function request_body(): array {
     return json_decode($raw, true) ?? [];
 }
 
-// ── db.json CRUD ──────────────────────────────────────────────────────────────
-function read_db(): array {
-    if (!file_exists(DB_PATH)) {
-        return ['employees' => [], 'documents' => [], 'activity_log' => [],
-                'leaves' => [], 'payroll_records' => [], 'employee_cl_balances' => []];
+// ── MySQL connection ──────────────────────────────────────────────────────────
+// Expects DB_HOST, DB_NAME, DB_USER, DB_PASS constants defined in config.php,
+// the same place SUPABASE_URL / SMTP_HOST etc. currently live.
+function get_db(): \PDO {
+    static $pdo = null;
+    if ($pdo === null) {
+        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+        $pdo = new \PDO($dsn, DB_USER, DB_PASS, [
+            \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            \PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
     }
-    $raw = file_get_contents(DB_PATH);
-    return json_decode($raw, true) ?? [];
+    return $pdo;
 }
 
-function write_db(array $data): void {
-    file_put_contents(DB_PATH, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+// ── Access control (replaces Postgres RLS — see mapping docs) ────────────────
+// PLACEHOLDER auth: reads the calling employee's id from a request header.
+// Task 2 replaces the body of currentEmployeeId() with real session/JWT
+// validation; currentUserRole() and requireRole() do not need to change.
+function currentEmployeeId(): ?string {
+    static $id = null;
+    static $resolved = false;
+    if ($resolved) return $id;
+    $resolved = true;
+
+    $headers = getallheaders();
+    $raw = $headers['X-Employee-Id'] ?? $headers['x-employee-id'] ?? null;
+    $id = $raw !== null && $raw !== '' ? $raw : null;
+    return $id;
+}
+
+function currentUserRole(): ?string {
+    static $role = null;
+    static $resolved = false;
+    if ($resolved) return $role;
+    $resolved = true;
+
+    $empId = currentEmployeeId();
+    if ($empId === null) return null;
+
+    $stmt = get_db()->prepare('SELECT role FROM employees WHERE id = ? LIMIT 1');
+    $stmt->execute([$empId]);
+    $row = $stmt->fetch();
+    $role = $row['role'] ?? null;
+    return $role;
+}
+
+// Call at the top of an endpoint to require one of the given roles.
+// e.g. requireRole(['HR', 'Admin']);
+function requireRole(array $allowedRoles): void {
+    $role = currentUserRole();
+    if ($role === null) {
+        json_error('Unauthorized', 401);
+    }
+    if (!in_array($role, $allowedRoles, true)) {
+        json_error('Forbidden', 403);
+    }
+}
+
+// Call when an endpoint's rule is "own record, or one of these roles".
+// e.g. requireOwnOrRole($row['employee_id'], ['HR', 'Admin']);
+function requireOwnOrRole(?string $ownerEmployeeId, array $allowedRoles): void {
+    $myId = currentEmployeeId();
+    if ($myId === null) {
+        json_error('Unauthorized', 401);
+    }
+    $role = currentUserRole();
+    if ($ownerEmployeeId === $myId) return;
+    if (in_array($role, $allowedRoles, true)) return;
+    json_error('Forbidden', 403);
 }
 
 // ── PHPMailer factory ─────────────────────────────────────────────────────────
@@ -108,74 +178,4 @@ function number_to_words(float $num): string {
 
     $paiseWords = $paise > 0 ? ' and ' . $twoDigits($paise) . ' Paise' : '';
     return 'Rupees ' . trim($result) . $paiseWords . ' Only';
-}
-
-// ── Supabase Admin REST call (cURL) ───────────────────────────────────────────
-function supabase_admin_post(string $endpoint, array $payload): array {
-    $url = rtrim(SUPABASE_URL, '/') . $endpoint;
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'apikey: '         . SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization: Bearer ' . SUPABASE_SERVICE_ROLE_KEY,
-        ],
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT        => 15,
-    ]);
-    $body = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $json = json_decode($body, true) ?? [];
-    $json['__http_code'] = $code;
-    return $json;
-}
-
-function supabase_admin_get(string $endpoint): array {
-    $url = rtrim(SUPABASE_URL, '/') . $endpoint;
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPGET        => true,
-        CURLOPT_HTTPHEADER     => [
-            'apikey: '         . SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization: Bearer ' . SUPABASE_SERVICE_ROLE_KEY,
-        ],
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT        => 15,
-    ]);
-    $body = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $json = json_decode($body, true) ?? [];
-    if (!is_array($json)) $json = ['raw' => $body];
-    $json['__http_code'] = $code;
-    return $json;
-}
-
-function supabase_admin_patch(string $endpoint, array $payload): array {
-    $url = rtrim(SUPABASE_URL, '/') . $endpoint;
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST  => 'PATCH',
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'apikey: '         . SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization: Bearer ' . SUPABASE_SERVICE_ROLE_KEY,
-        ],
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT        => 15,
-    ]);
-    $body = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $json = json_decode($body, true) ?? [];
-    if (!is_array($json)) $json = ['raw' => $body];
-    $json['__http_code'] = $code;
-    return $json;
 }

@@ -16,9 +16,11 @@ define('SMTP_NAME',   'Varistor EOPMS');
 // ── App URL ───────────────────────────────────────────────────────────────────
 define('APP_URL',     'https://eopms.ytbhai.com');
 
-// ── Supabase Admin ────────────────────────────────────────────────────────────
-define('SUPABASE_URL',              'https://vghttoqhflmbjztsphjy.supabase.co');
-define('SUPABASE_SERVICE_ROLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnaHR0b3FoZmxtYmp6dHNwaGp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjg4NDk3NywiZXhwIjoyMDk4NDYwOTc3fQ.AGjNkEvuB5K4HoavfaSCjhDxt8rKrWJxV2NfFZgrRiw');
+// ── MySQL ─────────────────────────────────────────────────────────────────────
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'adminbhai_eopmsdata');
+define('DB_USER', 'REPLACE_WITH_YOUR_MYSQL_USERNAME');
+define('DB_PASS', 'REPLACE_WITH_YOUR_MYSQL_PASSWORD');
 
-// ── db.json path ──────────────────────────────────────────────────────────────
+// ── db.json path (legacy — safe to remove once all handlers confirmed off it) ──
 define('DB_PATH', __DIR__ . '/db.json');
