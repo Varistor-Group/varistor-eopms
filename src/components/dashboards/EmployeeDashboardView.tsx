@@ -6,7 +6,7 @@ import { PointsBalance } from '../PointsBalance';
 import { TaskSummary } from '../TaskSummary';
 import { BirthdayCard } from '../BirthdayCard';
 
-import { MapPin, AlertCircle } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useKanbanTasks } from '../../hooks/useKanbanTasks';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { useFieldTracking } from '../../hooks/useFieldTracking';
