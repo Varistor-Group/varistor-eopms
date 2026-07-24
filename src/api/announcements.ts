@@ -1,127 +1,82 @@
 /**
- * ANNOUNCEMENTS SERVICE — Supabase
- * Replaces the localStorage-backed store.
+ * ANNOUNCEMENTS SERVICE — MySQL (via PHP backend)
  */
 
-import { supabase } from '../lib/supabase';
-import type { Announcement, AnnouncementDTO } from '../types';
-
-const EMOJIS = ['👍', '❤️', '🎉', '💵', '🎂'];
-
-// ─── Fetch ────────────────────────────────────────────────────────────────────
+import { apiFetch } from './httpClient';
+import type { AnnouncementDTO, Announcement } from '../types';
 
 export const announcementsApi = {
-  async fetchAnnouncements(userId: string): Promise<AnnouncementDTO[]> {
-    const [{ data: anns }, { data: reactions }, { data: reads }] = await Promise.all([
-      supabase.from('announcements').select('*').order('created_at', { ascending: false }),
-      supabase.from('announcement_reactions').select('*'),
-      supabase.from('announcement_reads').select('*').eq('user_id', userId),
-    ]);
-
-    return (anns ?? []).map(ann => {
-      const annReactions = (reactions ?? []).filter(r => r.announcement_id === ann.id);
-      const countsMap: Record<string, number> = {};
-      annReactions.forEach(r => { countsMap[r.emoji_type] = (countsMap[r.emoji_type] || 0) + 1; });
-      const userReacted = new Set(annReactions.filter(r => r.user_id === userId).map(r => r.emoji_type));
-      const uniqueEmojis = Array.from(new Set([...EMOJIS, ...Object.keys(countsMap)]));
-      const isRead = (reads ?? []).some(r => r.announcement_id === ann.id);
-
-      return {
-        ...ann,
-        author_role: ann.author_role as 'HR' | 'Admin',
-        type: ann.type as 'Standard' | 'Birthday' | 'Policy',
-        reactions: uniqueEmojis.map(emoji => ({ emoji, count: countsMap[emoji] || 0, reactedByUser: userReacted.has(emoji) })),
-        isRead,
-      };
-    });
-  },
-
-  // ─── React ──────────────────────────────────────────────────────────────────
-
-  async toggleReaction(announcementId: string, userId: string, emojiType: string): Promise<AnnouncementDTO[]> {
-    const { data: existing } = await supabase
-      .from('announcement_reactions')
-      .select('id')
-      .eq('announcement_id', announcementId)
-      .eq('user_id', userId)
-      .eq('emoji_type', emojiType)
-      .single();
-
-    if (existing) {
-      await supabase.from('announcement_reactions').delete().eq('id', existing.id);
-    } else {
-      await supabase.from('announcement_reactions').insert({ announcement_id: announcementId, user_id: userId, emoji_type: emojiType });
+  async fetchAnnouncements(_userId: string): Promise<AnnouncementDTO[]> {
+    try {
+      const res = await apiFetch('/api/announcements');
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error('[fetchAnnouncements]', e);
+      return [];
     }
-    return this.fetchAnnouncements(userId);
   },
 
-  // ─── Mark as read ────────────────────────────────────────────────────────────
-
-  async markAsRead(announcementId: string, userId: string): Promise<AnnouncementDTO[]> {
-    await supabase.from('announcement_reads').upsert(
-      { announcement_id: announcementId, user_id: userId },
-      { onConflict: 'announcement_id,user_id', ignoreDuplicates: true }
-    );
-    return this.fetchAnnouncements(userId);
+  async toggleReaction(announcementId: string, _userId: string, emojiType: string): Promise<AnnouncementDTO[]> {
+    try {
+      const res = await apiFetch(`/api/announcements/${announcementId}/react`, {
+        method: 'POST',
+        body: JSON.stringify({ emojiType }),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error('[toggleReaction]', e);
+      return [];
+    }
   },
 
-  // ─── Create ──────────────────────────────────────────────────────────────────
+  async markAsRead(announcementId: string, _userId: string): Promise<AnnouncementDTO[]> {
+    try {
+      const res = await apiFetch(`/api/announcements/${announcementId}/read`, {
+        method: 'POST',
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error('[markAsRead]', e);
+      return [];
+    }
+  },
 
   async createAnnouncement(
     announcement: Omit<Announcement, 'id' | 'created_at'>,
-    userId: string
+    _userId: string
   ): Promise<AnnouncementDTO[]> {
-    if (announcement.type === 'Birthday') {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const { data: existing } = await supabase
-        .from('announcements')
-        .select('id')
-        .eq('type', 'Birthday')
-        .eq('title', announcement.title)
-        .gte('created_at', todayStart.toISOString())
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        return this.fetchAnnouncements(userId);
-      }
+    try {
+      const res = await apiFetch('/api/announcements', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: announcement.title,
+          content: announcement.content,
+          author_role: announcement.author_role,
+          type: announcement.type,
+        }),
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error('[createAnnouncement]', e);
+      return [];
     }
-
-    const { data: newAnn, error } = await supabase
-      .from('announcements')
-      .insert({
-        title: announcement.title,
-        content: announcement.content,
-        author_role: announcement.author_role,
-        type: announcement.type,
-      })
-      .select()
-      .single();
-
-    if (error || !newAnn) {
-      console.error('[createAnnouncement]', error?.message);
-      return this.fetchAnnouncements(userId);
-    }
-
-    // Auto mark as read for creator
-    await supabase.from('announcement_reads').upsert(
-      { announcement_id: newAnn.id, user_id: userId },
-      { onConflict: 'announcement_id,user_id', ignoreDuplicates: true }
-    );
-
-    return this.fetchAnnouncements(userId);
   },
 
-  // ─── Delete ──────────────────────────────────────────────────────────────────
-
-  async deleteAnnouncement(announcementId: string, userId: string): Promise<AnnouncementDTO[]> {
-    await supabase.from('announcements').delete().eq('id', announcementId);
-    return this.fetchAnnouncements(userId);
+  async deleteAnnouncement(announcementId: string, _userId: string): Promise<AnnouncementDTO[]> {
+    try {
+      const res = await apiFetch(`/api/announcements/${announcementId}`, { method: 'DELETE' });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error('[deleteAnnouncement]', e);
+      return [];
+    }
   },
-
-  // ─── Legacy helpers (kept for backwards compat) ──────────────────────────────
 
   _getData() { return { announcements: [], reactions: [], reads: [] }; },
-  _saveData() { /* no-op — data lives in Supabase */ },
+  _saveData() {},
 };

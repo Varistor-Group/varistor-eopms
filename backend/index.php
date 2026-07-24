@@ -27,11 +27,13 @@ $method = $_SERVER['REQUEST_METHOD'];
 // ── Route table ───────────────────────────────────────────────────────────────
 // Format: [METHOD, regex pattern, handler file]
 $routes = [
-    // Email
+    // Auth
     ['GET',  '#^/api/auth/me$#',                    'me.php'],
     ['POST', '#^/api/auth/update-password$#',       'update_password.php'],
     ['POST', '#^/api/auth/reset-password$#',        'reset_password.php'],
     ['POST', '#^/api/auth/login$#',                 'login.php'],
+
+    // Email
     ['POST', '#^/api/send-credentials$#',          'send_credentials.php'],
     ['POST', '#^/api/send-password-reset$#',        'send_password_reset.php'],
     ['GET',  '#^/api/test-email$#',                 'test_email.php'],
@@ -65,6 +67,29 @@ $routes = [
     ['POST', '#^/api/leaves$#',                     'leaves.php'],
     ['PUT',  '#^/api/leaves/(?P<id>[^/]+)$#',       'leaves.php'],
 
+    // Leave Types
+    ['GET',    '#^/api/leave-types$#',                    'leave_types.php'],
+    ['POST',   '#^/api/leave-types$#',                    'leave_types.php'],
+    ['DELETE', '#^/api/leave-types/(?P<id>[^/]+)$#',      'leave_types.php'],
+
+    // Employee Leave Balances
+    ['GET', '#^/api/employee-leave-balances$#',                       'employee_leave_balances.php'],
+    ['GET', '#^/api/employee-leave-balances/(?P<employeeId>[^/]+)$#', 'employee_leave_balances.php'],
+    ['PUT', '#^/api/employee-leave-balances/(?P<employeeId>[^/]+)$#', 'employee_leave_balances.php'],
+
+    // Policies
+    ['GET',    '#^/api/policies$#',                 'policies.php'],
+    ['POST',   '#^/api/policies$#',                 'policies.php'],
+    ['PUT',    '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
+    ['DELETE', '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
+
+    // Announcements
+    ['GET',    '#^/api/announcements$#',                                 'announcements.php'],
+    ['POST',   '#^/api/announcements$#',                                 'announcements.php'],
+    ['DELETE', '#^/api/announcements/(?P<id>[^/]+)$#',                   'announcements.php'],
+    ['POST',   '#^/api/announcements/(?P<id>[^/]+)/(?P<action>react)$#', 'announcements.php'],
+    ['POST',   '#^/api/announcements/(?P<id>[^/]+)/(?P<action>read)$#',  'announcements.php'],
+
     // Activity log
     ['POST', '#^/api/activity$#',                   'activity.php'],
 
@@ -81,7 +106,7 @@ $routes = [
     ['POST', '#^/api/attendance/field-photos/verify$#', 'field_photos_hr.php'],
     ['POST', '#^/api/employees/location$#',           'field_locations.php'],
     ['GET',  '#^/api/employees/locations$#',          'field_locations.php'],
-    
+
     // Biometric ADMS
     ['POST', '#^/api/biometric$#',                    'biometric.php'],
 ];

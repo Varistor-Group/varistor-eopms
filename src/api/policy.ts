@@ -1,9 +1,8 @@
 /**
- * POLICY SERVICE — Supabase
- * Replaces the Express server-backed mock.
+ * POLICY SERVICE — MySQL (via PHP backend)
  */
 
-import { supabase } from '../lib/supabase';
+import { apiFetch } from './httpClient';
 
 export type PolicyTarget = 'Field' | 'Office' | 'Both';
 
@@ -11,7 +10,7 @@ export interface Policy {
   id: string;
   title: string;
   target: PolicyTarget;
-  content: string;       // pipe-separated bullet points
+  content: string;
   effectiveDate: string;
   createdAt?: string;
   updatedAt?: string;
@@ -31,49 +30,76 @@ function rowToPolicy(row: any): Policy {
 }
 
 export async function getPolicies(): Promise<Policy[]> {
-  const { data, error } = await supabase
-    .from('policies')
-    .select('*')
-    .order('effective_date', { ascending: false });
-  if (error) { console.error('[getPolicies]', error.message); return []; }
-  return (data ?? []).map(rowToPolicy);
+  try {
+    const res = await apiFetch('/api/policies');
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return (rows ?? []).map(rowToPolicy);
+  } catch (e) {
+    console.error('[getPolicies]', e);
+    return [];
+  }
 }
 
 export async function addPolicy(
   data: Omit<Policy, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<{ success: boolean; policy?: Policy; error: string | null }> {
-  const { data: row, error } = await supabase
-    .from('policies')
-    .insert({
-      title: data.title,
-      target: data.target,
-      content: data.content,
-      effective_date: data.effectiveDate,
-    })
-    .select()
-    .single();
-  if (error) return { success: false, error: error.message };
-  return { success: true, policy: rowToPolicy(row), error: null };
+  try {
+    const res = await apiFetch('/api/policies', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: data.title,
+        target: data.target,
+        content: data.content,
+        effectiveDate: data.effectiveDate,
+      }),
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result?.success) {
+      return { success: false, error: result?.error || 'Failed to create policy.' };
+    }
+    return { success: true, policy: rowToPolicy(result.policy), error: null };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 }
 
 export async function updatePolicy(
   id: string,
   data: Partial<Omit<Policy, 'id'>>
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase.from('policies').update({
-    ...(data.title !== undefined && { title: data.title }),
-    ...(data.target !== undefined && { target: data.target }),
-    ...(data.content !== undefined && { content: data.content }),
-    ...(data.effectiveDate !== undefined && { effective_date: data.effectiveDate }),
-  }).eq('id', id);
-  if (error) return { success: false, error: error.message };
-  return { success: true, error: null };
+  try {
+    const body: Record<string, unknown> = {};
+    if (data.title !== undefined) body.title = data.title;
+    if (data.target !== undefined) body.target = data.target;
+    if (data.content !== undefined) body.content = data.content;
+    if (data.effectiveDate !== undefined) body.effectiveDate = data.effectiveDate;
+
+    const res = await apiFetch(`/api/policies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result?.success) {
+      return { success: false, error: result?.error || 'Failed to update policy.' };
+    }
+    return { success: true, error: null };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 }
 
 export async function deletePolicy(id: string): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase.from('policies').delete().eq('id', id);
-  if (error) return { success: false, error: error.message };
-  return { success: true, error: null };
+  try {
+    const res = await apiFetch(`/api/policies/${id}`, { method: 'DELETE' });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result?.success) {
+      return { success: false, error: result?.error || 'Failed to delete policy.' };
+    }
+    return { success: true, error: null };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 }
 
 // Legacy stubs kept for backwards compatibility
