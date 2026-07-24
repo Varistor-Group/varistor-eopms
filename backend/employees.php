@@ -44,45 +44,49 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    requireRole(['HR', 'Admin']);
-    $employee = request_body();
+    try {
+        requireRole(['HR', 'Admin']);
+        $employee = request_body();
 
-    $empId = $employee['employeeId'] ?? '';
-    $email = $employee['personalEmail'] ?? '';
+        $empId = $employee['employeeId'] ?? '';
+        $email = $employee['personalEmail'] ?? '';
 
-    $dupCheck = $db->prepare('SELECT id FROM employees WHERE employee_id = ? OR personal_email = ? LIMIT 1');
-    $dupCheck->execute([$empId, $email]);
-    if ($dupCheck->fetch()) {
-        json_error('Employee ID or email already exists.', 400);
-    }
-
-    $columns = ['id'];
-    $placeholders = ['?'];
-    $values = [$employee['id'] ?? ('VAR-' . substr(bin2hex(random_bytes(4)), 0, 6))];
-
-    foreach (EMPLOYEE_FIELD_MAP as $jsKey => $col) {
-        if (array_key_exists($jsKey, $employee)) {
-            $columns[]      = $col;
-            $placeholders[] = '?';
-            $values[]       = $employee[$jsKey];
+        $dupCheck = $db->prepare('SELECT id FROM employees WHERE employee_id = ? OR personal_email = ? LIMIT 1');
+        $dupCheck->execute([$empId, $email]);
+        if ($dupCheck->fetch()) {
+            json_error('Employee ID or email already exists.', 400);
         }
+
+        $columns = ['id'];
+        $placeholders = ['?'];
+        $values = [$employee['id'] ?? ('VAR-' . substr(bin2hex(random_bytes(4)), 0, 6))];
+
+        foreach (EMPLOYEE_FIELD_MAP as $jsKey => $col) {
+            if (array_key_exists($jsKey, $employee)) {
+                $columns[]      = $col;
+                $placeholders[] = '?';
+                $values[]       = $employee[$jsKey];
+            }
+        }
+
+        $sql = 'INSERT INTO employees (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
+        $insert = $db->prepare($sql);
+        $insert->execute($values);
+
+        $myId = currentEmployeeId();
+        $log = $db->prepare('INSERT INTO activity_log (action, performed_by, details) VALUES (?, ?, ?)');
+        $log->execute([
+            'CREATE_EMPLOYEE',
+            $myId,
+            'Created employee ' . ($employee['fullName'] ?? '') . ' (' . $empId . ')',
+        ]);
+
+        $fetch = $db->prepare('SELECT * FROM employees WHERE id = ? LIMIT 1');
+        $fetch->execute([$values[0]]);
+        json_ok(['success' => true, 'employee' => $fetch->fetch()]);
+    } catch (\Throwable $e) {
+        json_error('DEBUG: ' . $e->getMessage(), 500);
     }
-
-    $sql = 'INSERT INTO employees (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
-    $insert = $db->prepare($sql);
-    $insert->execute($values);
-
-    $myId = currentEmployeeId();
-    $log = $db->prepare('INSERT INTO activity_log (action, performed_by, details) VALUES (?, ?, ?)');
-    $log->execute([
-        'CREATE_EMPLOYEE',
-        $myId,
-        'Created employee ' . ($employee['fullName'] ?? '') . ' (' . $empId . ')',
-    ]);
-
-    $fetch = $db->prepare('SELECT * FROM employees WHERE id = ? LIMIT 1');
-    $fetch->execute([$values[0]]);
-    json_ok(['success' => true, 'employee' => $fetch->fetch()]);
 }
 
 if ($method === 'PUT') {
