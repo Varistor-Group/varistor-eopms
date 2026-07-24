@@ -37,6 +37,14 @@ const EMPLOYEE_FIELD_MAP = [
     'optOutPT'         => 'opt_out_pt',
 ];
 
+// Normalize a value before binding to PDO — booleans must become 0/1,
+// not '' (PDO converts raw booleans to empty string, which breaks
+// tinyint columns like is_field_employee, opt_out_pf, opt_out_pt).
+function normalizeValue($val) {
+    if (is_bool($val)) return (int)$val;
+    return $val;
+}
+
 if ($method === 'GET') {
     if (currentEmployeeId() === null) json_error('Unauthorized', 401);
     $rows = $db->query('SELECT * FROM employees')->fetchAll();
@@ -64,7 +72,7 @@ if ($method === 'POST') {
         if (array_key_exists($jsKey, $employee)) {
             $columns[]      = $col;
             $placeholders[] = '?';
-            $values[]       = $employee[$jsKey];
+            $values[]       = normalizeValue($employee[$jsKey]);
         }
     }
 
@@ -105,7 +113,7 @@ if ($method === 'PUT') {
     foreach (EMPLOYEE_FIELD_MAP as $jsKey => $col) {
         if (array_key_exists($jsKey, $updates)) {
             $setClauses[] = "$col = ?";
-            $values[]     = $updates[$jsKey];
+            $values[]     = normalizeValue($updates[$jsKey]);
         }
     }
 
