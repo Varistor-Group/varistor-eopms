@@ -1,9 +1,11 @@
 /**
- * LEAVE MANAGEMENT SERVICE — Supabase
- * Replaces the localStorage-backed store.
+ * LEAVE MANAGEMENT SERVICE — MySQL (via PHP backend)
+ * Converted from Supabase. Note: rejectLeaveRequest still calls
+ * updateAttendance() from attendance.ts, which is not yet converted —
+ * that dependency will resolve once attendance.ts is done separately.
  */
 
-import { supabase } from '../lib/supabase';
+import { apiFetch } from './httpClient';
 import type { LeaveRequest, LeaveBalance, LeaveTypeModel, EmployeeLeaveBalance } from '../types';
 import { getEmployees } from './employees';
 import { updateAttendance } from './attendance';
@@ -37,8 +39,6 @@ export function calcWorkingDays(from: string, to: string): number {
   return days;
 }
 
-// ─── DB row ↔ domain mappers ──────────────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToLeaveRequest(row: any): LeaveRequest {
   return {
@@ -59,84 +59,90 @@ function rowToLeaveRequest(row: any): LeaveRequest {
   };
 }
 
-// ─── Dynamic Leave Types ──────────────────────────────────────────────────────
+// ─── Leave Types ───────────────────────────────────────────────────────────
 
 export async function getLeaveTypes(): Promise<LeaveTypeModel[]> {
-  const { data, error } = await (supabase as any).from('leave_types').select('*').order('name');
-  if (error) { console.error('[getLeaveTypes]', error.message); return []; }
-  return data ?? [];
+  try {
+    const res = await apiFetch('/api/leave-types');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    console.error('[getLeaveTypes]', e);
+    return [];
+  }
 }
 
 export async function createLeaveType(input: Omit<LeaveTypeModel, 'id'>): Promise<LeaveTypeModel | null> {
-  const { data, error } = await (supabase as any).from('leave_types').insert([input]).select().single();
-  if (error) { console.error('[createLeaveType]', error.message); return null; }
-  return data;
+  try {
+    const res = await apiFetch('/api/leave-types', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) return null;
+    return data.leaveType;
+  } catch (e) {
+    console.error('[createLeaveType]', e);
+    return null;
+  }
 }
 
 export async function deleteLeaveType(id: string): Promise<boolean> {
-  const { error } = await (supabase as any).from('leave_types').delete().eq('id', id);
-  if (error) { console.error('[deleteLeaveType]', error.message); return false; }
-  return true;
+  try {
+    const res = await apiFetch(`/api/leave-types/${id}`, { method: 'DELETE' });
+    return res.ok;
+  } catch (e) {
+    console.error('[deleteLeaveType]', e);
+    return false;
+  }
 }
 
-// ─── Dynamic Leave Balances ───────────────────────────────────────────────────
+// ─── Employee Leave Balances ───────────────────────────────────────────────
 
 export async function getEmployeeBalances(employeeId: string): Promise<EmployeeLeaveBalance[]> {
-  const { data, error } = await (supabase as any)
-    .from('employee_leave_balances')
-    .select('*')
-    .eq('employee_id', employeeId);
-  if (error) { console.error('[getEmployeeBalances]', error.message); return []; }
-  return data ?? [];
+  try {
+    const res = await apiFetch(`/api/employee-leave-balances/${employeeId}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    console.error('[getEmployeeBalances]', e);
+    return [];
+  }
 }
 
 export async function updateEmployeeBalance(employeeId: string, leaveTypeName: string, total: number, used: number): Promise<void> {
-  const { error } = await (supabase as any)
-    .from('employee_leave_balances')
-    .upsert({ employee_id: employeeId, leave_type_name: leaveTypeName, total, used }, { onConflict: 'employee_id,leave_type_name' });
-  if (error) { console.error('[updateEmployeeBalance]', error.message); }
+  try {
+    await apiFetch(`/api/employee-leave-balances/${employeeId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ leaveTypeName, total, used }),
+    });
+  } catch (e) {
+    console.error('[updateEmployeeBalance]', e);
+  }
 }
 
 export async function getAllEmployeeBalances(): Promise<EmployeeLeaveBalance[]> {
-  const { data, error } = await (supabase as any).from('employee_leave_balances').select('*');
-  if (error) { console.error('[getAllEmployeeBalances]', error.message); return []; }
-  return data ?? [];
+  try {
+    const res = await apiFetch('/api/employee-leave-balances');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    console.error('[getAllEmployeeBalances]', e);
+    return [];
+  }
 }
 
-/**
- * Initialises leave balances for a single employee.
- * Called automatically when a new employee is created.
- * Seeds one row per active leave type with total = default_allocation (or 12 days fallback), used = 0.
- */
 export async function initEmployeeLeaveBalances(employeeId: string): Promise<void> {
   const types = await getLeaveTypes();
   if (types.length === 0) {
-    // Fallback: create a single Annual Leave entry with 12 days
-    await (supabase as any)
-      .from('employee_leave_balances')
-      .upsert(
-        { employee_id: employeeId, leave_type_name: 'Annual Leave', total: 12, used: 0 },
-        { onConflict: 'employee_id,leave_type_name' }
-      );
+    await updateEmployeeBalance(employeeId, 'Annual Leave', 12, 0);
     return;
   }
-  const rows = types.map(t => ({
-    employee_id: employeeId,
-    leave_type_name: t.name,
-    total: t.default_allocation > 0 ? t.default_allocation : 12,
-    used: 0,
-  }));
-  const { error } = await (supabase as any)
-    .from('employee_leave_balances')
-    .upsert(rows, { onConflict: 'employee_id,leave_type_name' });
-  if (error) console.error('[initEmployeeLeaveBalances]', error.message);
+  for (const t of types) {
+    await updateEmployeeBalance(employeeId, t.name, t.default_allocation > 0 ? t.default_allocation : 12, 0);
+  }
 }
 
-/**
- * One-time migration: seeds 12-day balances for any employee who has no leave balance rows.
- * HR/Admin can trigger this from the LeaveBalanceManager UI.
- * Safe to run multiple times — uses upsert on conflict.
- */
 export async function migrateExistingEmployeeBalances(): Promise<{ seeded: number; skipped: number }> {
   const [employees, existingBalances] = await Promise.all([
     getEmployees(),
@@ -155,9 +161,8 @@ export async function migrateExistingEmployeeBalances(): Promise<{ seeded: numbe
   return { seeded, skipped: employees.length - missing.length };
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
+// ─── Legacy balance wrapper ─────────────────────────────────────────────────
 
-// Legacy wrapper for existing code, can be refactored out later
 export async function getLeaveBalance(employeeId: string): Promise<LeaveBalance> {
   const balances = await getEmployeeBalances(employeeId);
   const legacy: LeaveBalance = { employeeId };
@@ -170,19 +175,25 @@ export async function getLeaveBalance(employeeId: string): Promise<LeaveBalance>
   return legacy;
 }
 
+// ─── Leave Requests ─────────────────────────────────────────────────────────
+
 export function getLeaveRequests(employeeId?: string): LeaveRequest[] {
-  // Sync wrapper — components that call this should use getLeaveRequestsAsync instead.
   return mockLeaveRequests.filter(r => !employeeId || r.employeeId === employeeId);
 }
 
 export async function getLeaveRequestsAsync(employeeId?: string): Promise<LeaveRequest[]> {
-  let query = supabase.from('leave_requests').select('*').order('submitted_at', { ascending: false });
-  if (employeeId) query = query.eq('employee_id', employeeId);
-  const { data, error } = await query;
-  if (error) { console.error('[getLeaveRequestsAsync]', error.message); return []; }
-  const requests = (data ?? []).map(rowToLeaveRequest);
-  mockLeaveRequests.splice(0, mockLeaveRequests.length, ...requests);
-  return requests;
+  try {
+    const res = await apiFetch('/api/leaves');
+    if (!res.ok) return [];
+    const rows = await res.json();
+    let requests = (rows ?? []).map(rowToLeaveRequest);
+    if (employeeId) requests = requests.filter((r: LeaveRequest) => r.employeeId === employeeId);
+    mockLeaveRequests.splice(0, mockLeaveRequests.length, ...requests);
+    return requests;
+  } catch (e) {
+    console.error('[getLeaveRequestsAsync]', e);
+    return [];
+  }
 }
 
 export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>): LeaveRequest {
@@ -194,20 +205,25 @@ export function submitLeaveRequest(input: Omit<LeaveRequest, 'id' | 'status' | '
   };
   mockLeaveRequests.unshift(optimistic);
 
-  supabase.from('leave_requests').insert({
-    id: optimistic.id,
-    employee_id: input.employeeId,
-    employee_name: input.employeeName,
-    department: (input as LeaveRequest & { department?: string }).department ?? '',
-    type: input.type,
-    from_date: input.from,
-    to_date: input.to,
-    days: input.days,
-    reason: input.reason,
-    status: 'Pending',
-  }).then(({ error }) => {
-    if (error) console.error('[submitLeaveRequest]', error.message);
-  });
+  apiFetch('/api/leaves', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: input.type,
+      from_date: input.from,
+      to_date: input.to,
+      days: input.days,
+      reason: input.reason,
+    }),
+  }).then(async (res) => {
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      console.error('[submitLeaveRequest]', data?.error || 'Failed');
+    } else if (data.leave) {
+      // Replace optimistic entry with the real server-assigned id
+      const idx = mockLeaveRequests.findIndex(r => r.id === optimistic.id);
+      if (idx !== -1) mockLeaveRequests[idx] = rowToLeaveRequest(data.leave);
+    }
+  }).catch(e => console.error('[submitLeaveRequest]', e));
 
   return optimistic;
 }
@@ -220,37 +236,20 @@ export async function approveLeaveRequest(leaveId: string, reviewerName: string)
   request.reviewerName = reviewerName;
   request.reviewedAt = new Date().toISOString();
 
-  // Persist to Supabase
-  await supabase.from('leave_requests').update({
-    status: 'Approved',
-    reviewer_name: reviewerName,
-    reviewed_at: request.reviewedAt,
-  }).eq('id', leaveId);
+  const res = await apiFetch(`/api/leaves/${leaveId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'Approved' }),
+  });
+  if (!res.ok) {
+    console.error('[approveLeaveRequest] failed to persist status');
+    return;
+  }
 
   // Deduct from balance
-  const { data: balData } = await (supabase as any)
-    .from('employee_leave_balances')
-    .select('used')
-    .eq('employee_id', request.employeeId)
-    .eq('leave_type_name', request.type)
-    .single();
-
-  if (balData) {
-    await (supabase as any)
-      .from('employee_leave_balances')
-      .update({ used: balData.used + request.days })
-      .eq('employee_id', request.employeeId)
-      .eq('leave_type_name', request.type);
-  } else {
-    await (supabase as any)
-      .from('employee_leave_balances')
-      .insert({
-         employee_id: request.employeeId,
-         leave_type_name: request.type,
-         total: 0,
-         used: request.days
-      });
-  }
+  const balances = await getEmployeeBalances(request.employeeId);
+  const existing = balances.find(b => b.leave_type_name === request.type);
+  const newUsed = (existing?.used ?? 0) + request.days;
+  await updateEmployeeBalance(request.employeeId, request.type, existing?.total ?? 0, newUsed);
 }
 
 export async function rejectLeaveRequest(leaveId: string, reviewerName: string, comment: string): Promise<void> {
@@ -262,16 +261,16 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
   request.rejectionComment = comment;
   request.reviewedAt = new Date().toISOString();
 
-  // Persist rejection to Supabase
-  const { error } = await supabase.from('leave_requests').update({
-    status: 'Rejected',
-    reviewer_name: reviewerName,
-    rejection_comment: comment,
-    reviewed_at: request.reviewedAt,
-  }).eq('id', leaveId);
-  if (error) console.error('[rejectLeaveRequest]', error.message);
+  const res = await apiFetch(`/api/leaves/${leaveId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'Rejected', comment }),
+  });
+  if (!res.ok) {
+    console.error('[rejectLeaveRequest] failed to persist status');
+  }
 
-  // FIX 2: Mark each working day in the rejected leave period as Absent in attendance
+  // Mark each working day in the rejected leave period as Absent in attendance
+  // NOTE: updateAttendance still comes from attendance.ts, not yet converted
   try {
     const start = new Date(request.from + 'T00:00:00');
     const end = new Date(request.to + 'T00:00:00');
@@ -294,6 +293,5 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
   }
 }
 
-// In-memory cache (populated on first load)
 export let mockLeaveRequests: LeaveRequest[] = [];
 export let mockLeaveBalances: LeaveBalance[] = [];
