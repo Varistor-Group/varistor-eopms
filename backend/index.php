@@ -28,6 +28,9 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Format: [METHOD, regex pattern, handler file]
 $routes = [
     // Email
+    ['GET',  '#^/api/auth/me$#',                    'me.php'],
+    ['POST', '#^/api/auth/update-password$#',       'update_password.php'],
+    ['POST', '#^/api/auth/reset-password$#',        'reset_password.php'],
     ['POST', '#^/api/auth/login$#',                 'login.php'],
     ['POST', '#^/api/send-credentials$#',          'send_credentials.php'],
     ['POST', '#^/api/send-password-reset$#',        'send_password_reset.php'],

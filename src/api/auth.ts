@@ -1,14 +1,12 @@
 /**
- * AUTH SERVICE — Supabase Auth
- * Replaces the mock authentication system.
+ * AUTH SERVICE — PHP/MySQL backend (fully off Supabase)
  */
 
-import { supabase } from '../lib/supabase';
 import type { UserRole } from '../types';
 import { API_URL } from '../config/api';
 
 export interface AuthUser {
-  id: string;          // employees.id e.g. "VAR-001"
+  id: string;
   name: string;
   email: string;
   department: string;
@@ -17,20 +15,20 @@ export interface AuthUser {
   is_field_employee?: boolean;
 }
 
-// ─── Rate limiter (client-side, mirrors previous mock behaviour) ──────────────
-
 const loginAttempts: Record<string, { count: number; lockedUntil: number }> = {};
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 30_000;
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('eopms_auth_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export async function mockLogin(email: string, password: string): Promise<{ user: AuthUser | null; error: string | null }> {
   if (!email || !password) {
     return { user: null, error: 'Email and password are required.' };
   }
 
-  // Rate limit check
   const now = Date.now();
   const attempt = loginAttempts[email];
   if (attempt?.lockedUntil > now) {
@@ -38,168 +36,128 @@ export async function mockLogin(email: string, password: string): Promise<{ user
     return { user: null, error: `Too many failed attempts. Please wait ${secsLeft}s before trying again.` };
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  try {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json().catch(() => null);
 
-  if (error || !data.user) {
-    // Increment attempts
-    const prev = loginAttempts[email] ?? { count: 0, lockedUntil: 0 };
-    const newCount = prev.count + 1;
-    loginAttempts[email] = {
-      count: newCount,
-      lockedUntil: newCount >= MAX_ATTEMPTS ? now + LOCKOUT_MS : 0,
-    };
-    const remaining = MAX_ATTEMPTS - newCount;
-    const suffix =
-      newCount >= MAX_ATTEMPTS
-        ? ' Account temporarily locked for 30 seconds.'
-        : remaining > 0
-          ? ` ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
-          : '';
-    return { user: null, error: `Invalid email or password.${suffix}` };
+    if (!res.ok || !data?.success) {
+      const prev = loginAttempts[email] ?? { count: 0, lockedUntil: 0 };
+      const newCount = prev.count + 1;
+      loginAttempts[email] = {
+        count: newCount,
+        lockedUntil: newCount >= MAX_ATTEMPTS ? now + LOCKOUT_MS : 0,
+      };
+      const remaining = MAX_ATTEMPTS - newCount;
+      const suffix =
+        newCount >= MAX_ATTEMPTS
+          ? ' Account temporarily locked for 30 seconds.'
+          : remaining > 0
+            ? ` ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+            : '';
+      return { user: null, error: `${data?.error || 'Invalid email or password.'}${suffix}` };
+    }
+
+    delete loginAttempts[email];
+    localStorage.setItem('eopms_auth_token', data.token);
+    window.dispatchEvent(new Event('eopms-auth-change'));
+
+    return { user: data.user as AuthUser, error: null };
+  } catch {
+    return { user: null, error: 'Unable to reach the server. Please try again.' };
   }
-
-  delete loginAttempts[email];
-
-  // Load the employee profile for this auth user
-  const { data: emp, error: empError } = await supabase
-    .from('employees')
-    .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
-    .eq('auth_id', data.user.id)
-    .single();
-
-  if (empError || !emp) {
-    await supabase.auth.signOut();
-    return { user: null, error: 'Employee profile not found. Contact your administrator.' };
-  }
-
-  return {
-    user: {
-      id: emp.id,
-      name: emp.full_name,
-      email: emp.personal_email,
-      department: emp.department ?? '',
-      avatarUrl: emp.avatar_url ?? '',
-      role: emp.role as UserRole,
-      is_field_employee: emp.is_field_employee,
-    },
-    error: null,
-  };
 }
-
-// ─── Sign Out ─────────────────────────────────────────────────────────────────
 
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  localStorage.removeItem('eopms_auth_token');
+  window.dispatchEvent(new Event('eopms-auth-change'));
 }
-
-// ─── Get Current Session ──────────────────────────────────────────────────────
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session?.user) return null;
+  const token = localStorage.getItem('eopms_auth_token');
+  if (!token) return null;
 
-  const { data: emp } = await supabase
-    .from('employees')
-    .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
-    .eq('auth_id', data.session.user.id)
-    .single();
-
-  if (!emp) return null;
-
-  return {
-    id: emp.id,
-    name: emp.full_name,
-    email: emp.personal_email,
-    department: emp.department ?? '',
-    avatarUrl: emp.avatar_url ?? '',
-    role: emp.role as UserRole,
-    is_field_employee: emp.is_field_employee,
-  };
+  try {
+    const res = await fetch(`${API_URL}/api/auth/me`, { headers: authHeaders() });
+    if (!res.ok) {
+      localStorage.removeItem('eopms_auth_token');
+      return null;
+    }
+    const data = await res.json();
+    return data.user as AuthUser;
+  } catch {
+    return null;
+  }
 }
 
-// ─── Password Reset ───────────────────────────────────────────────────────────
-
 export async function mockResetPassword(email: string): Promise<{ success: boolean; error?: string; message?: string }> {
-  if (!email || !/\S+@\S+\.\S+/.test(email)) {
-    return { success: false, error: 'Please enter a valid email address.' };
-  }
-  // Security: always return success to prevent email enumeration
-  return {
-    success: true,
-    message: 'If an account exists with this email, a reset link has been sent.',
-  };
+  return sendPasswordReset(email);
 }
 
 export async function sendPasswordReset(email: string): Promise<{ success: boolean; error?: string; message?: string }> {
   if (!email || !/\S+@\S+\.\S+/.test(email)) {
     return { success: false, error: 'Please enter a valid email address.' };
   }
-
-  const redirectTo = `${window.location.origin}/reset-password`;
-
-  // Primary path: the backend generates a Supabase recovery link and emails it
-  // via the company SMTP (branded email). Parse defensively — a misconfigured
-  // API_URL can return non-JSON (e.g. a 404/500 HTML page).
   try {
-    const res = await fetch(`${API_URL}/api/send-password-reset`, {
+    const res = await fetch(`${API_URL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.success) {
-      return { success: true, message: 'Reset link sent — check your inbox.' };
+      return { success: true, message: data.message || 'If an account exists with this email, a new password has been sent.' };
     }
-    // Backend reachable but did not generate/send the link — fall through to
-    // Supabase's built-in reset so the user still receives a working link.
-    console.warn('[sendPasswordReset] backend did not send link:', data?.error ?? `HTTP ${res.status}`);
-  } catch (err) {
-    console.warn('[sendPasswordReset] backend unreachable:', err);
+    return { success: false, error: data?.error || 'Could not process reset request.' };
+  } catch {
+    return { success: false, error: 'Unable to reach the server. Please try again.' };
   }
-
-  // Fallback path: Supabase Auth generates its own recovery token + link and
-  // emails it directly. This guarantees a proper reset token is always produced.
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-  if (error) {
-    return { success: false, error: 'Could not generate a reset link. Please contact HR/Admin.' };
-  }
-  return { success: true, message: 'Reset link sent — check your inbox.' };
 }
 
 export async function updatePassword(password: string): Promise<{ success: boolean; error?: string }> {
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) {
-    return { success: false, error: error.message };
+  try {
+    const res = await fetch(`${API_URL}/api/auth/update-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { success: false, error: data?.error || 'Failed to update password.' };
+    }
+    return { success: true };
+  } catch {
+    return { success: false, error: 'Unable to reach the server. Please try again.' };
   }
-  return { success: true };
 }
 
-// ─── Auth state change listener ───────────────────────────────────────────────
-
+// Replaces Supabase's onAuthStateChange — same callback shape/return value
+// so existing callers don't need to change, just backed by our own token
+// + a custom event fired on login/logout, plus cross-tab sync via 'storage'.
 export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
-  return supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (!session?.user) {
-      callback(null);
-      return;
-    }
-    const { data: emp } = await supabase
-      .from('employees')
-      .select('id, full_name, personal_email, department, role, avatar_url, is_field_employee')
-      .eq('auth_id', session.user.id)
-      .single();
+  const handler = async () => {
+    const user = await getCurrentUser();
+    callback(user);
+  };
 
-    if (emp) {
-      callback({
-        id: emp.id,
-        name: emp.full_name,
-        email: emp.personal_email,
-        department: emp.department ?? '',
-        avatarUrl: emp.avatar_url ?? '',
-        role: emp.role as UserRole,
-        is_field_employee: emp.is_field_employee,
-      });
-    } else {
-      callback(null);
-    }
+  window.addEventListener('eopms-auth-change', handler);
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'eopms_auth_token') handler();
   });
+
+  // Fire once immediately, mirroring Supabase's initial callback behavior
+  handler();
+
+  return {
+    data: {
+      subscription: {
+        unsubscribe() {
+          window.removeEventListener('eopms-auth-change', handler);
+        },
+      },
+    },
+  };
 }
