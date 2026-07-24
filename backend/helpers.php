@@ -73,6 +73,19 @@ function currentEmployeeId(): ?string {
     $resolved = true;
 
     $headers = getallheaders();
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+
+    if ($authHeader && preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+        $token = $m[1];
+        $stmt = get_db()->prepare('SELECT employee_id FROM auth_sessions WHERE token = ? AND expires_at > NOW() LIMIT 1');
+        $stmt->execute([$token]);
+        $row = $stmt->fetch();
+        if ($row) {
+            $id = $row['employee_id'];
+            return $id;
+        }
+    }
+
     $raw = $headers['X-Employee-Id'] ?? $headers['x-employee-id'] ?? null;
     $id = $raw !== null && $raw !== '' ? $raw : null;
     return $id;
