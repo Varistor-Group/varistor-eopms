@@ -76,6 +76,13 @@ if ($method === 'POST') {
         }
     }
 
+    // Hash the temp password into password_hash so the employee can actually log in
+    if (isset($employee['tempPassword']) && $employee['tempPassword'] !== '') {
+        $columns[]      = 'password_hash';
+        $placeholders[] = '?';
+        $values[]       = password_hash($employee['tempPassword'], PASSWORD_DEFAULT);
+    }
+
     $sql = 'INSERT INTO employees (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
     $insert = $db->prepare($sql);
     $insert->execute($values);
