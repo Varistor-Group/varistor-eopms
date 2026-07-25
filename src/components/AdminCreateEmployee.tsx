@@ -4,8 +4,6 @@ import { createEmployee, getEmployees, getDepartments, addDepartment } from '../
 import type { CreateEmployeeInput, Department, Employee } from '../api/employees';
 import { useVariPoints } from '../hooks/useVariPoints';
 
-// ─── Inline shared field components ──────────────────────────────────────────
-
 interface FieldProps {
   label: string;
   required?: boolean;
@@ -39,6 +37,7 @@ const EMPTY_FORM: CreateEmployeeInput = {
   phone: '',
   department: '',
   reportingManager: '',
+  reportingManagerId: '',
   role: 'Employee',
   is_field_employee: false,
   shiftStart: '09:30',
@@ -46,8 +45,6 @@ const EMPTY_FORM: CreateEmployeeInput = {
   avatarUrl: '',
   dateOfJoining: new Date().toISOString().split('T')[0],
 };
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCancel }) => {
   const { currentRole } = useVariPoints();
@@ -64,14 +61,11 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     sub?: string;
   }>({ show: false, type: 'success', message: '' });
 
-  // Role gate — only Admin / HR can access
   const canAccess = currentRole === 'Admin' || currentRole === 'HR';
 
-  // Fetch employees on mount to lookup department heads and compute next ID
   useEffect(() => {
     getEmployees().then(emps => {
       setEmployees(emps);
-      // Auto-compute next employee ID from existing VAR-XXX pattern
       const maxNum = emps.reduce((max, e) => {
         const match = e.employeeId.match(/VAR-(\d+)/i);
         if (match) return Math.max(max, parseInt(match[1], 10));
@@ -95,9 +89,10 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     setForm(prev => ({
       ...prev,
       department: d,
-      reportingManager: head ? head.fullName : ''
+      reportingManagerId: head ? head.id : '',
+      reportingManager: head ? head.fullName : '',
     }));
-    setErrors(prev => ({ ...prev, department: undefined, reportingManager: undefined }));
+    setErrors(prev => ({ ...prev, department: undefined, reportingManagerId: undefined }));
   };
 
   const handleDepartmentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -114,6 +109,18 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     }
   };
 
+  // NEW: handles the reporting manager dropdown — stores both id and name
+  const handleManagerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    const manager = employees.find(m => m.id === id);
+    setForm(prev => ({
+      ...prev,
+      reportingManagerId: id,
+      reportingManager: manager?.fullName ?? '',
+    }));
+    setErrors(prev => ({ ...prev, reportingManagerId: undefined }));
+  };
+
   const validate = (): boolean => {
     const errs: FormErrors = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
@@ -122,13 +129,12 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     if (!form.personalEmail.trim()) errs.personalEmail = 'Email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.personalEmail)) errs.personalEmail = 'Enter a valid email.';
     if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
-    if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.dateOfJoining) errs.dateOfJoining = 'Date of joining is required.';
     if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
       errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
     }
-    // Reporting manager is now optional (can be null/None)
+    // Reporting manager is optional (can be null/None)
     if (!form.role) errs.role = 'System role is required.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -138,8 +144,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     setToast({ show: true, type, message, sub });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4500);
   };
-
-  // ── Submit ────────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,8 +171,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     setIsLoading(false);
   };
 
-  // ── Role gate UI ──────────────────────────────────────────────────────────
-
   if (!canAccess) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-4">
@@ -184,12 +186,9 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
     );
   }
 
-  // ── Main UI ───────────────────────────────────────────────────────────────
-
   return (
     <div className="max-w-4xl mx-auto pb-20 animate-[fadeInPage_250ms_ease-out]">
 
-      {/* Page header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -201,19 +200,16 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
           </p>
         </div>
 
-        {/* Admin-only badge */}
         <span className="flex-shrink-0 px-3 py-1 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
           Admin / HR only
         </span>
       </div>
 
-      {/* Form card */}
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6 lg:p-8">
         <form onSubmit={handleSubmit} noValidate>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
 
-            {/* Full Name */}
             <Field label="Full name" required error={errors.fullName}>
               <input
                 className={inputCls(!!errors.fullName)}
@@ -223,7 +219,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Employee ID */}
             <Field label="Employee ID" required error={errors.employeeId}>
               <input
                 className={inputCls(!!errors.employeeId)}
@@ -233,7 +228,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Username */}
             <Field label="Username" required error={errors.username}>
               <input
                 className={inputCls(!!errors.username)}
@@ -243,7 +237,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Temp password (read-only/auto-generated) */}
             <Field label="Temporary password">
               <input
                 className={`${inputCls()} bg-varistor-pageBg text-varistor-muted cursor-not-allowed`}
@@ -253,7 +246,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Personal Email */}
             <Field label="Personal email" required error={errors.personalEmail}>
               <input
                 type="email"
@@ -264,7 +256,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Phone */}
             <Field label="Phone" required error={errors.phone}>
               <input
                 type="tel"
@@ -275,7 +266,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Date of Joining */}
             <Field label="Date of Joining" required error={errors.dateOfJoining}>
               <input
                 type="date"
@@ -285,7 +275,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Date of Birth */}
             <Field label="Date of Birth" error={errors.dateOfBirth}>
               <input
                 type="date"
@@ -295,7 +284,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* UAN Number */}
             <Field label="UAN Number" error={errors.uanNumber}>
               <input
                 className={inputCls(!!errors.uanNumber)}
@@ -305,7 +293,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               />
             </Field>
 
-            {/* Opt outs */}
             <Field label="Payroll Options">
               <div className="flex flex-col gap-2 mt-1">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -329,7 +316,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               </div>
             </Field>
 
-            {/* Profile Picture URL */}
             <Field label="Profile picture URL">
               <div className="flex items-center gap-3">
                 {form.avatarUrl && (
@@ -361,7 +347,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                 ))}
                 <option value="___ADD_NEW___" className="font-bold text-varistor-limeText">+ Add Department</option>
               </select>
-              {/* Dept chips */}
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {deps.map(d => (
                   <button
@@ -379,25 +364,24 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               </div>
             </Field>
 
-            {/* Reporting Manager */}
-            <Field label="Reporting Manager" error={errors.reportingManager}>
+            {/* Reporting Manager — now stores employee ID, not typed name */}
+            <Field label="Reporting Manager" error={errors.reportingManagerId}>
               <select
-                className={inputCls(!!errors.reportingManager)}
-                value={form.reportingManager}
-                onChange={set('reportingManager')}
+                className={inputCls(!!errors.reportingManagerId)}
+                value={form.reportingManagerId ?? ''}
+                onChange={handleManagerChange}
               >
                 <option value="">None</option>
                 {employees
                   .filter(e => e.role === 'Reporting Manager' || e.role === 'Admin')
                   .map(m => (
-                    <option key={m.id} value={m.fullName}>
+                    <option key={m.id} value={m.id}>
                       {m.fullName} ({m.department})
                     </option>
                   ))}
               </select>
             </Field>
 
-            {/* System Role */}
             <Field label="System Role" required error={errors.role}>
               <select
                 className={inputCls(!!errors.role)}
@@ -411,7 +395,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               </select>
             </Field>
 
-            {/* Field Employee Toggle */}
             <div className="flex flex-col gap-1.5 md:col-span-2 mt-2">
               <label className="flex items-center gap-3 cursor-pointer p-3 border border-varistor-border rounded-varistor hover:border-varistor-lime transition-colors bg-white">
                 <div className="relative flex items-center">
@@ -430,7 +413,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
               </label>
             </div>
 
-            {/* Shift Timings */}
             <Field label="Shift Start Time">
               <input
                 type="time"
@@ -450,7 +432,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
             </Field>
           </div>
 
-          {/* Actions */}
           <div className="mt-8 pt-6 border-t border-varistor-border flex items-center justify-between gap-4 flex-wrap">
             <p className="text-xs text-varistor-muted">
               <span className="text-red-500">*</span> Required fields
@@ -498,7 +479,6 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
         </form>
       </div>
 
-      {/* ── Toast notification ── */}
       <div
         className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${toast.show ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
           }`}

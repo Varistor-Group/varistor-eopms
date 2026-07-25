@@ -18,6 +18,7 @@ export interface Employee {
   phone: string;
   department: Department;
   reportingManager: string;
+  reportingManagerId?: string;
   role: UserRole;
   tempPassword: string;
   createdAt: string;
@@ -63,6 +64,7 @@ export interface CreateEmployeeInput {
   phone: string;
   department: Department;
   reportingManager: string;
+  reportingManagerId?: string;
   role: UserRole;
   is_field_employee?: boolean;
   avatarUrl?: string;
@@ -89,6 +91,7 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     phone: (row.phone as string) ?? '',
     department: row.department as Department,
     reportingManager: (row.reporting_manager as string) ?? '',
+    reportingManagerId: (row.reporting_manager_id as string) ?? undefined,
     role: row.role as UserRole,
     tempPassword: (row.temp_password as string) ?? '',
     createdAt: row.created_at as string,
@@ -118,7 +121,6 @@ export async function getEmployees(): Promise<Employee[]> {
     }
     const rows = await res.json();
     const employees = (rows ?? []).map(rowToEmployee);
-    // PHP doesn't sort server-side — replicate the old Supabase ordering here
     employees.sort((a: Employee, b: Employee) => {
       if (a.status !== b.status) return a.status.localeCompare(b.status);
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -154,11 +156,6 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     finalAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(input.fullName)}&background=random`;
   }
 
-  // TODO Task 2 (Authentication): Supabase's create_employee_with_auth RPC used to
-  // also create a login account here. PHP has no /api/auth/* yet, so the employee
-  // row is created in MySQL but CANNOT log in until Task 2 ships. Flagging clearly
-  // rather than silently dropping this — revisit once login endpoints exist.
-
   const res = await apiFetch('/api/employees', {
     method: 'POST',
     body: JSON.stringify({
@@ -169,6 +166,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       phone: input.phone,
       department: input.department,
       reportingManager: input.reportingManager,
+      reportingManagerId: input.reportingManagerId,
       role: input.role,
       tempPassword,
       status: 'Active',
@@ -190,11 +188,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
     return { success: false, employee: null, error: result?.error || 'Failed to create employee.' };
   }
 
-  // Leave balance init — still Supabase-backed until leaves.ts is converted next
   await initEmployeeLeaveBalances(input.employeeId);
-
-  // NOTE: activity_log insert removed here — employees.php already logs
-  // CREATE_EMPLOYEE server-side now, so this would have been a duplicate.
 
   let emailErrorMsg: string | null = null;
   try {
@@ -235,6 +229,7 @@ export async function updateEmployee(
   if (updates.phone !== undefined) body.phone = updates.phone;
   if (updates.department !== undefined) body.department = updates.department;
   if (updates.reportingManager !== undefined) body.reportingManager = updates.reportingManager;
+  if (updates.reportingManagerId !== undefined) body.reportingManagerId = updates.reportingManagerId;
   if (updates.role !== undefined) body.role = updates.role;
   if (updates.status !== undefined) body.status = updates.status;
   if (updates.variPoints !== undefined) body.variPoints = updates.variPoints;
@@ -260,8 +255,6 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; error: string | null }> {
-  // TODO Task 2: won't clean up a Supabase Auth login — that system is being
-  // retired anyway, so this is fine short-term, just flagging for awareness.
   const res = await apiFetch(`/api/employees/${id}`, { method: 'DELETE' });
   const result = await res.json().catch(() => null);
   if (!res.ok || !result?.success) {
@@ -284,8 +277,6 @@ export async function updateFieldStatus(
   }
   return { success: true, error: null };
 }
-
-// ─── Field location tracking (unchanged — already used fetch(), not Supabase) ─
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 const todayAt = (h: number, min: number) => {

@@ -82,7 +82,13 @@ $routes = [
     ['POST',   '#^/api/policies$#',                 'policies.php'],
     ['PUT',    '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
     ['DELETE', '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
-    
+
+    // Tasks
+    ['GET',    '#^/api/tasks$#',                 'tasks.php'],
+    ['POST',   '#^/api/tasks$#',                 'tasks.php'],
+    ['PUT',    '#^/api/tasks/(?P<id>[^/]+)$#',   'tasks.php'],
+    ['DELETE', '#^/api/tasks/(?P<id>[^/]+)$#',   'tasks.php'],
+
     // Chat
     ['GET',    '#^/api/chat/channels$#',                                'chat_channels.php'],
     ['POST',   '#^/api/chat/channels$#',                                'chat_channels.php'],

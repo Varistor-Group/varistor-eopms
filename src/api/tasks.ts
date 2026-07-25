@@ -1,158 +1,134 @@
-import { supabase } from '../lib/supabase';
+/**
+ * TASKS SERVICE — MySQL (via PHP backend)
+ * Note: no realtime — EopmsContext.tsx's Supabase postgres_changes
+ * subscription for tasks needs removing/replacing with polling separately.
+ */
+
+import { apiFetch } from './httpClient';
 import type { Task, TaskPriority, TaskStatus, ChecklistItem, Comment, Attachment } from '../types';
 
 export const tasksApi = {
   async fetchTasks(): Promise<Task[]> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching tasks:', error);
-      throw error;
+    const res = await apiFetch('/api/tasks');
+    if (!res.ok) {
+      console.error('Error fetching tasks:', res.statusText);
+      throw new Error('Failed to fetch tasks');
     }
-
-    return (data || []).map(mapDbToTask);
+    const rows = await res.json();
+    return (rows || []).map(mapDbToTask);
   },
 
   async createTask(task: Omit<Task, 'id' | 'assignee' | 'comments' | 'attachments'> & { id: string }): Promise<Task> {
-    const dbPayload = {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      due_date: task.dueDate,
-      priority: task.priority,
-      status: task.status,
-      assignee_id: task.assigneeId,
-      checklist: task.checklist as any,
-      comments: [] as any,
-      attachments: [] as any,
-      points_processed: task.pointsProcessed || false,
-      is_overdue_swept: task.isOverdueSwept || false
-    };
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([dbPayload])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating task:', error);
-      throw error;
+    const res = await apiFetch('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        dueDate: task.dueDate,
+        priority: task.priority,
+        status: task.status,
+        assigneeId: task.assigneeId,
+        checklist: task.checklist,
+      }),
+    });
+    if (!res.ok) {
+      console.error('Error creating task:', res.statusText);
+      throw new Error('Failed to create task');
     }
-
-    return mapDbToTask(data);
+    return mapDbToTask(await res.json());
   },
 
   async updateTaskStatus(taskId: string, status: TaskStatus, pointsProcessed?: boolean): Promise<Task> {
-    const updates: any = { status };
-    if (pointsProcessed !== undefined) {
-      updates.points_processed = pointsProcessed;
+    const body: Record<string, unknown> = { status };
+    if (pointsProcessed !== undefined) body.pointsProcessed = pointsProcessed;
+
+    const res = await apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error('Error updating task status:', res.statusText);
+      throw new Error('Failed to update task status');
     }
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating task status:', error);
-      throw error;
-    }
-
-    return mapDbToTask(data);
+    return mapDbToTask(await res.json());
   },
 
   async updateTaskDetails(taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string): Promise<Task> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ title, description, priority, due_date: dueDate })
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating task details:', error);
-      throw error;
+    const res = await apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title, description, priority, dueDate }),
+    });
+    if (!res.ok) {
+      console.error('Error updating task details:', res.statusText);
+      throw new Error('Failed to update task details');
     }
-
-    return mapDbToTask(data);
+    return mapDbToTask(await res.json());
   },
 
   async updateTaskChecklist(taskId: string, checklist: ChecklistItem[], status?: TaskStatus): Promise<Task> {
-    const updates: any = { checklist: checklist as any };
-    if (status !== undefined) {
-      updates.status = status;
-    }
-    
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId)
-      .select()
-      .single();
+    const body: Record<string, unknown> = { checklist };
+    if (status !== undefined) body.status = status;
 
-    if (error) {
-      console.error('Error updating task checklist:', error);
-      throw error;
+    const res = await apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error('Error updating task checklist:', res.statusText);
+      throw new Error('Failed to update task checklist');
     }
-
-    return mapDbToTask(data);
+    return mapDbToTask(await res.json());
   },
 
   async updateTaskComments(taskId: string, comments: Comment[]): Promise<Task> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ comments: comments as any })
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating task comments:', error);
-      throw error;
+    const res = await apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ comments }),
+    });
+    if (!res.ok) {
+      console.error('Error updating task comments:', res.statusText);
+      throw new Error('Failed to update task comments');
     }
-
-    return mapDbToTask(data);
+    return mapDbToTask(await res.json());
   },
 
   async updateTaskAttachments(taskId: string, attachments: Attachment[]): Promise<Task> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ attachments: attachments as any })
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating task attachments:', error);
-      throw error;
+    const res = await apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ attachments }),
+    });
+    if (!res.ok) {
+      console.error('Error updating task attachments:', res.statusText);
+      throw new Error('Failed to update task attachments');
     }
+    return mapDbToTask(await res.json());
+  },
 
-    return mapDbToTask(data);
-  }
+  async deleteTask(taskId: string): Promise<void> {
+    const res = await apiFetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      console.error('Error deleting task:', res.statusText);
+      throw new Error('Failed to delete task');
+    }
+  },
 };
 
-// Helper to map DB row to frontend Task type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapDbToTask(row: any): Task {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
-    dueDate: row.due_date,
+    dueDate: row.dueDate,
     priority: row.priority as TaskPriority,
     status: row.status as TaskStatus,
-    assigneeId: row.assignee_id,
-    assignee: { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' }, // Frontend will map actual employee details in Context
+    assigneeId: row.assigneeId,
+    assignee: { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: row.checklist || [],
     comments: row.comments || [],
     attachments: row.attachments || [],
-    pointsProcessed: row.points_processed,
-    isOverdueSwept: row.is_overdue_swept
+    pointsProcessed: row.pointsProcessed,
+    isOverdueSwept: row.isOverdueSwept,
   };
 }
