@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldAlert, UserCog } from 'lucide-react';
-import { updateEmployee, getDepartments } from '../api/employees';
+import { updateEmployee, getDepartments, getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
 import type { UserRole } from '../types';
 import { useVariPoints } from '../hooks/useVariPoints';
@@ -33,11 +33,20 @@ const ROLES: UserRole[] = ['Employee', 'Field Employee', 'Reporting Manager', 'H
 export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => void; onSuccess: () => void }> = ({ employee, onCancel, onSuccess }) => {
   const { currentRole } = useVariPoints();
 
+  // NEW: list of possible managers, loaded once on mount
+  const [managerOptions, setManagerOptions] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    getEmployees().then(all => {
+      setManagerOptions(all.filter(e => e.id !== employee.id));
+    });
+  }, [employee.id]);
+
   const [form, setForm] = useState({
     fullName: employee.fullName,
     phone: employee.phone,
     department: employee.department,
-    reportingManager: employee.reportingManager || '',
+    reportingManagerId: employee.reportingManagerId || '',
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
     variPoints: (employee.variPoints ?? 0).toString(),
@@ -65,7 +74,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
     if (!/^\d{10}$/.test(form.phone.trim())) errs.phone = 'Phone number must be exactly 10 digits.';
     if (!form.department) errs.department = 'Please select a department.';
-    if (!form.reportingManager.trim()) errs.reportingManager = 'Reporting manager is required.';
+    if (!form.reportingManagerId) errs.reportingManagerId = 'Reporting manager is required.';
     if (!form.role) errs.role = 'System role is required.';
     if (isNaN(Number(form.variPoints)) || Number(form.variPoints) < 0) errs.variPoints = 'Points must be a positive number.';
     if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
@@ -89,11 +98,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     if (!validate()) return;
     setIsLoading(true);
 
+    const selectedManager = managerOptions.find(m => m.id === form.reportingManagerId);
+
     const { success, error } = await updateEmployee(employee.id, {
       fullName: form.fullName,
       phone: form.phone,
       department: form.department,
-      reportingManager: form.reportingManager,
+      reportingManagerId: form.reportingManagerId,
+      reportingManager: selectedManager?.fullName ?? '',
       role: form.role,
       status: form.status,
       variPoints: Number(form.variPoints),
@@ -143,7 +155,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
 
-            {/* Read Only Fields */}
             <Field label="Employee ID">
               <input className={`${inputCls()} bg-varistor-pageBg text-varistor-muted cursor-not-allowed`} value={employee.employeeId} disabled readOnly />
             </Field>
@@ -185,8 +196,13 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
               <input type="number" className={inputCls(!!errors.variPoints)} value={form.variPoints} onChange={set('variPoints')} min="0" />
             </Field>
 
-            <Field label="Reporting Manager" required error={errors.reportingManager}>
-              <input className={inputCls(!!errors.reportingManager)} value={form.reportingManager} onChange={set('reportingManager')} />
+            <Field label="Reporting Manager" required error={errors.reportingManagerId}>
+              <select className={inputCls(!!errors.reportingManagerId)} value={form.reportingManagerId} onChange={set('reportingManagerId')}>
+                <option value="">Select a manager...</option>
+                {managerOptions.map(m => (
+                  <option key={m.id} value={m.id}>{m.fullName} ({m.employeeId})</option>
+                ))}
+              </select>
             </Field>
 
             <Field label="Shift Start Time" required error={errors.shiftStart}>
