@@ -11,7 +11,7 @@ import { getEmployees, type Employee } from '../api/employees';
 type PendingAttachment = Required<Pick<ChatAttachment, 'name' | 'size' | 'type' | 'dataUrl'>>;
 
 const QUICK_EMOJIS = ['👍', '❤️', '🎉', '😂', '🙏', '👀'];
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5MB - keeps localStorage well within quota
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -32,7 +32,6 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// Highlights "@Name" mention tokens inline within message text
 function renderMessageText(text: string) {
   const parts = text.split(/(@[A-Za-z]+(?:\s[A-Za-z]+)?)/g);
   return parts.map((part, i) =>
@@ -53,7 +52,10 @@ export const Chat: React.FC = () => {
   const selfAvatar = currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selfName)}&background=84CC16&color=fff&size=80&bold=true`;
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
   const canManageChannels = currentRole === 'Admin' || currentRole === 'HR';
-  const [channels, setChannels] = useState<ChatChannel[]>(() => chatApi.getChannels(currentUser ?? undefined));
+
+  // CHANGED: getChannels() is now async (server call) — can't populate useState
+  // synchronously anymore. Starts empty, loaded via useEffect below.
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<ChannelId>('all-hands');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -78,27 +80,29 @@ export const Chat: React.FC = () => {
 
   const activeChannel = channels.find(c => c.id === activeChannelId) ?? channels[0];
 
-  const refreshUnread = () => setUnread(chatApi.getUnreadSummary());
-  const refreshChannels = () => setChannels(chatApi.getChannels(currentUser ?? undefined));
+  // CHANGED: both now async
+  const refreshUnread = async () => setUnread(await chatApi.getUnreadSummary());
+  const refreshChannels = async () => setChannels(await chatApi.getChannels());
 
   const loadChannelMessages = async (channelId: ChannelId) => {
     setIsLoading(true);
-    const data = await chatApi.fetchMessages(channelId, selfName);
+    // CHANGED: fetchMessages no longer takes selfName — server determines isSelf from token
+    const data = await chatApi.fetchMessages(channelId);
     setMessages(data);
     setIsLoading(false);
-    chatApi.markChannelRead(channelId);
+    await chatApi.markChannelRead(channelId);
     refreshUnread();
   };
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadChannelMessages(activeChannelId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannelId]);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshUnread();
+    refreshChannels();
     const handler = () => {
       refreshUnread();
       refreshChannels();
@@ -106,9 +110,9 @@ export const Chat: React.FC = () => {
     window.addEventListener(chatApi.CHAT_EVENT, handler);
     getEmployees().then(setEmployees);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  // If the active channel was deleted (by this tab or another), fall back to whatever remains.
   useEffect(() => {
     if (channels.length > 0 && !channels.some(c => c.id === activeChannelId)) {
       setActiveChannelId(channels[0].id);
@@ -124,13 +128,25 @@ export const Chat: React.FC = () => {
     const text = draft.trim();
     if (!text && !pendingAttachment) return;
 
+    // CHANGED: sendMessage no longer takes a `sender` object — server determines
+    // author from the logged-in token. Also: dataUrl is sent but the backend
+    // silently ignores it (not persisted) — only kept here for the immediate
+    // optimistic local preview below.
     const message = await chatApi.sendMessage(
       activeChannelId,
       text || undefined,
-      pendingAttachment ?? undefined,
-      { name: selfName, role: selfRole, avatarUrl: selfAvatar, selfName }
+      pendingAttachment ?? undefined
     );
-    setMessages(prev => [...prev, { ...message, isSelf: true }]);
+
+    if (message) {
+      // Merge dataUrl back in locally so the preview shows immediately —
+      // this will be lost on next fetchMessages() / page reload, since the
+      // server never stored it (file storage is out of scope for now).
+      const messageWithPreview = pendingAttachment
+        ? { ...message, attachment: { ...message.attachment, dataUrl: pendingAttachment.dataUrl } }
+        : message;
+      setMessages(prev => [...prev, { ...messageWithPreview, isSelf: true }]);
+    }
     setDraft('');
     setPendingAttachment(null);
     setShowEmojiPicker(false);
@@ -138,8 +154,6 @@ export const Chat: React.FC = () => {
 
   const handleAttachClick = () => fileInputRef.current?.click();
 
-  // Stages the file for preview - it isn't sent until the user hits Send,
-  // same as attaching a file in WhatsApp or similar messaging apps.
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -162,13 +176,14 @@ export const Chat: React.FC = () => {
 
   const removePendingAttachment = () => setPendingAttachment(null);
 
-  const handleDeleteMessage = (message: ChatMessage) => {
+  // CHANGED: now async, awaits deleteMessage
+  const handleDeleteMessage = async (message: ChatMessage) => {
     const confirmed = window.confirm(
       message.isSelf ? 'Delete this message?' : `Delete this message from ${message.authorName}?`
     );
     if (!confirmed) return;
 
-    chatApi.deleteMessage(message.id);
+    await chatApi.deleteMessage(message.id);
     setMessages(prev => prev.filter(m => m.id !== message.id));
     refreshUnread();
   };
@@ -179,7 +194,7 @@ export const Chat: React.FC = () => {
   };
 
   const handleToggleReaction = async (messageId: string, emoji: string) => {
-    chatApi.toggleReaction(messageId, emoji);
+    await chatApi.toggleReaction(messageId, emoji);
     setMessages(await chatApi.fetchMessages(activeChannelId));
     setReactionPickerFor(null);
   };
@@ -192,18 +207,19 @@ export const Chat: React.FC = () => {
     setShowCreateChannel(true);
   };
 
-  const handleCreateChannel = (e: React.FormEvent) => {
+  // CHANGED: now async, awaits createChannel, handles possible null return
+  const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
-      const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
-      const channel = chatApi.createChannel(newChannelName, allowedIds, depts);
-      refreshChannels();
-      setActiveChannelId(channel.id);
-      setShowCreateChannel(false);
-    } catch (err) {
-      setChannelError(err instanceof Error ? err.message : 'Could not create channel.');
+    const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
+    const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
+    const channel = await chatApi.createChannel(newChannelName, allowedIds, depts);
+    if (!channel) {
+      setChannelError('Could not create channel.');
+      return;
     }
+    await refreshChannels();
+    setActiveChannelId(channel.id);
+    setShowCreateChannel(false);
   };
 
   const openEditChannel = () => {
@@ -214,39 +230,51 @@ export const Chat: React.FC = () => {
     setEditingChannelId(activeChannel.id);
   };
 
-  const handleEditChannel = (e: React.FormEvent) => {
+  // CHANGED: now async, awaits editChannel
+  const handleEditChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingChannelId) return;
-    try {
-      const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
-      const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
-      chatApi.editChannel(editingChannelId, newChannelName, allowedIds, depts);
-      refreshChannels();
-      setEditingChannelId(null);
-    } catch (err) {
-      setChannelError(err instanceof Error ? err.message : 'Could not edit channel.');
+    const allowedIds = newChannelMembers.length > 0 ? newChannelMembers : undefined;
+    const depts = newChannelDepts.length > 0 ? newChannelDepts : undefined;
+    const result = await chatApi.editChannel(editingChannelId, newChannelName, allowedIds, depts);
+    if (!result) {
+      setChannelError('Could not edit channel.');
+      return;
     }
+    await refreshChannels();
+    setEditingChannelId(null);
   };
 
-  const handleEditSave = (messageId: string) => {
+  // CHANGED: now async, awaits editMessage
+  const handleEditSave = async (messageId: string) => {
     if (!editingDraft.trim()) return;
-    chatApi.editMessage(messageId, editingDraft);
+    await chatApi.editMessage(messageId, editingDraft);
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: editingDraft, edited: true } : m));
     setEditingMessageId(null);
     setEditingDraft('');
   };
 
-  const handleDeleteChannel = (e: React.MouseEvent, channel: ChatChannel) => {
+  // CHANGED: now async, awaits deleteChannel (which throws on error, same as before)
+  const handleDeleteChannel = async (e: React.MouseEvent, channel: ChatChannel) => {
     e.stopPropagation();
     const confirmed = window.confirm(`Delete #${channel.name}? This removes it and all its messages for everyone.`);
     if (!confirmed) return;
 
     try {
-      chatApi.deleteChannel(channel.id);
-      refreshChannels();
+      await chatApi.deleteChannel(channel.id);
+      await refreshChannels();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not delete channel.');
     }
   };
+
+  if (!activeChannel) {
+    return (
+      <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex items-center justify-center h-[calc(100vh-160px)] min-h-[520px] text-varistor-muted text-sm">
+        Loading channels...
+      </div>
+    );
+  }
 
   return (
     <div className="bg-varistor-surface rounded-varistor border border-varistor-border shadow-varistor flex h-[calc(100vh-160px)] min-h-[520px] overflow-hidden">
@@ -309,11 +337,10 @@ export const Chat: React.FC = () => {
 
       {/* Message Thread */}
       <div className={`${showMobileSidebar ? 'hidden' : 'flex'} md:flex flex-1 flex-col min-w-0`}>
-        {/* Channel Header */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-varistor-border flex-shrink-0">
           <div>
             <h3 className="text-sm font-bold text-varistor-dark flex items-center gap-1">
-              <button 
+              <button
                 onClick={() => setShowMobileSidebar(true)}
                 className="md:hidden mr-2 p-1.5 rounded hover:bg-varistor-surfaceMuted text-varistor-muted transition-colors cursor-pointer"
               >
@@ -342,7 +369,6 @@ export const Chat: React.FC = () => {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {isLoading ? (
             <div className="space-y-4 animate-pulse">
@@ -417,7 +443,7 @@ export const Chat: React.FC = () => {
                         </div>
                         {message.attachment.dataUrl && (
                           <div className="flex items-center gap-1 flex-shrink-0 ml-1">
-                            <a
+                            
                               href={message.attachment.dataUrl}
                               target="_blank"
                               rel="noreferrer"
@@ -426,7 +452,7 @@ export const Chat: React.FC = () => {
                             >
                               <Eye size={13} />
                             </a>
-                            <a
+                            
                               href={message.attachment.dataUrl}
                               download={message.attachment.name}
                               title="Download"
@@ -524,18 +550,15 @@ export const Chat: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Attachment error */}
         {attachError && (
           <div className="px-4 py-2 text-[11px] font-semibold text-varistor-dangerText bg-varistor-dangerBg border-t border-varistor-dangerBorder flex-shrink-0">
             {attachError}
           </div>
         )}
 
-        {/* Composer */}
         <form onSubmit={handleSend} className="border-t border-varistor-border px-4 py-3 flex flex-col gap-2 relative flex-shrink-0">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
 
-          {/* Staged attachment preview - not sent until the user hits Send */}
           {pendingAttachment && (
             <div className="flex items-center gap-3 bg-varistor-surfaceMuted border border-varistor-border rounded-lg px-3 py-2">
               {pendingAttachment.type.startsWith('image/') ? (
@@ -617,7 +640,6 @@ export const Chat: React.FC = () => {
         </form>
       </div>
 
-      {/* Create Channel Modal - Admin/HR only */}
       <Modal isOpen={showCreateChannel || !!editingChannelId} onClose={() => { setShowCreateChannel(false); setEditingChannelId(null); }} title={editingChannelId ? "Edit channel" : "Create a channel"}>
         <form onSubmit={editingChannelId ? handleEditChannel : handleCreateChannel} className="flex flex-col gap-4">
           <Input
@@ -648,7 +670,7 @@ export const Chat: React.FC = () => {
                 ))}
               </div>
             </div>
-            
+
             <div className="flex-1">
               <label className="block text-xs font-semibold text-varistor-dark mb-1.5">Select Specific Employees (Optional)</label>
               <div className="max-h-48 overflow-y-auto border border-varistor-border rounded-lg p-2 space-y-1">

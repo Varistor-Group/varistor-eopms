@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Megaphone, Cake, MessageSquare, CheckCheck, Award } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { chatApi } from '../api/chat';
-import type { ChannelId } from '../types';
+import type { ChannelId, ChatChannel } from '../types';
 
 interface NotificationBellProps {
   onNavigateToChat: () => void;
@@ -24,20 +24,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
   const { announcements, readAnnouncement, reactToAnnouncement, ledger } = useVariPoints();
   const [isOpen, setIsOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState<{ total: number; byChannel: Record<string, number> }>({ total: 0, byChannel: {} });
+  // NEW: channels now need to be fetched async and stored, since getChannels() is no longer sync
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [readLedgerIds, setReadLedgerIds] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('eopms_read_ledger');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const refreshChatUnread = () => setChatUnread(chatApi.getUnreadSummary());
+  // CHANGED: now async
+  const refreshChatUnread = async () => setChatUnread(await chatApi.getUnreadSummary());
+  const refreshChannels = async () => setChannels(await chatApi.getChannels());
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshChatUnread();
-    const handler = () => refreshChatUnread();
+    refreshChannels();
+    const handler = () => {
+      refreshChatUnread();
+      refreshChannels();
+    };
     window.addEventListener(chatApi.CHAT_EVENT, handler);
     return () => window.removeEventListener(chatApi.CHAT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -62,12 +70,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
   const recentAnnouncements = [...announcements]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 6);
-  const recentLedger = ledger.slice(0, 5); // ledger is already newest-first
-  const unreadChannels = chatApi.getChannels().filter(c => chatUnread.byChannel[c.id]);
+  const recentLedger = ledger.slice(0, 5);
+  // CHANGED: uses the channels state instead of calling getChannels() synchronously
+  const unreadChannels = channels.filter(c => chatUnread.byChannel[c.id]);
 
-  const handleMarkAllRead = () => {
+  // CHANGED: now async, awaits markChannelRead calls
+  const handleMarkAllRead = async () => {
     unreadAnnouncements.forEach(a => readAnnouncement(a.id));
-    unreadChannels.forEach(c => chatApi.markChannelRead(c.id));
+    await Promise.all(unreadChannels.map(c => chatApi.markChannelRead(c.id)));
     persistReadLedger(new Set([...readLedgerIds, ...ledger.map(l => l.id)]));
   };
 
@@ -75,8 +85,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
     persistReadLedger(new Set(readLedgerIds).add(id));
   };
 
-  const handleChatItemClick = (channelId: ChannelId) => {
-    chatApi.markChannelRead(channelId);
+  // CHANGED: now async, awaits markChannelRead
+  const handleChatItemClick = async (channelId: ChannelId) => {
+    await chatApi.markChannelRead(channelId);
     setIsOpen(false);
     onNavigateToChat();
   };
@@ -112,7 +123,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
           </div>
 
           <div className="max-h-96 overflow-y-auto">
-            {/* Chat unread section */}
             {unreadChannels.length > 0 && (
               <div className="px-4 pt-3 pb-1">
                 <span className="text-[9px] font-bold text-varistor-muted uppercase tracking-wider">Chat</span>
@@ -136,7 +146,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
               </button>
             ))}
 
-            {/* Vari Points section */}
             <div className="px-4 pt-3 pb-1">
               <span className="text-[9px] font-bold text-varistor-muted uppercase tracking-wider">Vari Points</span>
             </div>
@@ -171,7 +180,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigateTo
               })
             )}
 
-            {/* Announcements section */}
             <div className="px-4 pt-3 pb-1">
               <span className="text-[9px] font-bold text-varistor-muted uppercase tracking-wider">Announcements</span>
             </div>

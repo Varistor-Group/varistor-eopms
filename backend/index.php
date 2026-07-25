@@ -82,6 +82,20 @@ $routes = [
     ['POST',   '#^/api/policies$#',                 'policies.php'],
     ['PUT',    '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
     ['DELETE', '#^/api/policies/(?P<id>[^/]+)$#',   'policies.php'],
+    
+    // Chat
+    ['GET',    '#^/api/chat/channels$#',                                'chat_channels.php'],
+    ['POST',   '#^/api/chat/channels$#',                                'chat_channels.php'],
+    ['PUT',    '#^/api/chat/channels/(?P<id>[^/]+)$#',                  'chat_channels.php'],
+    ['DELETE', '#^/api/chat/channels/(?P<id>[^/]+)$#',                  'chat_channels.php'],
+    ['POST',   '#^/api/chat/channels/(?P<channelId>[^/]+)/read$#',      'chat_messages.php'],
+
+    ['GET',    '#^/api/chat/unread$#',                                  'chat_messages.php'],
+    ['GET',    '#^/api/chat/messages/(?P<channelId>[^/]+)$#',           'chat_messages.php'],
+    ['POST',   '#^/api/chat/messages$#',                                'chat_messages.php'],
+    ['PUT',    '#^/api/chat/messages/(?P<id>[^/]+)$#',                  'chat_messages.php'],
+    ['DELETE', '#^/api/chat/messages/(?P<id>[^/]+)$#',                  'chat_messages.php'],
+    ['POST',   '#^/api/chat/messages/(?P<id>[^/]+)/(?P<action>react)$#','chat_messages.php'],
 
     // Announcements
     ['GET',    '#^/api/announcements$#',                                 'announcements.php'],
