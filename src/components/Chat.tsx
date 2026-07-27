@@ -143,8 +143,17 @@ export const Chat: React.FC = () => {
       // this will be lost on next fetchMessages() / page reload, since the
       // server never stored it (file storage is out of scope for now).
       const messageWithPreview = pendingAttachment
-        ? { ...message, attachment: { ...message.attachment, dataUrl: pendingAttachment.dataUrl } }
-        : message;
+      ? {
+          ...message,
+          attachment: {
+            ...message.attachment,
+            dataUrl: pendingAttachment.dataUrl,
+            name: message.attachment?.name ?? pendingAttachment.name,
+            size: message.attachment?.size ?? pendingAttachment.size,
+            type: message.attachment?.type ?? pendingAttachment.type,
+          },
+        }
+      : message;
       setMessages(prev => [...prev, { ...messageWithPreview, isSelf: true }]);
     }
     setDraft('');

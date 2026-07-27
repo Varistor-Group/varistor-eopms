@@ -10,7 +10,6 @@
 import { apiFetch } from './httpClient';
 import { getEmployees } from './employees';
 import { getMonthlyReport } from './attendance';
-import { API_URL } from '../config/api';
 
 export interface SalaryComponents {
   basic: number;
