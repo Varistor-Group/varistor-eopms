@@ -13,7 +13,6 @@ require_once __DIR__ . '/helpers.php';
 cors_headers();
 
 // ── Parse path ───────────────────────────────────────────────────────────────
-// Strip script directory prefix so this works whether deployed at /  or /eopms-api/
 $scriptDir   = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $requestUri  = $_SERVER['REQUEST_URI'];
 $path        = parse_url($requestUri, PHP_URL_PATH);
@@ -25,7 +24,6 @@ $path   = '/' . ltrim($path, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
 // ── Route table ───────────────────────────────────────────────────────────────
-// Format: [METHOD, regex pattern, handler file]
 $routes = [
     // Auth
     ['GET',  '#^/api/auth/me$#',                    'me.php'],
@@ -41,12 +39,22 @@ $routes = [
     ['POST', '#^/api/leave/notify-manager$#',       'leave_notify_manager.php'],
     ['POST', '#^/api/leave/notify-employee$#',      'leave_notify_employee.php'],
 
-    // Payroll
+    // Payroll (legacy akash endpoints — kept as-is, still functional)
     ['POST', '#^/api/payroll/send-slips$#',         'payroll_send_slips.php'],
     ['GET',  '#^/api/payroll/schedule$#',           'payroll_schedule.php'],
     ['PUT',  '#^/api/payroll/schedule$#',           'payroll_schedule.php'],
     ['POST', '#^/api/payroll/records$#',            'payroll_records.php'],
     ['POST', '#^/api/payroll/trigger-send$#',       'payroll_trigger.php'],
+
+    // Payroll Records (new MySQL-backed API)
+    ['GET',    '#^/api/payroll-records$#',                                'payroll_records.php'],
+    ['PUT',    '#^/api/payroll-records/(?P<id>[^/]+)$#',                  'payroll_records.php'],
+    ['POST',   '#^/api/payroll-records/(?P<id>[^/]+)/(?P<action>approve)$#',  'payroll_records.php'],
+    ['POST',   '#^/api/payroll-records/(?P<id>[^/]+)/(?P<action>revision)$#', 'payroll_records.php'],
+
+    // Payroll Settings (formula/config, replaces localStorage)
+    ['GET', '#^/api/payroll-settings$#',                     'payroll_settings.php'],
+    ['PUT', '#^/api/payroll-settings/(?P<key>[^/]+)$#',      'payroll_settings.php'],
 
     // Employees
     ['GET',  '#^/api/employees$#',                  'employees.php'],
@@ -137,7 +145,7 @@ $matched = false;
 foreach ($routes as [$routeMethod, $pattern, $handler]) {
     if ($routeMethod !== $method) continue;
     if (preg_match($pattern, $path, $m)) {
-        $params  = $m;   // named capture groups (id, employeeId, etc.)
+        $params  = $m;
         $matched = true;
         require __DIR__ . '/' . $handler;
         exit;

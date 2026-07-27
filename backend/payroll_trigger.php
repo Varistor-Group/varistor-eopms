@@ -1,26 +1,27 @@
 <?php
 /**
  * POST /api/payroll/trigger-send
- * Manually triggers payslip dispatch from db.json records.
- * Mirrors dispatchPayslips() + buildSlipsFromDb() from server.js.
+ * Manually triggers payslip dispatch, pulling the latest revision per
+ * employee from the payroll_records MySQL table.
  */
 
-$db      = read_db();
-$records = $db['payroll_records'] ?? [];
-$empList = $db['employees']       ?? [];
+requireRole(['HR', 'Admin']); // SECURITY FIX: was completely open before
+
+$db = get_db();
+
+// Get latest revision per employee (any status — matches old behavior,
+// which didn't filter by draft/approved)
+$records = $db->query(
+    'SELECT pr.* FROM payroll_records pr
+     INNER JOIN (
+         SELECT employee_id, MAX(revision) AS max_rev
+         FROM payroll_records
+         GROUP BY employee_id
+     ) latest ON pr.employee_id = latest.employee_id AND pr.revision = latest.max_rev'
+)->fetchAll();
 
 if (count($records) === 0) {
     json_ok(['success' => true, 'sent' => 0, 'failed' => [], 'skipped' => true]);
-}
-
-// Keep only latest revision per employee
-$latestMap = [];
-foreach ($records as $rec) {
-    $empId    = $rec['employeeId'] ?? '';
-    $existing = $latestMap[$empId] ?? null;
-    if (!$existing || ($rec['revision'] ?? 0) > ($existing['revision'] ?? 0)) {
-        $latestMap[$empId] = $rec;
-    }
 }
 
 function get_days_in_month(string $monthLabel): int {
@@ -29,28 +30,28 @@ function get_days_in_month(string $monthLabel): int {
 }
 
 $slips = [];
-foreach ($latestMap as $rec) {
-    $empId = $rec['employeeId'] ?? '';
-    $emp   = null;
-    foreach ($empList as $e) {
-        if ($e['employeeId'] === $empId) { $emp = $e; break; }
-    }
-    if (!$emp || empty($emp['personalEmail']) || ($emp['status'] ?? '') !== 'Active') continue;
+foreach ($records as $rec) {
+    $empStmt = $db->prepare('SELECT personal_email, status FROM employees WHERE id = ? LIMIT 1');
+    $empStmt->execute([$rec['employee_id']]);
+    $emp = $empStmt->fetch();
 
-    $c = $rec['components'] ?? [];
+    if (!$emp || empty($emp['personal_email']) || $emp['status'] !== 'Active') continue;
+
+    $c = $rec['components'] ? json_decode($rec['components'], true) : [];
+
     $slips[] = [
-        'name'            => $rec['employeeName']  ?? '',
-        'email'           => $emp['personalEmail'],
-        'employeeId'      => $empId,
+        'name'            => $rec['employee_name']  ?? '',
+        'email'           => $emp['personal_email'],
+        'employeeId'      => $rec['employee_id'],
         'department'      => $rec['department']    ?? '',
         'designation'     => $rec['designation']   ?? '',
         'month'           => $rec['month']         ?? date('M Y'),
-        'monthlySalary'   => $rec['monthlySalary'] ?? $rec['ctc'] ?? 0,
-        'ctc'             => $rec['ctc']           ?? $rec['monthlySalary'] ?? 0,
-        'totalDays'       => $rec['totalDays']     ?? get_days_in_month($rec['month'] ?? ''),
-        'payDays'         => $rec['payDays']       ?? get_days_in_month($rec['month'] ?? ''),
-        'clBalance'       => $rec['clBalance']     ?? 0,
-        'pfUan'           => $rec['pfUan']         ?? '—',
+        'monthlySalary'   => $rec['monthly_salary'] ?? $rec['ctc'] ?? 0,
+        'ctc'             => $rec['ctc']           ?? $rec['monthly_salary'] ?? 0,
+        'totalDays'       => $rec['total_days']    ?? get_days_in_month($rec['month'] ?? ''),
+        'payDays'         => $rec['pay_days']      ?? get_days_in_month($rec['month'] ?? ''),
+        'clBalance'       => $rec['cl_balance']    ?? 0,
+        'pfUan'           => $rec['pf_uan']        ?? '—',
         'basic'           => $c['basic']           ?? 0,
         'hra'             => $c['hra']             ?? 0,
         'medical'         => $c['medical']         ?? 0,
@@ -67,13 +68,13 @@ foreach ($latestMap as $rec) {
         'overtime'        => $c['overtime']        ?? 0,
         'otherDeductions' => $c['otherDeductions'] ?? 0,
         'deductions'      => ($c['pfEmployee'] ?? 0) + ($c['esi'] ?? 0) + ($c['pt'] ?? 0) + ($c['tds'] ?? 0) + ($c['otherDeductions'] ?? 0),
-        'netPay'          => $rec['netPay']        ?? 0,
-        'finalPay'        => $rec['finalPay']      ?? 0,
-        'deduction'       => $rec['deduction']     ?? 0,
-        'additionHeads'   => $rec['additionHeads'] ?? [],
-        'deductionHeads'  => $rec['deductionHeads']?? [],
-        'additionValues'  => $rec['additionValues']?? [],
-        'deductionValues' => $rec['deductionValues']?? [],
+        'netPay'          => $rec['net_pay']        ?? 0,
+        'finalPay'        => $rec['final_pay']      ?? 0,
+        'deduction'       => $rec['deduction']      ?? 0,
+        'additionHeads'   => $rec['addition_heads']  ? json_decode($rec['addition_heads'], true)  : [],
+        'deductionHeads'  => $rec['deduction_heads'] ? json_decode($rec['deduction_heads'], true) : [],
+        'additionValues'  => $rec['addition_values']  ? json_decode($rec['addition_values'], true)  : [],
+        'deductionValues' => $rec['deduction_values'] ? json_decode($rec['deduction_values'], true) : [],
     ];
 }
 
@@ -81,20 +82,23 @@ if (count($slips) === 0) {
     json_ok(['success' => true, 'sent' => 0, 'failed' => [], 'skipped' => true]);
 }
 
-// Reuse send-slips logic by including it (body is already available via $slips variable)
-// We temporarily override $body to simulate a POST to send-slips
+// Reuse send-slips logic by including it — same pattern as before,
+// but note payroll_send_slips.php now also calls requireRole() itself,
+// which is redundant here but harmless (caller already passed the check).
 $body = ['slips' => $slips];
 ob_start();
 require __DIR__ . '/payroll_send_slips.php';
 $output = ob_get_clean();
 
-// Update lastRun
-$db2 = read_db();
-if (!isset($db2['payroll_schedule'])) $db2['payroll_schedule'] = [];
-$db2['payroll_schedule']['lastRun'] = date('c');
-write_db($db2);
+// Update lastRun in payroll_settings
+$stmt = $db->prepare('SELECT setting_value FROM payroll_settings WHERE setting_key = ? LIMIT 1');
+$stmt->execute(['schedule']);
+$row = $stmt->fetch();
+$sched = $row ? json_decode($row['setting_value'], true) : [];
+$sched['lastRun'] = date('c');
+$db->prepare('INSERT INTO payroll_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')
+   ->execute(['schedule', json_encode($sched)]);
 
-// Forward the send-slips response
 header('Content-Type: application/json; charset=utf-8');
 echo $output;
 exit;

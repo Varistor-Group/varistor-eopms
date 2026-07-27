@@ -3,14 +3,9 @@
  * POST /api/payroll/send-slips
  * Sends salary slip emails (HTML + PDF attachment) to each employee.
  * Body: { slips: SlipRow[] }
- *
- * Each SlipRow matches the shape built by the frontend/cron:
- *  name, email, employeeId, department, designation, month, ctc,
- *  totalDays, payDays, clBalance, pfUan, basic, hra, medical, ta, lta,
- *  specialAllowance, pfEmployee, pfEmployer, esi, pt, tds, reimbursement,
- *  incentives, overtime, otherDeductions, deductions, netPay, finalPay,
- *  deduction, additionHeads[], additionValues[], deductionHeads[], deductionValues[]
  */
+
+requireRole(['HR', 'Admin']); // SECURITY FIX: this endpoint had zero access control before
 
 $body  = request_body();
 $slips = $body['slips'] ?? null;
@@ -19,8 +14,7 @@ if (!is_array($slips) || count($slips) === 0) {
     json_error('No slip data provided.', 400);
 }
 
-$db        = read_db();
-$employees = $db['employees'] ?? [];
+$db = get_db(); // FIX: was read_db() — that function no longer exists (legacy db.json system)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 $fmt = function ($n) {
@@ -37,7 +31,6 @@ function build_slip_html(array $slip, callable $fmt): string
             - (float)($slip['deduction'] ?? 0));
     $words    = number_to_words($finalPay);
 
-    // Build rows HTML
     $rowsHtml   = '';
     $totalCtc   = 0;
     $totalDeduc = 0;
@@ -70,7 +63,6 @@ function build_slip_html(array $slip, callable $fmt): string
               <td style='text-align:right;border:1px solid #cccccc;'>" . ($dv ?: '&nbsp;') . "</td>
             </tr>";
         }
-        // Post-tax extras
         $postItems = [];
         if (!empty($slip['reimbursement'])) $postItems[] = ['Travel Allowance', (float)$slip['reimbursement']];
         if (!empty($slip['overtime']))      $postItems[] = ['Overtime',          (float)$slip['overtime']];
@@ -85,7 +77,6 @@ function build_slip_html(array $slip, callable $fmt): string
             </tr>";
         }
     } else {
-        // Legacy flat rows
         $earnRows = [
             ['Salary',          $slip['monthlySalary'] ?? 0],
             ['Basic',           $slip['basic'] ?? 0],
@@ -205,15 +196,12 @@ foreach ($slips as $slip) {
         continue;
     }
 
-    // Only active employees
-    $emp = null;
-    foreach ($employees as $e) {
-        if ($e['personalEmail'] === $slip['email'] || $e['employeeId'] === ($slip['employeeId'] ?? '')) {
-            $emp = $e;
-            break;
-        }
-    }
-    if (!$emp || ($emp['status'] ?? '') !== 'Active') {
+    // FIX: was looping over $db['employees'] array — now a real MySQL query
+    $empStmt = $db->prepare('SELECT status FROM employees WHERE personal_email = ? OR employee_id = ? LIMIT 1');
+    $empStmt->execute([$slip['email'], $slip['employeeId'] ?? '']);
+    $emp = $empStmt->fetch();
+
+    if (!$emp || $emp['status'] !== 'Active') {
         $failed[] = ['email' => $slip['email'], 'name' => $slip['name'], 'error' => 'Employee is inactive or not found'];
         continue;
     }
@@ -222,7 +210,6 @@ foreach ($slips as $slip) {
         $month    = $slip['month'] ?? date('M Y');
         $htmlBody = build_slip_html($slip, $fmt);
 
-        // ── Build PDF with TCPDF ──────────────────────────────────────────────
         $pdf = new \TCPDF('P', 'pt', 'A4', true, 'UTF-8', false);
         $pdf->SetCreator('Varistor EOPMS');
         $pdf->SetAuthor('HR System');
@@ -233,7 +220,7 @@ foreach ($slips as $slip) {
         $pdf->setPrintFooter(false);
         $pdf->AddPage();
         $pdf->writeHTMLCell(0, 0, 40, 40, $htmlBody, 0, 1, false, true, '', true);
-        $pdfBuffer = $pdf->Output('', 'S'); // return as string
+        $pdfBuffer = $pdf->Output('', 'S');
 
         $mail = make_mailer();
         $mail->addAddress($slip['email'], $slip['name']);
@@ -243,7 +230,7 @@ foreach ($slips as $slip) {
         $mail->send();
 
         $sent[] = ['email' => $slip['email'], 'name' => $slip['name']];
-        usleep(120000); // 120 ms throttle
+        usleep(120000);
     } catch (\Exception $e) {
         $failed[] = ['email' => $slip['email'], 'name' => $slip['name'], 'error' => $e->getMessage()];
     }
