@@ -36,7 +36,6 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { currentUser } = useVariPoints();
-  const employeeId = currentUser?.id ?? '';
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -111,7 +110,7 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
       setTimeout(() => setQuizVisible(true), 50);
     }, 300);
   };
-  
+
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   const toggleMute = () => setIsMuted(!isMuted);

@@ -195,7 +195,6 @@ const TrainingLibrary: React.FC = () => {
 
   const { currentRole, currentUser } = useVariPoints();
   const isManager = currentRole === 'HR' || currentRole === 'Admin';
-  const employeeId = currentUser?.id ?? '';
 
   const loadModules = useCallback(async () => {
     setLoading(true);
@@ -206,7 +205,7 @@ const TrainingLibrary: React.FC = () => {
       setLoading(false);
     }
   }, []);
-  
+
   useEffect(() => {
    
     loadModules();
