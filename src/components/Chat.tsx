@@ -47,7 +47,6 @@ function renderMessageText(text: string) {
 
 export const Chat: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
-  const selfName = currentUser?.name ?? 'You';
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
   const canManageChannels = currentRole === 'Admin' || currentRole === 'HR';
   // CHANGED: getChannels() is now async (server call) — can't populate useState
