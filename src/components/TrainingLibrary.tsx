@@ -193,7 +193,7 @@ const TrainingLibrary: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<TrainingModuleWithStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
 
-  const { currentRole, currentUser } = useVariPoints();
+  const { currentRole } = useVariPoints();
   const isManager = currentRole === 'HR' || currentRole === 'Admin';
 
   const loadModules = useCallback(async () => {
