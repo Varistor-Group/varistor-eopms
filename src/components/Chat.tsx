@@ -443,8 +443,8 @@ export const Chat: React.FC = () => {
                         </div>
                         {message.attachment.dataUrl && (
                           <div className="flex items-center gap-1 flex-shrink-0 ml-1">
-                            
-                              href={message.attachment.dataUrl}
+  
+                             <a href={message.attachment.dataUrl}
                               target="_blank"
                               rel="noreferrer"
                               title="Preview"
@@ -452,8 +452,9 @@ export const Chat: React.FC = () => {
                             >
                               <Eye size={13} />
                             </a>
+
                             
-                              href={message.attachment.dataUrl}
+                              <a href={message.attachment.dataUrl}
                               download={message.attachment.name}
                               title="Download"
                               className="p-1.5 rounded hover:bg-varistor-surface text-varistor-muted hover:text-varistor-dark transition-colors"
