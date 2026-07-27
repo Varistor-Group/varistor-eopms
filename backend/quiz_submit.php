@@ -5,6 +5,9 @@
  * Body: { employeeEmail, hrEmail, moduleTitle, score, passed }
  */
 
+$myId = currentEmployeeId();
+if ($myId === null) json_error('Unauthorized', 401);
+
 $body          = request_body();
 $employeeEmail = $body['employeeEmail'] ?? '';
 $hrEmail       = $body['hrEmail']       ?? '';
@@ -12,7 +15,7 @@ $moduleTitle   = $body['moduleTitle']   ?? '';
 $score         = $body['score']         ?? 0;
 $passed        = (bool)($body['passed'] ?? false);
 
-if (!$employeeEmail || !$moduleTitle || $score === '') {
+if (!$employeeEmail || !$moduleTitle) {
     json_error('Missing required fields');
 }
 

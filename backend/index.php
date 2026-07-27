@@ -30,6 +30,17 @@ $routes = [
     ['POST', '#^/api/auth/update-password$#',       'update_password.php'],
     ['POST', '#^/api/auth/reset-password$#',        'reset_password.php'],
     ['POST', '#^/api/auth/login$#',                 'login.php'],
+    // Training
+    ['GET',    '#^/api/training-modules$#',                    'training_modules.php'],
+    ['POST',   '#^/api/training-modules$#',                    'training_modules.php'],
+    ['DELETE', '#^/api/training-modules/(?P<id>[^/]+)$#',      'training_modules.php'],
+
+    ['PUT',    '#^/api/training-progress$#',                   'training_progress.php'],
+
+    ['GET',    '#^/api/quiz-questions/(?P<moduleId>[^/]+)$#',  'quiz_questions.php'],
+
+    ['GET',    '#^/api/quiz-attempts/latest/(?P<moduleId>[^/]+)$#', 'quiz_attempts.php'],
+    ['POST',   '#^/api/quiz-attempts$#',                       'quiz_attempts.php'],
 
     // Email
     ['POST', '#^/api/send-credentials$#',          'send_credentials.php'],

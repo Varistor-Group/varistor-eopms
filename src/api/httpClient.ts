@@ -3,8 +3,13 @@
  * Attaches X-Employee-Id from the logged-in user, stored the same way
  * EopmsContext persists it (localStorage key 'eopms_current_user').
  *
- * PLACEHOLDER: X-Employee-Id is a stopgap until Task 2 (Authentication)
- * builds real session/token handling — see helpers.php on the backend.
+ * NOTE: Task 2 (Authentication) is done — login.php now issues a real
+ * Bearer token, and helpers.php's currentEmployeeId() checks
+ * `Authorization: Bearer <token>` first, falling back to X-Employee-Id
+ * only for callers not yet updated. This file still only sends the
+ * legacy X-Employee-Id header, so every request here is silently using
+ * the weaker fallback path instead of the real session token. Needs a
+ * follow-up pass to switch this to sending the stored Bearer token.
  */
 import { API_URL } from '../config/api';
 
@@ -19,10 +24,19 @@ function getCurrentEmployeeId(): string | null {
   }
 }
 
-export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+interface ApiFetchOptions extends RequestInit {
+  isMultipart?: boolean;
+}
+
+export async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
   const empId = getCurrentEmployeeId();
+  const { isMultipart, ...rest } = options;
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+
+  if (!isMultipart) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (empId) headers.set('X-Employee-Id', empId);
-  return fetch(`${API_URL}${path}`, { ...options, headers });
+
+  return fetch(`${API_URL}${path}`, { ...rest, headers });
 }
