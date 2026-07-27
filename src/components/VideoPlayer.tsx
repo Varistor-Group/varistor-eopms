@@ -78,18 +78,17 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
-
-  // Save progress every 5 seconds
+// Save progress every 5 seconds
   useEffect(() => {
     progressSaveTimer.current = setInterval(() => {
       if (playerRef.current && isPlaying) {
-        trainingApi.updateProgress(employeeId, mod.id, Math.floor(playerRef.current.currentTime));
+        trainingApi.updateProgress(mod.id, Math.floor(playerRef.current.currentTime));
       }
     }, 5000);
     return () => {
       if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
     };
-  }, [isPlaying, employeeId, mod.id]);
+  }, [isPlaying, mod.id]);
 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,13 +105,13 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const handleVideoEnded = () => {
     setIsPlaying(false);
     setVideoCompleted(true);
-    trainingApi.updateProgress(employeeId, mod.id, Math.floor(duration));
+    trainingApi.updateProgress(mod.id, Math.floor(duration));
     setTimeout(() => {
       setQuizReady(true);
       setTimeout(() => setQuizVisible(true), 50);
     }, 300);
   };
-
+  
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   const toggleMute = () => setIsMuted(!isMuted);

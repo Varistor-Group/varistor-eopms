@@ -186,7 +186,6 @@ function TrainingCard({
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-
 const TrainingLibrary: React.FC = () => {
   const [modules, setModules] = useState<TrainingModuleWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,13 +200,13 @@ const TrainingLibrary: React.FC = () => {
   const loadModules = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await trainingApi.fetchModulesWithStatus(employeeId, currentRole, currentUser?.department);
+      const data = await trainingApi.fetchModulesWithStatus();
       setModules(data);
     } finally {
       setLoading(false);
     }
-  }, [employeeId, currentRole, currentUser?.department]);
-
+  }, []);
+  
   useEffect(() => {
    
     loadModules();

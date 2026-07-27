@@ -27,7 +27,7 @@ export function useTrainingGate(employeeId: string | undefined, role: UserRole |
     }
     setLoading(true);
     trainingApi
-      .fetchModulesWithStatus(employeeId, role, department)
+      .fetchModulesWithStatus()
       .then(modules => {
         const allComplete = modules.length === 0 || modules.every(m => m.status === 'completed');
         setLocked(!allComplete);
