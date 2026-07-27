@@ -48,11 +48,8 @@ function renderMessageText(text: string) {
 export const Chat: React.FC = () => {
   const { currentRole, currentUser } = useVariPoints();
   const selfName = currentUser?.name ?? 'You';
-  const selfRole = currentRole;
-  const selfAvatar = currentUser?.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selfName)}&background=84CC16&color=fff&size=80&bold=true`;
   const canModerate = currentRole === 'Admin' || currentRole === 'HR';
   const canManageChannels = currentRole === 'Admin' || currentRole === 'HR';
-
   // CHANGED: getChannels() is now async (server call) — can't populate useState
   // synchronously anymore. Starts empty, loaded via useEffect below.
   const [channels, setChannels] = useState<ChatChannel[]>([]);
