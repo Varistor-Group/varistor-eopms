@@ -14,7 +14,6 @@ import {
   Lock,
 } from 'lucide-react';
 import { trainingApi } from '../api/training';
-import { useVariPoints } from '../hooks/useVariPoints';
 import type { TrainingModuleWithStatus } from '../types';
 
 interface Props {
