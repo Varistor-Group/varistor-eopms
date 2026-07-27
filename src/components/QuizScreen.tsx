@@ -137,7 +137,7 @@ const QuizScreen: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
     try {
       const [qs, latest] = await Promise.all([
         trainingApi.fetchQuizQuestions(mod.id),
-        trainingApi.getLatestAttempt(employeeId, mod.id),
+        trainingApi.getLatestAttempt(mod.id),
       ]);
       setQuestions(qs);
       setLatestAttempt(latest);
