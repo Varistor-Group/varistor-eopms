@@ -35,8 +35,6 @@ const VideoPlayer: React.FC<Props> = ({ module: mod, onComplete, onBack }) => {
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { currentUser } = useVariPoints();
-
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(mod.progress?.watched_seconds ?? 0);
