@@ -271,7 +271,6 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
 
   // Mark each working day in the rejected leave period as Absent in attendance
   // NOTE: updateAttendance still comes from attendance.ts, not yet converted
-  import { getAttendanceByDate, updateAttendance, getEditableLedgerId } from './attendance';
 
 // ...
 

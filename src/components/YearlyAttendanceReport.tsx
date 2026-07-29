@@ -12,7 +12,6 @@ import {
   type EmployeeYearlySummary,
   type DayCode,
 } from '../api/attendance';
-import { getEmployeeBalances } from '../api/leaves';
 import * as XLSX from 'xlsx';
 import { API_URL } from '../config/api';
 
@@ -108,21 +107,11 @@ const EmployeeYearDetail: React.FC<{
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      getEmployeeBalances(employeeId),
-    ]).then(([balance]) => {
-      return getYearlyAttendanceReport(year, employeeId, balance);
-    }).then(r => {
+    getYearlyAttendanceReport(year, employeeId).then(r => {
       setReport(r);
       setLoading(false);
-    }).catch(() => {
-      getYearlyAttendanceReport(year, employeeId).then(r => {
-        setReport(r);
-        setLoading(false);
-      });
     });
   }, [employeeId, year]);
-
   function exportEmployeeExcel() {
     if (!report) return;
     const rows: Record<string, string>[] = [];
