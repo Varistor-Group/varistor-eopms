@@ -35,7 +35,7 @@ export const FieldPunch: React.FC = () => {
   const checkPunchStatus = async () => {
     if (!currentUser) return;
     try {
-      const status = await isFieldEmployeePunchedIn(currentUser.id);
+      const status = await isFieldEmployeePunchedIn();
       setIsPunchedIn(status);
     } catch (e) {
       console.error(e);

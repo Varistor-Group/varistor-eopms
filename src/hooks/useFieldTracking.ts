@@ -80,9 +80,9 @@ export function useFieldTracking(employeeId: string | null, isFieldEmployee: boo
       return;
     }
 
-    const checkPunchStatus = async () => {
+     const checkPunchStatus = async () => {
       try {
-        const isPunchedIn = await isFieldEmployeePunchedIn(employeeId);
+        const isPunchedIn = await isFieldEmployeePunchedIn();
         if (isPunchedIn) {
           startTracking();
         } else {
@@ -92,7 +92,7 @@ export function useFieldTracking(employeeId: string | null, isFieldEmployee: boo
         console.warn('Failed to check punch status', e);
       }
     };
-
+    
     checkPunchStatus();
     punchInterval = setInterval(checkPunchStatus, 30000); // Check every 30s
 

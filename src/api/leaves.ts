@@ -271,20 +271,27 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
 
   // Mark each working day in the rejected leave period as Absent in attendance
   // NOTE: updateAttendance still comes from attendance.ts, not yet converted
-  try {
+  import { getAttendanceByDate, updateAttendance, getEditableLedgerId } from './attendance';
+
+// ...
+
+try {
     const start = new Date(request.from + 'T00:00:00');
     const end = new Date(request.to + 'T00:00:00');
     const cursor = new Date(start);
     while (cursor <= end) {
       const dateStr = cursor.toISOString().split('T')[0];
       if (!isWeekend(dateStr) && !isHoliday(dateStr)) {
-        const ledgerId = `atl-${request.employeeId}-${dateStr}`;
-        await updateAttendance(
-          ledgerId,
-          { status: 'Absent' },
-          `Leave rejected: ${comment || 'No reason provided'}`,
-          reviewerName
-        );
+        const dayEntries = await getAttendanceByDate(dateStr);
+        const myEntry = dayEntries.find(e => e.employee_id === request.employeeId);
+        if (myEntry) {
+          const ledgerId = getEditableLedgerId(myEntry);
+          await updateAttendance(
+            ledgerId,
+            { status: 'Absent' },
+            `Leave rejected: ${comment || 'No reason provided'}`
+          );
+        }
       }
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -292,6 +299,5 @@ export async function rejectLeaveRequest(leaveId: string, reviewerName: string, 
     console.error('[rejectLeaveRequest] attendance update failed', e);
   }
 }
-
 export let mockLeaveRequests: LeaveRequest[] = [];
 export let mockLeaveBalances: LeaveBalance[] = [];

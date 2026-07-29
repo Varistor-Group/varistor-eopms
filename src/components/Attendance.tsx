@@ -1,3 +1,4 @@
+import { updateAttendance, getEditableLedgerId } from '../api/attendance';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ClipboardCheck, Users, Clock, Calendar, TrendingUp,
@@ -305,14 +306,13 @@ export const Attendance: React.FC = () => {
     }
     setSaving(true);
     const result = await updateAttendance(
-      editingEntry.id,
+      getEditableLedgerId(editingEntry),
       {
         punch_in: editPunchIn ? new Date(editPunchIn).toISOString() : undefined,
         punch_out: editPunchOut ? new Date(editPunchOut).toISOString() : undefined,
         status: editStatus,
       },
-      editReason,
-      activeUserId
+      editReason
     );
     setSaving(false);
     if (result.success) {
@@ -459,8 +459,6 @@ export const Attendance: React.FC = () => {
     if (!photoFile || !currentUser) return;
     setUploading(true);
     const result = await uploadFieldPhoto(
-      currentUser.id,
-      todayISO(),
       punchType,
       photoFile,
       faceConfidence ?? 70,
@@ -516,11 +514,10 @@ export const Attendance: React.FC = () => {
       addToast(result.error || 'Upload failed.', 0, 'debit');
     }
   }
-
-  // ── Field photo verification ──────────────────────────────────────────────
+// ── Field photo verification ──────────────────────────────────────────────
   async function handleVerify(photoId: string, status: 'Verified' | 'Rejected') {
     setVerifyingId(photoId);
-    const result = await verifyFieldPhoto(photoId, status, activeUserId);
+    const result = await verifyFieldPhoto(photoId, status);
     setVerifyingId(null);
     if (result.success) {
       addToast(`Photo ${status.toLowerCase()} successfully.`, 0, status === 'Verified' ? 'credit' : 'debit');
@@ -536,7 +533,7 @@ export const Attendance: React.FC = () => {
       addToast('Please fill in date and occasion.', 0, 'debit'); return;
     }
     setSavingHoliday(true);
-    const result = await addHoliday(holidayForm, activeUserId);
+    const result = await addHoliday(holidayForm);
     setSavingHoliday(false);
     if (result.success) {
       addToast('Holiday added. All employee attendance auto-marked.', 0, 'credit');
