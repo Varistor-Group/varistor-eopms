@@ -73,8 +73,29 @@ $routes = [
     ['PUT',  '#^/api/employees/(?P<id>[^/]+)$#',    'employees.php'],
     ['DELETE','#^/api/employees/(?P<id>[^/]+)$#',   'employees.php'],
 
-    // Documents
-    ['GET',  '#^/api/documents/(?P<employeeId>[^/]+)$#', 'documents.php'],
+   // Documents
+    ['GET',    '#^/api/documents/single/(?P<id>[^/]+)$#',      'documents.php'],
+    ['GET',    '#^/api/documents/(?P<id>[^/]+)/download$#',    'documents.php'],
+    ['PUT',    '#^/api/documents/(?P<id>[^/]+)/status$#',      'documents.php'],
+    ['PUT',    '#^/api/documents/(?P<id>[^/]+)$#',             'documents.php'],
+    ['POST',   '#^/api/documents$#',                           'documents.php'],
+    ['GET',    '#^/api/documents/(?P<employeeId>[^/]+)$#',     'documents.php'],
+
+    // Document Templates
+    ['GET',    '#^/api/document-templates$#',                  'document_templates.php'],
+    ['POST',   '#^/api/document-templates$#',                  'document_templates.php'],
+    ['PUT',    '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
+    ['DELETE', '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
+
+    // Employee Document Slots
+    ['GET',    '#^/api/employee-document-slots-pending-summary$#',                 'employee_document_slots.php'],
+    ['POST',   '#^/api/employee-document-slots/(?P<employeeId>[^/]+)/seed$#',      'employee_document_slots.php'],
+    ['GET',    '#^/api/employee-document-slots/(?P<employeeId>[^/]+)$#',           'employee_document_slots.php'],
+    ['POST',   '#^/api/employee-document-slots$#',                                 'employee_document_slots.php'],
+    ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)/link$#',              'employee_document_slots.php'],
+    ['PUT',    '#^/api/employee-document-slots/sync/(?P<templateId>[^/]+)$#',      'employee_document_slots.php'],
+    ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)$#',                   'employee_document_slots.php'],
+    ['DELETE', '#^/api/employee-document-slots/(?P<id>[^/]+)$#',                   'employee_document_slots.php'],
 
     // CL Balances
     ['GET',  '#^/api/cl-balances$#',                'cl_balances.php'],
@@ -85,7 +106,15 @@ $routes = [
     ['GET',  '#^/api/leaves$#',                     'leaves.php'],
     ['POST', '#^/api/leaves$#',                     'leaves.php'],
     ['PUT',  '#^/api/leaves/(?P<id>[^/]+)$#',       'leaves.php'],
+    
+    // Attendance Settings
+    ['GET', '#^/api/attendance-settings$#',              'attendance_settings.php'],
+    ['PUT', '#^/api/attendance-settings/(?P<key>[^/]+)$#', 'attendance_settings.php'],
 
+    // Attendance Self-Punch
+    ['POST', '#^/api/attendance/punch$#',        'attendance_punch.php'],
+    ['GET',  '#^/api/attendance/punch/status$#', 'attendance_punch.php'],
+    
     // Leave Types
     ['GET',    '#^/api/leave-types$#',                    'leave_types.php'],
     ['POST',   '#^/api/leave-types$#',                    'leave_types.php'],
