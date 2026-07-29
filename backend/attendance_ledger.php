@@ -34,7 +34,7 @@ function calcWorkHours($punchIn, $punchOut) {
 
 // GET /api/attendance-ledger/date/:date
 if ($method === 'GET' && $date !== null) {
-    $empStmt = $db->query('SELECT id, full_name, department FROM employees WHERE status != "Inactive"');
+    $empStmt = $db->query("SELECT id, full_name, department FROM employees WHERE status != 'Inactive'");
     $roster = $empStmt->fetchAll();
 
     $ledgerStmt = $db->prepare('SELECT * FROM attendance_ledger WHERE date = ?');
@@ -43,7 +43,16 @@ if ($method === 'GET' && $date !== null) {
     $ledgerMap = [];
     foreach ($ledgerRows as $row) $ledgerMap[$row['employee_id']] = $row;
 
-    $result = array_map(function ($emp) use ($ledgerMap, $date) {
+    $holCheckStmt = $db->prepare('SELECT id FROM holidays WHERE date = ? LIMIT 1');
+    $holCheckStmt->execute([$date]);
+    $isHoliday = (bool)$holCheckStmt->fetch();
+    $isSunday = date('N', strtotime($date)) == 7;
+
+    $fallbackStatus = 'Absent';
+    if ($isSunday) $fallbackStatus = 'W.O';
+    elseif ($isHoliday) $fallbackStatus = 'Holiday';
+
+    $result = array_map(function ($emp) use ($ledgerMap, $date, $fallbackStatus) {
         $row = $ledgerMap[$emp['id']] ?? null;
         if ($row) {
             return array_merge($row, [
@@ -51,7 +60,6 @@ if ($method === 'GET' && $date !== null) {
                 'department' => $emp['department'],
             ]);
         }
-        // Honest fallback: no record for this date = Absent, nothing fabricated.
         return [
             'id' => null,
             'employee_id' => $emp['id'],
@@ -61,7 +69,7 @@ if ($method === 'GET' && $date !== null) {
             'punch_in' => null,
             'punch_out' => null,
             'work_hours' => null,
-            'status' => 'Absent',
+            'status' => $fallbackStatus,
             'source' => 'none',
             'confidence' => null,
             'photo_url' => null,

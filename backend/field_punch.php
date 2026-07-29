@@ -1,136 +1,113 @@
 <?php
 /**
- * POST /api/attendance/field-punch   — Body: JSON { employeeId, date, punchType, photoUrl, confidenceScore, lat?, lng?, accuracy? }
- * GET  /api/attendance/field-punch/status?employeeId=...
+ * POST /api/attendance/field-punch          — multipart: photo (file), punchType, lat?, lng?, accuracy?, confidenceScore?
+ * GET  /api/attendance/field-punch/status    — punch status for the logged-in employee, today
+ *
+ * Employee identity is ALWAYS derived from the auth token, never trusted
+ * from client input — the original version trusted a client-supplied
+ * employeeId, meaning anyone could submit a punch/photo as any employee.
  */
 
-$method = $_SERVER['REQUEST_METHOD'];
+$db = get_db();
+$myId = currentEmployeeId();
+if ($myId === null) json_error('Unauthorized', 401);
 
+const FIELD_PHOTO_UPLOAD_BASE = __DIR__ . '/uploads/field-photos';
+const FIELD_PHOTO_URL_BASE = 'https://eopms.ytbhai.com/eopms-api/uploads/field-photos';
+const MAX_FIELD_PHOTO_BYTES = 8 * 1024 * 1024;
+
+function generateUuidV4(): string {
+    $data = random_bytes(16);
+    $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+    $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+function saveFieldPhoto($file, $employeeId) {
+    if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Upload failed (code ' . $file['error'] . ').');
+    if ($file['size'] > MAX_FIELD_PHOTO_BYTES) throw new Exception('Photo exceeds the 8MB limit.');
+
+    $dir = FIELD_PHOTO_UPLOAD_BASE . '/' . $employeeId;
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+    $safeName = time() . '_' . bin2hex(random_bytes(6)) . '.jpg';
+    $dest = $dir . '/' . $safeName;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) throw new Exception('Failed to save photo.');
+
+    $storagePath = $employeeId . '/' . $safeName;
+    return [$storagePath, FIELD_PHOTO_URL_BASE . '/' . $storagePath];
+}
+
+// GET /api/attendance/field-punch/status
 if ($method === 'GET') {
-    $employeeId = $_GET['employeeId'] ?? '';
-    if (!$employeeId) {
-        json_error('Employee ID required');
-    }
-    
-    $date = date('Y-m-d');
-    $ledgerId = "atl-{$employeeId}-{$date}";
-    
-    $data = read_db();
-    
-    $punchedIn = false;
-    foreach (($data['attendance_ledger'] ?? []) as $entry) {
-        if ($entry['id'] === $ledgerId && !empty($entry['punch_in']) && empty($entry['punch_out'])) {
-            $punchedIn = true;
-            break;
-        }
-    }
-    
+    $today = date('Y-m-d');
+    $stmt = $db->prepare('SELECT punch_in, punch_out FROM attendance_ledger WHERE employee_id = ? AND date = ? LIMIT 1');
+    $stmt->execute([$myId, $today]);
+    $row = $stmt->fetch();
+    $punchedIn = (bool)($row && !empty($row['punch_in']) && empty($row['punch_out']));
     json_ok(['punchedIn' => $punchedIn]);
 }
 
+// POST /api/attendance/field-punch
 if ($method === 'POST') {
-    // Accept JSON body (photo is already uploaded to Supabase Storage by the frontend)
-    $body = request_body();
+    if (empty($_FILES['photo']['name'])) json_error('Photo is required.', 422);
 
-    $employeeId     = $body['employeeId']     ?? '';
-    $date           = $body['date']           ?? date('Y-m-d');
-    $punchType      = $body['punchType']      ?? 'in';
-    $photoUrl       = $body['photoUrl']       ?? '';
-    $confidenceScore = (float)($body['confidenceScore'] ?? 0);
-    $lat      = isset($body['lat'])      ? (float)$body['lat']      : null;
-    $lng      = isset($body['lng'])      ? (float)$body['lng']      : null;
-    $accuracy = isset($body['accuracy']) ? (float)$body['accuracy'] : null;
+    $date = date('Y-m-d');
+    $punchType = $_POST['punchType'] ?? 'in';
+    $lat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
+    $lng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
+    $accuracy = isset($_POST['accuracy']) ? (float)$_POST['accuracy'] : null;
+    // Client-supplied — informational only for HR's review, never trusted as
+    // an actual verification signal. Real verification is the HR approve/reject
+    // step in field_photos_hr.php.
+    $confidenceScore = isset($_POST['confidenceScore']) ? (float)$_POST['confidenceScore'] : null;
 
-    if (!$employeeId) json_error('Missing employeeId');
-    if (!$photoUrl)   json_error('Missing photoUrl');
-    
-    // Load db.json safely
-    $data = read_db();
-    if (!isset($data['attendance_ledger'])) $data['attendance_ledger'] = [];
-    if (!isset($data['field_photos'])) $data['field_photos'] = [];
-    
-    $now = date('c');
-    
-    // Fetch employee name from Supabase — correct column is full_name
-    $empName = 'Unknown';
-    $empDept = 'Unknown';
-    $supaResponse = supabase_admin_get('/rest/v1/employees?id=eq.' . urlencode($employeeId) . '&select=full_name,department');
-    if (isset($supaResponse[0])) {
-        $empName = $supaResponse[0]['full_name'] ?? 'Unknown';
-        $empDept = $supaResponse[0]['department'] ?? 'Unknown';
+    try {
+        [$storagePath, $photoUrl] = saveFieldPhoto($_FILES['photo'], $myId);
+    } catch (Exception $e) {
+        json_error($e->getMessage(), 422);
     }
-    
-    // Save to field_photos
-    $photoEntry = [
-        'id' => 'fp-' . time() . rand(100, 999),
-        'employee_id' => $employeeId,
-        'employeeName' => $empName,
-        'department' => $empDept,
-        'date' => $date,
-        'photo_url' => $photoUrl,
-        'uploaded_at' => $now,
-        'punch_type' => $punchType,
-        'verification_status' => 'Pending',
-        'confidence_score' => $confidenceScore,
-        'latitude' => $lat,
-        'longitude' => $lng,
-        'location_accuracy' => $accuracy,
-        'punch_time' => $now,
-    ];
-    
-    $data['field_photos'][] = $photoEntry;
-    
-    // Upsert attendance_ledger
-    $ledgerId = "atl-{$employeeId}-{$date}";
-    $ledgerIdx = -1;
-    foreach ($data['attendance_ledger'] as $i => $entry) {
-        if ($entry['id'] === $ledgerId) {
-            $ledgerIdx = $i;
-            break;
-        }
-    }
-    
-    if ($ledgerIdx >= 0) {
-        $data['attendance_ledger'][$ledgerIdx]['status'] = 'Present';
-        $data['attendance_ledger'][$ledgerIdx]['source'] = 'field_photo';
-        $data['attendance_ledger'][$ledgerIdx]['photo_url'] = $photoUrl;
-        $data['attendance_ledger'][$ledgerIdx]['confidence'] = $confidenceScore;
+
+    $now = date('Y-m-d H:i:s');
+
+    $photoId = generateUuidV4();
+    $db->prepare(
+        'INSERT INTO field_attendance_photos
+         (id, employee_id, date, photo_url, storage_path, punch_type, verification_status, confidence_score, latitude, longitude, location_accuracy, punch_time)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$photoId, $myId, $date, $photoUrl, $storagePath, $punchType, 'Pending', $confidenceScore, $lat, $lng, $accuracy, $now]);
+
+    $find = $db->prepare('SELECT * FROM attendance_ledger WHERE employee_id = ? AND date = ? LIMIT 1');
+    $find->execute([$myId, $date]);
+    $existing = $find->fetch();
+
+    if ($existing) {
         if ($punchType === 'in') {
-            $data['attendance_ledger'][$ledgerIdx]['punch_in'] = $now;
+            $db->prepare('UPDATE attendance_ledger SET punch_in = ?, status = ?, source = ?, photo_url = ?, confidence = ? WHERE id = ?')
+               ->execute([$now, 'Present', 'field_photo', $photoUrl, $confidenceScore, $existing['id']]);
         } else {
-            $data['attendance_ledger'][$ledgerIdx]['punch_out'] = $now;
-            // Calculate work hours if punch_in exists
-            if (!empty($data['attendance_ledger'][$ledgerIdx]['punch_in'])) {
-                $inTime = strtotime($data['attendance_ledger'][$ledgerIdx]['punch_in']);
-                $outTime = strtotime($now);
-                $data['attendance_ledger'][$ledgerIdx]['work_hours'] = round(($outTime - $inTime) / 3600, 2);
-            }
+            $workHours = !empty($existing['punch_in'])
+                ? round((strtotime($now) - strtotime($existing['punch_in'])) / 3600, 2)
+                : null;
+            $db->prepare('UPDATE attendance_ledger SET punch_out = ?, photo_url = ?, work_hours = ? WHERE id = ?')
+               ->execute([$now, $photoUrl, $workHours, $existing['id']]);
         }
     } else {
-        $newLedger = [
-            'id' => $ledgerId,
-            'employee_id' => $employeeId,
-            'employeeName' => $empName,
-            'department' => $empDept,
-            'date' => $date,
-            'status' => 'Present',
-            'source' => 'field_photo',
-            'photo_url' => $photoUrl,
-            'confidence' => $confidenceScore,
-            'created_at' => $now,
-            'is_field_employee' => true,
-        ];
+        $newId = generateUuidV4();
         if ($punchType === 'in') {
-            $newLedger['punch_in'] = $now;
+            $db->prepare(
+                'INSERT INTO attendance_ledger (id, employee_id, date, status, source, photo_url, confidence, is_field_employee, punch_in)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)'
+            )->execute([$newId, $myId, $date, 'Present', 'field_photo', $photoUrl, $confidenceScore, $now]);
         } else {
-            $newLedger['punch_out'] = $now;
+            $db->prepare(
+                'INSERT INTO attendance_ledger (id, employee_id, date, status, source, photo_url, is_field_employee, punch_out)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
+            )->execute([$newId, $myId, $date, 'Present', 'field_photo', $photoUrl, $now]);
         }
-        $data['attendance_ledger'][] = $newLedger;
     }
-    
-    write_db($data);
-    
+
     json_ok(['success' => true, 'photoUrl' => $photoUrl]);
 }
 
-json_error('Method not allowed', 405);
+json_error("Method not allowed: {$method}", 405);

@@ -8,6 +8,9 @@
  * POST /api/attendance/force-resync
  */
 
+$myId = currentEmployeeId();
+if ($myId === null) json_error('Unauthorized', 401);
+
 if (strpos($path, 'device-status') !== false) {
     json_ok([
         'ipAddress'     => '192.168.1.42',
