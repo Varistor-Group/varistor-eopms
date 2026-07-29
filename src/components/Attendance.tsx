@@ -1,4 +1,3 @@
-import { updateAttendance, getEditableLedgerId } from '../api/attendance';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ClipboardCheck, Users, Clock, Calendar, TrendingUp,
@@ -16,6 +15,7 @@ import {
   getAttendanceByDate,
   getAttendanceByEmployee,
   updateAttendance,
+  getEditableLedgerId,
   getMonthlyReport,
   getHolidays,
   addHoliday,
