@@ -41,7 +41,20 @@ $routes = [
 
     ['GET',    '#^/api/quiz-attempts/latest/(?P<moduleId>[^/]+)$#', 'quiz_attempts.php'],
     ['POST',   '#^/api/quiz-attempts$#',                       'quiz_attempts.php'],
-
+    // Attendance Monthly Report
+    ['GET', '#^/api/attendance-monthly-report/(?P<month>[^/]+)$#', 'attendance_monthly_report.php'],
+    // Attendance Yearly Reports
+    ['GET', '#^/api/attendance-yearly-report/(?P<year>[^/]+)/(?P<employeeId>[^/]+)$#', 'attendance_yearly_report.php'],
+    ['GET', '#^/api/attendance-yearly-summary/(?P<year>[^/]+)$#',                      'attendance_yearly_summaries.php'],
+    // Holidays
+    ['GET',    '#^/api/holidays/(?P<year>[^/]+)$#', 'holidays.php'],
+    ['POST',   '#^/api/holidays$#',                 'holidays.php'],
+    ['DELETE', '#^/api/holidays/(?P<id>[^/]+)$#',   'holidays.php'],
+    // Field Attendance
+    ['POST', '#^/api/attendance/field-punch$#',          'field_punch.php'],
+    ['GET',  '#^/api/attendance/field-punch/status$#',   'field_punch.php'],
+    ['GET',  '#^/api/attendance/field-photos/pending$#', 'field_photos_hr.php'],
+    ['POST', '#^/api/attendance/field-photos/verify$#',  'field_photos_hr.php'],
     // Email
     ['POST', '#^/api/send-credentials$#',          'send_credentials.php'],
     ['POST', '#^/api/send-password-reset$#',        'send_password_reset.php'],
@@ -86,6 +99,9 @@ $routes = [
     ['POST',   '#^/api/document-templates$#',                  'document_templates.php'],
     ['PUT',    '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
     ['DELETE', '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
+    // Attendance Edits & Field History
+    ['GET', '#^/api/attendance-edits$#',         'attendance_edits.php'],
+    ['GET', '#^/api/field-attendance-history$#', 'field_attendance_history.php'],
 
     // Employee Document Slots
     ['GET',    '#^/api/employee-document-slots-pending-summary$#',                 'employee_document_slots.php'],

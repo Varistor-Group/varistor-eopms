@@ -1,66 +1,58 @@
 <?php
 /**
- * GET /api/attendance/field-photos/pending
- * POST /api/attendance/field-photos/verify
+ * GET  /api/attendance/field-photos/pending   — all pending field photo verifications (HR/Admin)
+ * POST /api/attendance/field-photos/verify    — verify or reject one (HR/Admin)
  */
 
-$method = $_SERVER['REQUEST_METHOD'];
-$dbStr = file_get_contents(DB_PATH);
-$data = json_decode($dbStr, true);
+$db = get_db();
+$myId = currentEmployeeId();
+if ($myId === null) json_error('Unauthorized', 401);
 
+// GET /api/attendance/field-photos/pending
 if ($method === 'GET') {
-    $pending = [];
-    foreach (($data['field_photos'] ?? []) as $photo) {
-        if (($photo['verification_status'] ?? '') === 'Pending') {
-            $pending[] = $photo;
-        }
-    }
-    json_ok($pending);
+    requireRole(['HR', 'Admin']);
+    $stmt = $db->query(
+        "SELECT p.*, e.full_name AS employeeName, e.department
+         FROM field_attendance_photos p
+         JOIN employees e ON e.id = p.employee_id
+         WHERE p.verification_status = 'Pending'
+         ORDER BY p.uploaded_at ASC"
+    );
+    json_ok($stmt->fetchAll());
 }
 
+// POST /api/attendance/field-photos/verify
 if ($method === 'POST') {
-    $body = request_body();
-    $photoId = $body['photoId'] ?? '';
-    $status = $body['status'] ?? '';
-    $verifiedBy = $body['verifiedBy'] ?? 'System';
-    
-    if (!$photoId || !in_array($status, ['Verified', 'Rejected'])) {
-        json_error('Invalid input');
+    requireRole(['HR', 'Admin']);
+    $input = request_body();
+    $photoId = $input['photoId'] ?? '';
+    $status = $input['status'] ?? '';
+    if ($photoId === '' || !in_array($status, ['Verified', 'Rejected'], true)) {
+        json_error('Invalid input.', 422);
     }
-    
-    $photoIdx = -1;
-    foreach ($data['field_photos'] as $i => $photo) {
-        if ($photo['id'] === $photoId) {
-            $photoIdx = $i;
-            break;
-        }
-    }
-    
-    if ($photoIdx < 0) {
-        json_error('Photo record not found');
-    }
-    
-    $photo = $data['field_photos'][$photoIdx];
-    $data['field_photos'][$photoIdx]['verification_status'] = $status;
-    $data['field_photos'][$photoIdx]['verified_by'] = $verifiedBy;
-    $data['field_photos'][$photoIdx]['verified_at'] = date('c');
-    
-    // If rejected, mark ledger as Absent
+
+    $find = $db->prepare('SELECT * FROM field_attendance_photos WHERE id = ? LIMIT 1');
+    $find->execute([$photoId]);
+    $photo = $find->fetch();
+    if (!$photo) json_error('Photo record not found.', 404);
+
+    $db->prepare(
+        'UPDATE field_attendance_photos SET verification_status = ?, verified_by = ?, verified_at = NOW() WHERE id = ?'
+    )->execute([$status, $myId, $photoId]);
+
     if ($status === 'Rejected') {
-        $ledgerId = "atl-{$photo['employee_id']}-{$photo['date']}";
-        foreach ($data['attendance_ledger'] as $i => $ledger) {
-            if ($ledger['id'] === $ledgerId) {
-                $data['attendance_ledger'][$i]['status'] = 'Absent';
-                $data['attendance_ledger'][$i]['override_reason'] = 'Field photo rejected by HR';
-                $data['attendance_ledger'][$i]['editor_id'] = $verifiedBy;
-                $data['attendance_ledger'][$i]['edited_at'] = date('c');
-                break;
-            }
+        $ledgerStmt = $db->prepare('SELECT id FROM attendance_ledger WHERE employee_id = ? AND date = ? LIMIT 1');
+        $ledgerStmt->execute([$photo['employee_id'], $photo['date']]);
+        $ledger = $ledgerStmt->fetch();
+
+        if ($ledger) {
+            $db->prepare(
+                'UPDATE attendance_ledger SET status = ?, override_reason = ?, editor_id = ?, edited_at = NOW() WHERE id = ?'
+            )->execute(['Absent', 'Field photo rejected by HR', $myId, $ledger['id']]);
         }
     }
-    
-    file_put_contents(DB_PATH, json_encode($data, JSON_PRETTY_PRINT));
+
     json_ok(['success' => true]);
 }
 
-json_error('Method not allowed', 405);
+json_error("Method not allowed: {$method}", 405);
