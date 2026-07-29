@@ -42,14 +42,12 @@ export async function uploadDocument(
 ): Promise<{ success: boolean; document?: VaultDocument; error: string | null }> {
   try {
     const key = await getMasterKey();
-    const encryptedBlob = await encryptFile(file, key);
+      const encryptedBlob = await encryptFile(file, key);
+      const blob = new Blob([encryptedBlob], { type: 'application/octet-stream' });
 
-    const formData = new FormData();
-    formData.append('employeeId', employeeId);
-    // Keep the original filename on the encrypted blob so the backend can
-    // still derive type/extension from it — mirrors the old `.enc` naming.
-    formData.append('file', encryptedBlob, `${file.name}.enc`);
-
+      const formData = new FormData();
+      formData.append('employeeId', employeeId); // (only in uploadDocument, not updateDocumentFile)
+      formData.append('file', blob, `${file.name}.enc`);
     const res = await apiFetch('/api/documents', {
       method: 'POST',
       body: formData,
@@ -73,10 +71,11 @@ export async function updateDocumentFile(
 ): Promise<{ success: boolean; document?: VaultDocument; error: string | null }> {
   try {
     const key = await getMasterKey();
-    const encryptedBlob = await encryptFile(file, key);
+      const encryptedBlob = await encryptFile(file, key);
+      const blob = new Blob([encryptedBlob], { type: 'application/octet-stream' });
 
-    const formData = new FormData();
-    formData.append('file', encryptedBlob, `${file.name}.enc`);
+      const formData = new FormData();
+      formData.append('file', blob, `${file.name}.enc`);
 
     const res = await apiFetch(`/api/documents/${documentId}`, {
       method: 'PUT',
@@ -141,7 +140,18 @@ export async function updateDocumentStatus(
   if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to update status.' };
   return { success: true, error: null };
 }
-
+export async function trackDocumentAction(action: string, documentId: string): Promise<boolean> {
+  try {
+    const res = await apiFetch('/api/activity', {
+      method: 'POST',
+      body: JSON.stringify({ action, details: `Document action: ${action}`, metadata: { documentId } }),
+    });
+    const result = await res.json().catch(() => null);
+    return !!result?.success;
+  } catch {
+    return false;
+  }
+}
 // ===========================================================================
 // TEMPLATE MANAGEMENT (HR/Admin)
 // ===========================================================================
