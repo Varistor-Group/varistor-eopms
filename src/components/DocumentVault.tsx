@@ -326,7 +326,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
 
   const handleView = async () => {
     if (!slot.documentId) return;
-    trackDocumentAction('hr@varistor.in', 'View', slot.documentId);
+    trackDocumentAction('View', slot.documentId);
     addToast('Decrypting...', 0, 'credit');
     const res = await downloadDecryptedDocument(slot.documentId);
     if (res.success && res.blob) { const url = URL.createObjectURL(res.blob); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 10000); }
@@ -335,13 +335,12 @@ const SlotCard: React.FC<SlotCardProps> = ({
 
   const handleDownload = async () => {
     if (!slot.documentId) return;
-    trackDocumentAction('hr@varistor.in', 'Download', slot.documentId);
+    trackDocumentAction('Download', slot.documentId);
     addToast('Decrypting...', 0, 'credit');
     const res = await downloadDecryptedDocument(slot.documentId);
     if (res.success && res.blob) { const url = URL.createObjectURL(res.blob); const a = document.createElement('a'); a.href = url; a.download = res.filename ?? 'document'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
     else { addToast(res.error ?? 'Failed', 0, 'debit'); }
   };
-
   const handleSaveNotes = async () => {
     setSavingNotes(true);
     const res = await updateSlotNotes(slot.id, editNotes);
