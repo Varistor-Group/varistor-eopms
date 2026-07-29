@@ -7,6 +7,8 @@
  * Body: { rows: [], month: string, type: 'daily'|'monthly'|'yearly' }
  * Response: application/pdf binary
  */
+$myId = currentEmployeeId();
+if ($myId === null) json_error('Unauthorized', 401);
 
 $body  = request_body();
 $rows  = $body['rows']  ?? [];

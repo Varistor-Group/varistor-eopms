@@ -1,14 +1,14 @@
 /**
- * VAULT SERVICE - Supabase Storage + Database
- * Replaces Express server + local file system.
- * Documents are encrypted client-side before upload, decrypted on download.
+ * VAULT SERVICE — MySQL (via PHP backend) + real file storage
+ * Converted from Supabase Storage + Database. Documents are still encrypted
+ * client-side before upload / decrypted after download — that logic
+ * (encryptFile/decryptFile/getMasterKey) is UNCHANGED. Only the storage
+ * layer (where encrypted bytes and metadata live) changed.
  */
 
-import { supabase } from '../lib/supabase';
+import { apiFetch } from './httpClient';
 import type { DocumentStatus, DocumentTemplate, EmployeeDocumentSlot } from '../types';
 import { encryptFile, decryptFile, getMasterKey } from '../utils/crypto';
-
-const BUCKET = 'employee-documents';
 
 export interface VaultDocument {
   id: string;
@@ -21,32 +21,21 @@ export interface VaultDocument {
   filename?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToDoc(row: any): VaultDocument {
-  return {
-    id: row.id,
-    name: row.filename,
-    filename: row.filename,
-    type: row.type,
-    size: row.size,
-    status: row.status as DocumentStatus,
-    url: '#',
-    storagePath: row.storage_path,
-  };
-}
+// ─── Fetch ────────────────────────────────────────────────────────────────
 
-// Fetch
 export async function getVaultDocuments(employeeId: string): Promise<VaultDocument[]> {
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('employee_id', employeeId)
-    .order('created_at', { ascending: false });
-  if (error) { console.error('[getVaultDocuments]', error.message); return []; }
-  return (data ?? []).map(rowToDoc);
+  try {
+    const res = await apiFetch(`/api/documents/${employeeId}`);
+    if (!res.ok) { console.error('[getVaultDocuments]', res.statusText); return []; }
+    return await res.json();
+  } catch (err) {
+    console.error('[getVaultDocuments]', err);
+    return [];
+  }
 }
 
-// Upload
+// ─── Upload ───────────────────────────────────────────────────────────────
+
 export async function uploadDocument(
   employeeId: string,
   file: File
@@ -54,139 +43,102 @@ export async function uploadDocument(
   try {
     const key = await getMasterKey();
     const encryptedBlob = await encryptFile(file, key);
-    const storagePath = `${employeeId}/${Date.now()}_${file.name}.enc`;
-    const { error: uploadErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, encryptedBlob, { contentType: 'application/octet-stream', upsert: false });
-    if (uploadErr) return { success: false, error: uploadErr.message };
-    const { data: doc, error: dbErr } = await supabase
-      .from('documents')
-      .insert({
-        employee_id: employeeId,
-        filename: file.name,
-        type: file.name.split('.').pop()?.toUpperCase() || 'DOCUMENT',
-        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
-        status: 'Pending',
-        storage_path: storagePath,
-      })
-      .select()
-      .single();
-    if (dbErr) return { success: false, error: dbErr.message };
-    await supabase.from('activity_log').insert({
-      action: 'document_uploaded',
-      performed_by: employeeId,
-      details: `Uploaded document ${file.name}`,
-      metadata: { documentId: doc.id },
+
+    const formData = new FormData();
+    formData.append('employeeId', employeeId);
+    // Keep the original filename on the encrypted blob so the backend can
+    // still derive type/extension from it — mirrors the old `.enc` naming.
+    formData.append('file', encryptedBlob, `${file.name}.enc`);
+
+    const res = await apiFetch('/api/documents', {
+      method: 'POST',
+      body: formData,
+      isMultipart: true,
     });
-    return { success: true, document: rowToDoc(doc), error: null };
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result) return { success: false, error: result?.error || 'Upload failed.' };
+
+    return { success: true, document: result, error: null };
   } catch (err) {
     console.error('[uploadDocument]', err);
     return { success: false, error: 'Upload failed.' };
   }
 }
 
-// Replace / Update file
+// ─── Replace / Update file ──────────────────────────────────────────────────
+
 export async function updateDocumentFile(
   documentId: string,
   file: File
 ): Promise<{ success: boolean; document?: VaultDocument; error: string | null }> {
   try {
-    const { data: existing } = await supabase
-      .from('documents')
-      .select('storage_path, employee_id')
-      .eq('id', documentId)
-      .single();
-    if (!existing) return { success: false, error: 'Document not found.' };
-    if (existing.storage_path) {
-      await supabase.storage.from(BUCKET).remove([existing.storage_path]);
-    }
     const key = await getMasterKey();
     const encryptedBlob = await encryptFile(file, key);
-    const newPath = `${existing.employee_id}/${Date.now()}_${file.name}.enc`;
-    const { error: uploadErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(newPath, encryptedBlob, { contentType: 'application/octet-stream', upsert: false });
-    if (uploadErr) return { success: false, error: uploadErr.message };
-    const { data: updated, error: dbErr } = await supabase
-      .from('documents')
-      .update({
-        filename: file.name,
-        type: file.name.split('.').pop()?.toUpperCase() || 'DOCUMENT',
-        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
-        status: 'Pending',
-        storage_path: newPath,
-      })
-      .eq('id', documentId)
-      .select()
-      .single();
-    if (dbErr) return { success: false, error: dbErr.message };
-    return { success: true, document: rowToDoc(updated), error: null };
+
+    const formData = new FormData();
+    formData.append('file', encryptedBlob, `${file.name}.enc`);
+
+    const res = await apiFetch(`/api/documents/${documentId}`, {
+      method: 'PUT',
+      body: formData,
+      isMultipart: true,
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result) return { success: false, error: result?.error || 'Update failed.' };
+
+    return { success: true, document: result, error: null };
   } catch (err) {
     console.error('[updateDocumentFile]', err);
     return { success: false, error: 'Update failed.' };
   }
 }
 
-// Download (decrypt)
+// ─── Download (decrypt) ──────────────────────────────────────────────────────
+
 export async function downloadDecryptedDocument(
   documentId: string
 ): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
   try {
-    const { data: doc } = await supabase
-      .from('documents')
-      .select('storage_path, filename')
-      .eq('id', documentId)
-      .single();
-    if (!doc) return { success: false, error: 'Document not found.' };
-    const { data: fileData, error: downloadErr } = await supabase.storage
-      .from(BUCKET)
-      .download(doc.storage_path ?? '');
-    if (downloadErr || !fileData) return { success: false, error: 'Download failed.' };
+    // Need the filename for the decrypted result — fetch metadata first.
+    // NOTE: this costs one extra request vs. the original (which had the
+    // filename from a single `.select('storage_path, filename')` call before
+    // downloading). Acceptable trade-off since the backend now serves the
+    // raw encrypted stream directly rather than a queryable row + blob.
+   const metaRes = await apiFetch(`/api/documents/single/${documentId}`);
+    // ^ NOTE: this endpoint doesn't exist as a single-document GET yet —
+    // see flag below.
+
+    const fileRes = await apiFetch(`/api/documents/${documentId}/download`);
+    if (!fileRes.ok) return { success: false, error: 'Download failed.' };
+
     const key = await getMasterKey();
-    const ext = doc.filename.split('.').pop()?.toLowerCase() ?? '';
+    const meta = await metaRes.json().catch(() => null);
+    const filename = meta?.filename ?? meta?.name ?? 'document';
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
     const mimeTypes: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
     const mimeType = mimeTypes[ext] ?? 'application/octet-stream';
-    const encryptedPayload = await fileData.text();
+
+    const encryptedPayload = await fileRes.text();
     const decryptedBlob = await decryptFile(encryptedPayload, key, mimeType);
-    return { success: true, blob: decryptedBlob, filename: doc.filename };
+    return { success: true, blob: decryptedBlob, filename };
   } catch (err) {
     console.error('[downloadDecryptedDocument]', err);
     return { success: false, error: 'Decryption failed.' };
   }
 }
 
-// Track activity
-export async function trackDocumentAction(
-  userEmail: string,
-  action: string,
-  documentId: string
-): Promise<boolean> {
-  const { error } = await supabase.from('activity_log').insert({
-    action,
-    performed_by: userEmail,
-    details: `Document action: ${action}`,
-    metadata: { documentId },
-  });
-  return !error;
-}
+// ─── Update status (HR/Admin) ────────────────────────────────────────────────
 
-// Update status (HR/Admin)
 export async function updateDocumentStatus(
   documentId: string,
-  newStatus: DocumentStatus,
-  performedBy: string = 'hr@varistor.in'
+  newStatus: DocumentStatus
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('documents')
-    .update({ status: newStatus })
-    .eq('id', documentId);
-  if (error) return { success: false, error: error.message };
-  await supabase.from('activity_log').insert({
-    action: 'document_status_changed',
-    performed_by: performedBy,
-    details: `Document ${documentId} status changed to ${newStatus}`,
-    metadata: { documentId, newStatus },
+  const res = await apiFetch(`/api/documents/${documentId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: newStatus }),
   });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to update status.' };
   return { success: true, error: null };
 }
 
@@ -194,26 +146,15 @@ export async function updateDocumentStatus(
 // TEMPLATE MANAGEMENT (HR/Admin)
 // ===========================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToTemplate(row: any): DocumentTemplate {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? '',
-    isRequired: row.is_required,
-    isActive: row.is_active,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-  };
-}
-
 export async function getDocumentTemplates(): Promise<DocumentTemplate[]> {
-  const { data, error } = await supabase
-    .from('document_templates')
-    .select('*')
-    .order('sort_order', { ascending: true });
-  if (error) { console.error('[getDocumentTemplates]', error.message); return []; }
-  return (data ?? []).map(rowToTemplate);
+  try {
+    const res = await apiFetch('/api/document-templates');
+    if (!res.ok) { console.error('[getDocumentTemplates]', res.statusText); return []; }
+    return await res.json();
+  } catch (err) {
+    console.error('[getDocumentTemplates]', err);
+    return [];
+  }
 }
 
 export async function createDocumentTemplate(
@@ -221,42 +162,34 @@ export async function createDocumentTemplate(
   description: string,
   isRequired: boolean
 ): Promise<{ success: boolean; template?: DocumentTemplate; error: string | null }> {
-  const { data, error } = await supabase
-    .from('document_templates')
-    .insert({ name: name.trim(), description: description.trim(), is_required: isRequired, is_active: true })
-    .select()
-    .single();
-  if (error) return { success: false, error: error.message };
-  return { success: true, template: rowToTemplate(data), error: null };
+  const res = await apiFetch('/api/document-templates', {
+    method: 'POST',
+    body: JSON.stringify({ name: name.trim(), description: description.trim(), isRequired }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result) return { success: false, error: result?.error || 'Failed to create template.' };
+  return { success: true, template: result, error: null };
 }
 
 export async function updateDocumentTemplate(
   templateId: string,
   patch: Partial<{ isRequired: boolean; isActive: boolean; name: string; description: string }>
 ): Promise<{ success: boolean; template?: DocumentTemplate; error: string | null }> {
-  const dbPatch: Record<string, unknown> = {};
-  if (patch.isRequired !== undefined) dbPatch.is_required = patch.isRequired;
-  if (patch.isActive !== undefined)   dbPatch.is_active   = patch.isActive;
-  if (patch.name !== undefined)       dbPatch.name        = patch.name;
-  if (patch.description !== undefined) dbPatch.description = patch.description;
-  const { data, error } = await supabase
-    .from('document_templates')
-    .update(dbPatch as any)
-    .eq('id', templateId)
-    .select()
-    .single();
-  if (error) return { success: false, error: error.message };
-  return { success: true, template: rowToTemplate(data), error: null };
+  const res = await apiFetch(`/api/document-templates/${templateId}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result) return { success: false, error: result?.error || 'Failed to update template.' };
+  return { success: true, template: result, error: null };
 }
 
 export async function deleteDocumentTemplate(
   templateId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('document_templates')
-    .delete()
-    .eq('id', templateId);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/document-templates/${templateId}`, { method: 'DELETE' });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to delete template.' };
   return { success: true, error: null };
 }
 
@@ -264,41 +197,23 @@ export async function deleteDocumentTemplate(
 // EMPLOYEE DOCUMENT SLOTS
 // ===========================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToSlot(row: any): EmployeeDocumentSlot {
-  return {
-    id: row.id,
-    employeeId: row.employee_id,
-    templateId: row.template_id ?? undefined,
-    documentName: row.document_name,
-    isRequired: row.is_required,
-    isCustom: row.is_custom,
-    documentId: row.document_id ?? undefined,
-    filename: row.documents?.filename ?? undefined,
-    storagePath: row.documents?.storage_path ?? undefined,
-    status: (row.status ?? 'Pending') as DocumentStatus,
-    notes: row.notes ?? '',
-    createdAt: row.created_at,
-  };
-}
-
-export async function getEmployeeDocumentSlots(
-  employeeId: string
-): Promise<EmployeeDocumentSlot[]> {
-  const { data, error } = await supabase
-    .from('employee_document_slots')
-    .select('*, documents(filename, storage_path)')
-    .eq('employee_id', employeeId)
-    .order('created_at', { ascending: true });
-  if (error) { console.error('[getEmployeeDocumentSlots]', error.message); return []; }
-  return (data ?? []).map(rowToSlot);
+export async function getEmployeeDocumentSlots(employeeId: string): Promise<EmployeeDocumentSlot[]> {
+  try {
+    const res = await apiFetch(`/api/employee-document-slots/${employeeId}`);
+    if (!res.ok) { console.error('[getEmployeeDocumentSlots]', res.statusText); return []; }
+    return await res.json();
+  } catch (err) {
+    console.error('[getEmployeeDocumentSlots]', err);
+    return [];
+  }
 }
 
 export async function seedEmployeeSlots(
   employeeId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase.rpc('seed_employee_document_slots' as any, { p_employee_id: employeeId });
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/${employeeId}/seed`, { method: 'POST' });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to seed slots.' };
   return { success: true, error: null };
 }
 
@@ -308,50 +223,38 @@ export async function addCustomSlotForEmployee(
   isRequired: boolean,
   notes?: string
 ): Promise<{ success: boolean; slot?: EmployeeDocumentSlot; error: string | null }> {
-  const { data, error } = await supabase
-    .from('employee_document_slots')
-    .insert({
-      employee_id: employeeId,
-      template_id: null,
-      document_name: documentName.trim(),
-      is_required: isRequired,
-      is_custom: true,
-      notes: notes?.trim() ?? '',
-    })
-    .select('*, documents(filename, storage_path)')
-    .single();
-  if (error) return { success: false, error: error.message };
-  return { success: true, slot: rowToSlot(data), error: null };
+  const res = await apiFetch('/api/employee-document-slots', {
+    method: 'POST',
+    body: JSON.stringify({ employeeId, documentName: documentName.trim(), isRequired, notes: notes?.trim() ?? '' }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result) return { success: false, error: result?.error || 'Failed to add slot.' };
+  return { success: true, slot: result, error: null };
 }
 
 export async function updateSlotRequirement(
   slotId: string,
   isRequired: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .update({ is_required: isRequired })
-    .eq('id', slotId);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/${slotId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ isRequired }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to update requirement.' };
   return { success: true, error: null };
 }
 
 export async function updateSlotStatus(
   slotId: string,
-  status: DocumentStatus,
-  performedBy: string = 'hr@varistor.in'
+  status: DocumentStatus
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .update({ status })
-    .eq('id', slotId);
-  if (error) return { success: false, error: error.message };
-  await supabase.from('activity_log').insert({
-    action: 'slot_status_changed',
-    performed_by: performedBy,
-    details: `Document slot ${slotId} status changed to ${status}`,
-    metadata: { slotId, status },
+  const res = await apiFetch(`/api/employee-document-slots/${slotId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
   });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to update status.' };
   return { success: true, error: null };
 }
 
@@ -359,23 +262,21 @@ export async function updateSlotNotes(
   slotId: string,
   notes: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .update({ notes })
-    .eq('id', slotId);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/${slotId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ notes }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to update notes.' };
   return { success: true, error: null };
 }
 
 export async function removeCustomSlot(
   slotId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .delete()
-    .eq('id', slotId)
-    .eq('is_custom', true);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/${slotId}`, { method: 'DELETE' });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to remove slot.' };
   return { success: true, error: null };
 }
 
@@ -383,55 +284,36 @@ export async function linkDocumentToSlot(
   slotId: string,
   documentId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .update({ document_id: documentId, status: 'Pending' })
-    .eq('id', slotId);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/${slotId}/link`, {
+    method: 'PUT',
+    body: JSON.stringify({ documentId }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to link document.' };
   return { success: true, error: null };
 }
 
-/**
- * When HR changes is_required on a template, propagate to ALL slots derived
- * from that template (non-custom only, so per-employee overrides are kept).
- */
 export async function syncTemplateSlotsRequirement(
   templateId: string,
   isRequired: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  const { error } = await supabase
-    .from('employee_document_slots')
-    .update({ is_required: isRequired })
-    .eq('template_id', templateId)
-    .eq('is_custom', false);
-  if (error) return { success: false, error: error.message };
+  const res = await apiFetch(`/api/employee-document-slots/sync/${templateId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ isRequired }),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result?.success) return { success: false, error: result?.error || 'Failed to sync requirement.' };
   return { success: true, error: null };
 }
 
-export async function getEmployeesWithPendingDocuments(): Promise<{ pending: Set<string>, seeded: Set<string> }> {
-  const { data, error } = await supabase
-    .from('employee_document_slots')
-    .select('employee_id, document_id, status, is_required');
-
-  if (error) {
-    console.error('[getEmployeesWithPendingDocuments]', error.message);
+export async function getEmployeesWithPendingDocuments(): Promise<{ pending: Set<string>; seeded: Set<string> }> {
+  try {
+    const res = await apiFetch('/api/employee-document-slots-pending-summary');
+    if (!res.ok) { console.error('[getEmployeesWithPendingDocuments]', res.statusText); return { pending: new Set(), seeded: new Set() }; }
+    const data = await res.json();
+    return { pending: new Set(data.pending ?? []), seeded: new Set(data.seeded ?? []) };
+  } catch (err) {
+    console.error('[getEmployeesWithPendingDocuments]', err);
     return { pending: new Set(), seeded: new Set() };
   }
-  
-  const seededSet = new Set<string>();
-  const unverifiedCounts: Record<string, number> = {};
-  
-  for (const row of (data || [])) {
-    seededSet.add(row.employee_id);
-    if (row.is_required && (!row.document_id || row.status !== 'Verified')) {
-      unverifiedCounts[row.employee_id] = (unverifiedCounts[row.employee_id] || 0) + 1;
-    }
-  }
-  
-  const pendingSet = new Set<string>();
-  for (const [empId, count] of Object.entries(unverifiedCounts)) {
-    if (count > 0) pendingSet.add(empId);
-  }
-  
-  return { pending: pendingSet, seeded: seededSet };
 }
