@@ -4,6 +4,7 @@ import { updateEmployee, getDepartments, getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
 import type { UserRole } from '../types';
 import { useVariPoints } from '../hooks/useVariPoints';
+import { updateEmployee, getDepartments, addDepartment, getEmployees } from '../api/employees';
 
 interface FieldProps {
   label: string;
@@ -41,11 +42,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       setManagerOptions(all.filter(e => e.id !== employee.id));
     });
   }, [employee.id]);
+  
+  const [deps, setDeps] = useState<string[]>(getDepartments());
 
   const [form, setForm] = useState({
     fullName: employee.fullName,
     phone: employee.phone,
     department: employee.department,
+    designation: employee.designation || '',
     reportingManagerId: employee.reportingManagerId || '',
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
@@ -68,7 +72,21 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     setForm(prev => ({ ...prev, [field]: e.target.value }));
     setErrors(prev => ({ ...prev, [field]: '' }));
   };
-
+  const handleDepartmentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const val = e.target.value;
+      if (val === '___ADD_NEW___') {
+        const newDept = window.prompt('Enter new department name:');
+        if (newDept && newDept.trim()) {
+          addDepartment(newDept.trim());
+          setDeps(getDepartments());
+          setForm(prev => ({ ...prev, department: newDept.trim() }));
+          setErrors(prev => ({ ...prev, department: '' }));
+        }
+      } else {
+        setForm(prev => ({ ...prev, department: val }));
+        setErrors(prev => ({ ...prev, department: '' }));
+      }
+  };
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
@@ -104,6 +122,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       fullName: form.fullName,
       phone: form.phone,
       department: form.department,
+      designation: form.designation,
       reportingManagerId: form.reportingManagerId,
       reportingManager: selectedManager?.fullName ?? '',
       role: form.role,
@@ -174,9 +193,13 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             </Field>
 
             <Field label="Department" required error={errors.department}>
-              <select className={inputCls(!!errors.department)} value={form.department} onChange={set('department')}>
-                {getDepartments().map(d => <option key={d} value={d}>{d}</option>)}
+              <select className={inputCls(!!errors.department)} value={form.department} onChange={handleDepartmentSelect}>
+                {deps.map(d => <option key={d} value={d}>{d}</option>)}
+                <option value="___ADD_NEW___" className="font-bold text-varistor-limeText">+ Add Department</option>
               </select>
+            </Field>
+            <Field label="Designation" error={errors.designation}>
+              <input className={inputCls(!!errors.designation)} value={form.designation} onChange={set('designation')} />
             </Field>
 
             <Field label="System Role" required error={errors.role}>

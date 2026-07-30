@@ -147,6 +147,7 @@ export const EmployeeManagementPortal: React.FC = () => {
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Employee</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">ID / Role</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Department</th>
+                <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Designation</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Points</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px]">Status</th>
                 <th className="px-6 py-4 font-bold text-varistor-muted uppercase tracking-wider text-[11px] text-right">Actions</th>
@@ -204,6 +205,11 @@ export const EmployeeManagementPortal: React.FC = () => {
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2 py-1 rounded border border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
                       {emp.department}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-medium text-varistor-muted">
+                      {emp.designation || '—'}
                     </span>
                   </td>
                   <td className="px-6 py-4">

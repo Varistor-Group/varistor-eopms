@@ -123,6 +123,7 @@ export function mapDbToTask(row: any): Task {
     dueDate: row.dueDate,
     priority: row.priority as TaskPriority,
     status: row.status as TaskStatus,
+    completedAt: row.completedAt,
     assigneeId: row.assigneeId,
     assignee: { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     checklist: row.checklist || [],
