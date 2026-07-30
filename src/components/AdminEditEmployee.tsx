@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, UserCog } from 'lucide-react';
-import { updateEmployee, getDepartments, getEmployees } from '../api/employees';
 import type { Employee } from '../api/employees';
 import type { UserRole } from '../types';
 import { useVariPoints } from '../hooks/useVariPoints';

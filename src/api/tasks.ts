@@ -28,6 +28,7 @@ export const tasksApi = {
         dueDate: task.dueDate,
         priority: task.priority,
         status: task.status,
+        completedAt: row.completedAt,
         assigneeId: task.assigneeId,
         checklist: task.checklist,
       }),
