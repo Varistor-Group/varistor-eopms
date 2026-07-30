@@ -1,34 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Users, Award, Calendar, Camera } from 'lucide-react';
 import { getEmployees } from '../../api/employees';
+import { tasksApi } from '../../api/tasks';
+import { getLeaveRequestsAsync } from '../../api/leaves';
 import { useVariPoints } from '../../hooks/useVariPoints';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
 
 export const AdminDashboardView: React.FC = () => {
   const { currentUser } = useVariPoints();
 
-  const [mockData, setMockData] = useState<any[]>([]);
+  const [perfRows, setPerfRows] = useState<any[]>([]);
   const [editingAvatar, setEditingAvatar] = useState(false);
 
   useEffect(() => {
-    getEmployees().then(data => {
-      
-      const perfData = data.map(emp => ({
-        id: emp.id,
-        name: emp.fullName,
-        department: emp.department,
-        rating: Math.floor(Math.random() * 40) + 60, // 60-99
-        points: emp.variPoints || 0,
-        pendingLeaves: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0,
-        status: emp.status
-      })).sort((a, b) => {
-        if (a.status === 'Active' && b.status === 'Inactive') return -1;
-        if (a.status === 'Inactive' && b.status === 'Active') return 1;
-        return b.points - a.points;
-      });
-      
-      setMockData(perfData);
-    });
+    Promise.all([getEmployees(), tasksApi.fetchTasks(), getLeaveRequestsAsync()]).then(
+      ([employees, tasks, leaveRequests]) => {
+        // ── Task Performance: per employee, % of max achievable score ──
+        // done + on-time (completedAt <= dueDate) = 1
+        // done + late (completedAt > dueDate)     = 0.5
+        // not done                                 = 0
+        // completedAt is null on a done task only for tasks completed
+        // before this feature existed — treated as on-time (1) since we
+        // have no way to know the real completion time for those.
+        const taskScoreByEmployee: Record<string, { earned: number; total: number }> = {};
+
+        for (const task of tasks) {
+          if (!task.assigneeId) continue;
+          if (!taskScoreByEmployee[task.assigneeId]) {
+            taskScoreByEmployee[task.assigneeId] = { earned: 0, total: 0 };
+          }
+          const bucket = taskScoreByEmployee[task.assigneeId];
+          bucket.total += 1;
+
+          if (task.status !== 'done') {
+            // earned += 0, nothing to add
+            continue;
+          }
+
+          if (!task.completedAt) {
+            bucket.earned += 1; // pre-existing done task, no timestamp — assume on-time
+          } else {
+            const completed = new Date(task.completedAt).getTime();
+            const due = new Date(task.dueDate).getTime();
+            bucket.earned += completed <= due ? 1 : 0.5;
+          }
+        }
+
+        // ── Pending Leaves: sum of days requested per employee, status='Pending' only ──
+        const pendingDaysByEmployee: Record<string, number> = {};
+        for (const req of leaveRequests) {
+          if (req.status !== 'Pending') continue;
+          pendingDaysByEmployee[req.employeeId] = (pendingDaysByEmployee[req.employeeId] ?? 0) + (req.days ?? 0);
+        }
+
+        const rows = employees
+          .map(emp => {
+            const scores = taskScoreByEmployee[emp.id];
+            const rating = scores && scores.total > 0
+              ? Math.round((scores.earned / scores.total) * 100)
+              : 0;
+
+            return {
+              id: emp.id,
+              name: emp.fullName,
+              department: emp.department,
+              rating,
+              points: emp.variPoints || 0,
+              pendingLeaves: pendingDaysByEmployee[emp.id] ?? 0,
+              status: emp.status,
+            };
+          })
+          .sort((a, b) => {
+            if (a.status === 'Active' && b.status === 'Inactive') return -1;
+            if (a.status === 'Inactive' && b.status === 'Active') return 1;
+            return b.points - a.points;
+          });
+
+        setPerfRows(rows);
+      }
+    );
   }, []);
 
   return (
@@ -85,7 +135,7 @@ export const AdminDashboardView: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {mockData.map((data, idx) => (
+                {perfRows.map((data, idx) => (
                   <tr key={data.id} className="border-b border-varistor-border hover:bg-varistor-surfaceMuted">
                     <td className="px-4 py-3 font-medium text-varistor-dark flex items-center gap-2">
                       <span className="text-varistor-muted text-xs">#{idx + 1}</span> {data.name}
@@ -125,7 +175,7 @@ export const AdminDashboardView: React.FC = () => {
               <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wide group-hover:text-orange-600">View all →</span>
             </div>
             <div className="space-y-3">
-              {mockData.filter(d => d.pendingLeaves > 0).map(d => (
+              {perfRows.filter(d => d.pendingLeaves > 0).map(d => (
                 <div key={d.id} className="flex justify-between items-center p-3 border border-varistor-border rounded-lg bg-varistor-surfaceMuted">
                   <div>
                     <p className="font-semibold text-sm text-varistor-dark">{d.name}</p>
@@ -139,7 +189,7 @@ export const AdminDashboardView: React.FC = () => {
                   </button>
                 </div>
               ))}
-              {mockData.filter(d => d.pendingLeaves > 0).length === 0 && (
+              {perfRows.filter(d => d.pendingLeaves > 0).length === 0 && (
                 <p className="text-sm text-varistor-muted">No pending leave requests.</p>
               )}
             </div>

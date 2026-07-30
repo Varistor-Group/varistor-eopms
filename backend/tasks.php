@@ -24,6 +24,7 @@ function rowToTask($row) {
         'dueDate' => $row['due_date'],
         'priority' => $row['priority'],
         'status' => $row['status'],
+        'completedAt' => $row['completed_at'],
         'assigneeId' => $row['assignee_id'],
         'checklist' => $row['checklist'] ? json_decode($row['checklist'], true) : [],
         'comments' => $row['comments'] ? json_decode($row['comments'], true) : [],
@@ -73,6 +74,7 @@ if ($method === 'PUT') {
     // Guard: marking a task 'done' requires approval-capable role.
     // HR/Admin can approve anyone's task. A Reporting Manager can only
     // approve tasks for employees whose reporting_manager_id matches them.
+    // Guard: marking a task 'done' requires approval-capable role.
     if (isset($input['status']) && $input['status'] === 'done') {
         if (!in_array($role, ['HR', 'Admin', 'Reporting Manager'], true)) {
             json_error('Only HR, Admin, or a Reporting Manager can approve task completion.', 403);
@@ -92,8 +94,11 @@ if ($method === 'PUT') {
                 json_error('You can only approve tasks for your direct reports.', 403);
             }
         }
-    }
 
+        // Stamp completion time — this is what lets us later tell whether
+        // the task was finished on-time or late, comparing against due_date.
+        $input['completedAt'] = date('Y-m-d H:i:s');
+    }
     $setClauses = [];
     $values = [];
 
@@ -103,6 +108,7 @@ if ($method === 'PUT') {
         'dueDate' => 'due_date',
         'priority' => 'priority',
         'status' => 'status',
+        'completedAt' => 'completed_at',
         'pointsProcessed' => 'points_processed',
         'isOverdueSwept' => 'is_overdue_swept',
     ];

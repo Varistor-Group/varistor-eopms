@@ -36,6 +36,7 @@ const EMPTY_FORM: CreateEmployeeInput = {
   personalEmail: '',
   phone: '',
   department: '',
+  designation: '',
   reportingManager: '',
   reportingManagerId: '',
   role: 'Employee',
@@ -362,6 +363,14 @@ export const AdminCreateEmployee: React.FC<{ onCancel?: () => void }> = ({ onCan
                   </button>
                 ))}
               </div>
+            </Field>
+            <Field label="Designation" error={errors.designation}>
+              <input
+                className={inputCls(!!errors.designation)}
+                placeholder="e.g. Sales Executive"
+                value={form.designation ?? ''}
+                onChange={set('designation')}
+              />
             </Field>
 
             {/* Reporting Manager — now stores employee ID, not typed name */}
