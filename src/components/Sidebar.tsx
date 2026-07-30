@@ -111,6 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'ledger', label: 'Vari Points', icon: Award, enabled: true },
       { id: 'announcements', label: 'Announcements', icon: Megaphone, enabled: true },
       { id: 'policy', label: 'Policy', icon: ScrollText, enabled: true },
+      { id: 'vault', label: 'Document Vault', icon: Lock, enabled: true },
       { id: 'leaves', label: 'Leaves', icon: Calendar, enabled: true },
       { id: 'payroll', label: 'Payroll', icon: CreditCard, enabled: true },
       { id: 'chat', label: 'Chat', icon: MessageSquare, enabled: true },
