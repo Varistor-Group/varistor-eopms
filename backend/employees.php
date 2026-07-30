@@ -24,6 +24,7 @@ const EMPLOYEE_FIELD_MAP = [
     'reportingManager'   => 'reporting_manager',
     'reportingManagerId' => 'reporting_manager_id',
     'role'               => 'role',
+    'designation'        => 'designation',
     'tempPassword'       => 'temp_password',
     'status'             => 'status',
     'variPoints'         => 'vari_points',

@@ -17,6 +17,7 @@ export interface Employee {
   personalEmail: string;
   phone: string;
   department: Department;
+  designation?: string;
   reportingManager: string;
   reportingManagerId?: string;
   role: UserRole;
@@ -63,6 +64,7 @@ export interface CreateEmployeeInput {
   personalEmail: string;
   phone: string;
   department: Department;
+  designation?: string;
   reportingManager: string;
   reportingManagerId?: string;
   role: UserRole;
@@ -90,6 +92,7 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     personalEmail: row.personal_email as string,
     phone: (row.phone as string) ?? '',
     department: row.department as Department,
+    designation: (row.designation as string) ?? undefined,
     reportingManager: (row.reporting_manager as string) ?? '',
     reportingManagerId: (row.reporting_manager_id as string) ?? undefined,
     role: row.role as UserRole,
@@ -165,6 +168,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{
       personalEmail: input.personalEmail,
       phone: input.phone,
       department: input.department,
+      designation: input.designation,
       reportingManager: input.reportingManager,
       reportingManagerId: input.reportingManagerId,
       role: input.role,
@@ -226,6 +230,9 @@ export async function updateEmployee(
 ): Promise<{ success: boolean; employee: Employee | null; error: string | null }> {
   const body: Record<string, unknown> = {};
   if (updates.fullName !== undefined) body.fullName = updates.fullName;
+  if (updates.department !== undefined) body.department = updates.department;
+  if (updates.designation !== undefined) body.designation = updates.designation;
+  if (updates.reportingManager !== undefined) body.reportingManager = updates.reportingManager;
   if (updates.phone !== undefined) body.phone = updates.phone;
   if (updates.department !== undefined) body.department = updates.department;
   if (updates.reportingManager !== undefined) body.reportingManager = updates.reportingManager;
