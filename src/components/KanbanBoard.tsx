@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DndContext, 
   useDraggable, 
@@ -12,6 +12,7 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { Calendar, Check, FileText, CheckSquare, X } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
+import { getEmployees, type Employee } from '../api/employees';
 import type { Task, TaskStatus, TaskPriority } from '../types';
 import { TaskDrawer } from './TaskDrawer';
 
@@ -218,15 +219,37 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
 };
 
 export const KanbanBoard: React.FC = () => {
-  const { tasks, moveTask } = useKanbanTasks();
+  const { tasks, moveTask, currentRole, currentUser } = useKanbanTasks();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
 
-  // Set up DnD sensors
+  useEffect(() => {
+    if (currentRole === 'Reporting Manager') {
+      getEmployees().then(setAllEmployees);
+    }
+  }, [currentRole]);
+
+  // Employees/Field Employees: only their own tasks.
+  // Reporting Managers: only tasks assigned to their direct reports.
+  // HR/Admin: everyone's tasks.
+  const visibleTasks = (() => {
+    if (currentRole === 'Employee' || currentRole === 'Field Employee') {
+      return tasks.filter(t => t.assigneeId === currentUser?.id);
+    }
+    if (currentRole === 'Reporting Manager') {
+      const subordinateIds = new Set(
+        allEmployees.filter(e => e.reportingManagerId === currentUser?.id).map(e => e.id)
+      );
+      return tasks.filter(t => t.assigneeId && subordinateIds.has(t.assigneeId));
+    }
+    return tasks; // HR / Admin
+  })();
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Allow regular clicks to open drawer without dragging instantly
+        distance: 8,
       },
     })
   );
@@ -243,13 +266,10 @@ export const KanbanBoard: React.FC = () => {
     const taskId = active.id as string;
     const targetStatus = over.id as TaskStatus;
     
-    const task = tasks.find(t => t.id === taskId);
+    const task = visibleTasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Do not allow dragging to 'done' directly (requires clicking Approve in awaiting_approval column)
     if (targetStatus === 'done') return;
-    
-    // Do not allow dragging directly from 'todo' to 'awaiting_approval'
     if (task.status === 'todo' && targetStatus === 'awaiting_approval') {
       return;
     }
@@ -257,14 +277,12 @@ export const KanbanBoard: React.FC = () => {
     moveTask(taskId, targetStatus);
   };
 
-  // Group tasks by active statuses for Kanban Columns
-  const todoTasks = tasks.filter(t => t.status === 'todo');
-  const progressTasks = tasks.filter(t => t.status === 'in_progress');
-  const approvalTasks = tasks.filter(t => t.status === 'awaiting_approval');
+  const todoTasks = visibleTasks.filter(t => t.status === 'todo');
+  const progressTasks = visibleTasks.filter(t => t.status === 'in_progress');
+  const approvalTasks = visibleTasks.filter(t => t.status === 'awaiting_approval');
 
   return (
     <div className="space-y-6">
-      {/* Board Description */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-varistor-dark">Task Board</h1>
@@ -272,7 +290,6 @@ export const KanbanBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* DnD Context */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           <KanbanColumn 
@@ -297,16 +314,15 @@ export const KanbanBoard: React.FC = () => {
         <DragOverlay>
           {activeId ? (
             <KanbanCard 
-              task={tasks.find(t => t.id === activeId)!} 
+              task={visibleTasks.find(t => t.id === activeId)!} 
               onClick={() => {}} 
             />
           ) : null}
         </DragOverlay>
       </DndContext>
 
-      {/* Details Slide-out Drawer */}
       <TaskDrawer 
-        task={selectedTask ? tasks.find(t => t.id === selectedTask.id) || null : null} 
+        task={selectedTask ? visibleTasks.find(t => t.id === selectedTask.id) || null : null} 
         onClose={() => setSelectedTask(null)} 
       />
     </div>

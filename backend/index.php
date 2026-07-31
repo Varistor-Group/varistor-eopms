@@ -99,9 +99,11 @@ $routes = [
     ['POST',   '#^/api/document-templates$#',                  'document_templates.php'],
     ['PUT',    '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
     ['DELETE', '#^/api/document-templates/(?P<id>[^/]+)$#',    'document_templates.php'],
+    ['POST', '#^/api/employee-document-slots/(?P<employeeId>[^/]+)/request/(?P<templateId>[^/]+)$#', 'employee_document_slots.php'],
     // Attendance Edits & Field History
     ['GET', '#^/api/attendance-edits$#',         'attendance_edits.php'],
     ['GET', '#^/api/field-attendance-history$#', 'field_attendance_history.php'],
+    
 
     // Employee Document Slots
     ['GET',    '#^/api/employee-document-slots-pending-summary$#',                 'employee_document_slots.php'],

@@ -75,7 +75,36 @@ if ($method === 'POST' && $employeeId !== null && $action === 'seed') {
 
     json_ok(['success' => true]);
 }
+// POST /api/employee-document-slots/:employeeId/request/:templateId
+// Adds a single template as a slot for one employee — for HR requesting
+// one specific document, as opposed to seed (which adds every active template).
+if ($method === 'POST' && $employeeId !== null && isset($params['templateId'])) {
+    $templateId = $params['templateId'];
 
+    $existing = $db->prepare('SELECT id FROM employee_document_slots WHERE employee_id = ? AND template_id = ? LIMIT 1');
+    $existing->execute([$employeeId, $templateId]);
+    if ($existing->fetch()) {
+        json_error('This document has already been requested for this employee.', 422);
+    }
+
+    $tmplStmt = $db->prepare('SELECT name, is_required FROM document_templates WHERE id = ? LIMIT 1');
+    $tmplStmt->execute([$templateId]);
+    $tmpl = $tmplStmt->fetch();
+    if (!$tmpl) json_error('Template not found.', 404);
+
+    $newId = generateUuidV4();
+    $db->prepare(
+        'INSERT INTO employee_document_slots (id, employee_id, template_id, document_name, is_required, is_custom)
+         VALUES (?, ?, ?, ?, ?, 0)'
+    )->execute([$newId, $employeeId, $templateId, $tmpl['name'], (int)$tmpl['is_required']]);
+
+    $fetch = $db->prepare(
+        'SELECT s.*, d.filename AS doc_filename, d.storage_path AS doc_storage_path
+         FROM employee_document_slots s LEFT JOIN documents d ON d.id = s.document_id WHERE s.id = ?'
+    );
+    $fetch->execute([$newId]);
+    json_ok(rowToSlot($fetch->fetch()));
+}
 // POST /api/employee-document-slots  — add custom slot
 if ($method === 'POST' && $employeeId === null && $id === null) {
     $input = request_body();

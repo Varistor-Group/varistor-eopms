@@ -55,6 +55,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     variPoints: (employee.variPoints ?? 0).toString(),
     shiftStart: employee.shiftStart ?? '09:30',
     shiftEnd: employee.shiftEnd ?? '18:30',
+    dateOfJoining: employee.dateOfJoining || '',
     dateOfBirth: employee.dateOfBirth || '',
     uanNumber: employee.uanNumber || '',
     optOutPF: employee.optOutPF || false,
@@ -129,6 +130,7 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       variPoints: Number(form.variPoints),
       shiftStart: form.shiftStart,
       shiftEnd: form.shiftEnd,
+      dateOfJoining: form.dateOfJoining,
       dateOfBirth: form.dateOfBirth,
       uanNumber: form.uanNumber,
       optOutPF: form.optOutPF,
@@ -199,6 +201,14 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
             </Field>
             <Field label="Designation" error={errors.designation}>
               <input className={inputCls(!!errors.designation)} value={form.designation} onChange={set('designation')} />
+            </Field>
+            
+            <Field label="Date of Joining" error={errors.dateOfJoining}>
+              <input type="date" className={inputCls(!!errors.dateOfJoining)} value={form.dateOfJoining} onChange={set('dateOfJoining')} />
+            </Field>
+
+            <Field label="Date of Birth" error={errors.dateOfBirth}>
+              <input type="date" className={inputCls(!!errors.dateOfBirth)} value={form.dateOfBirth} onChange={set('dateOfBirth')} />
             </Field>
 
             <Field label="System Role" required error={errors.role}>

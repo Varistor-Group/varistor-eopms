@@ -10,6 +10,7 @@ export const useKanbanTasks = () => {
   return {
     tasks: context.tasks,
     currentRole: context.currentRole,
+    currentUser: context.currentUser,
     moveTask: context.moveTask,
     approveTask: context.approveTask,
     rejectTask: context.rejectTask,
