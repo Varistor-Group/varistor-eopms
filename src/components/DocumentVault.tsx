@@ -15,6 +15,7 @@ import {
   updateSlotStatus,
   updateSlotNotes,
   removeCustomSlot,
+  requestTemplateForEmployee,
   trackDocumentAction,
   downloadDecryptedDocument,
   uploadDocument,
@@ -52,13 +53,17 @@ interface TemplateManagerProps {
   onTemplateUpdate: (t: DocumentTemplate) => void;
   onTemplateCreate: (t: DocumentTemplate) => void;
   onTemplateDelete: (id: string) => void;
-  /** Called after Required/Visible toggle so parent can propagate to slot state */
   onSlotsChanged: (templateId: string, change: { isRequired?: boolean; isActive?: boolean }) => void;
   addToast: (msg: string, pts: number, type: 'credit' | 'debit') => void;
+  selectedEmployeeId: string;
+  selectedEmployeeName: string;
+  requestedTemplateIds: Set<string>;
+  onSlotAdded: (slot: EmployeeDocumentSlot) => void;
 }
 
 const TemplateManager: React.FC<TemplateManagerProps> = ({
-  templates, onTemplateUpdate, onTemplateCreate, onTemplateDelete, onSlotsChanged, addToast
+  templates, onTemplateUpdate, onTemplateCreate, onTemplateDelete, onSlotsChanged, addToast,
+  selectedEmployeeId, selectedEmployeeName, requestedTemplateIds, onSlotAdded
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -126,6 +131,17 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     if (res.success && res.template) { onTemplateCreate(res.template); setNewName(''); setNewDesc(''); setNewRequired(true); addToast(`"${res.template.name}" added`, 0, 'credit'); }
     else { addToast(res.error ?? 'Failed', 0, 'debit'); }
   };
+  const handleRequestForEmployee = async (tmpl: DocumentTemplate) => {
+    setActionId(tmpl.id);
+    const res = await requestTemplateForEmployee(selectedEmployeeId, tmpl.id);
+    setActionId(null);
+    if (res.success && res.slot) {
+      onSlotAdded(res.slot);
+      addToast(`"${tmpl.name}" requested from ${selectedEmployeeName}`, 0, 'credit');
+    } else {
+      addToast(res.error ?? 'Request failed', 0, 'debit');
+    }
+  };
 
   return (
     <div className="bg-white rounded-[14px] border border-varistor-border shadow-sm mb-6 overflow-hidden">
@@ -150,34 +166,54 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
             <span className="w-2/5">Document Name</span>
             <span className="w-1/5 text-center">Required</span>
             <span className="w-1/5 text-center">Visible</span>
+            <span className="w-1/5 text-center">Request</span>
             <span className="w-1/5 text-right">Actions</span>
           </div>
           <div className="px-4 pb-2 space-y-1.5">
-            {templates.map(tmpl => (
-              <div key={tmpl.id} className={`flex items-center gap-4 px-3 py-2.5 rounded-xl border transition-all ${tmpl.isActive ? 'bg-gray-50 border-gray-100' : 'bg-gray-50/50 border-dashed border-gray-200 opacity-60'}`}>
-                <div className="w-2/5 flex items-center gap-2 min-w-0">
-                  <FileCheck2 size={14} className={tmpl.isActive ? 'text-varistor-lime shrink-0' : 'text-gray-300 shrink-0'} />
-                  <span className="text-sm font-medium text-brand-ink truncate">{tmpl.name}</span>
-                  {tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200 rounded-full px-1.5 py-0.5">req</span>}
-                  {!tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-sky-50 text-sky-500 border border-sky-200 rounded-full px-1.5 py-0.5">opt</span>}
+            {templates.map(tmpl => {
+              const alreadyRequested = requestedTemplateIds.has(tmpl.id);
+              return (
+                <div key={tmpl.id} className={`flex items-center gap-4 px-3 py-2.5 rounded-xl border transition-all ${tmpl.isActive ? 'bg-gray-50 border-gray-100' : 'bg-gray-50/50 border-dashed border-gray-200 opacity-60'}`}>
+                  <div className="w-2/5 flex items-center gap-2 min-w-0">
+                    <FileCheck2 size={14} className={tmpl.isActive ? 'text-varistor-lime shrink-0' : 'text-gray-300 shrink-0'} />
+                    <span className="text-sm font-medium text-brand-ink truncate">{tmpl.name}</span>
+                    {tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200 rounded-full px-1.5 py-0.5">req</span>}
+                    {!tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-sky-50 text-sky-500 border border-sky-200 rounded-full px-1.5 py-0.5">opt</span>}
+                  </div>
+                  <div className="w-1/5 flex justify-center">
+                    <button onClick={() => handleToggleRequired(tmpl)} disabled={actionId === tmpl.id} title={tmpl.isRequired ? 'Make Optional' : 'Make Required'}>
+                      {tmpl.isRequired ? <ToggleRight size={20} className="text-varistor-lime" /> : <ToggleLeft size={20} className="text-gray-300" />}
+                    </button>
+                  </div>
+                  <div className="w-1/5 flex justify-center">
+                    <button onClick={() => handleToggleActive(tmpl)} disabled={actionId === tmpl.id} title={tmpl.isActive ? 'Hide' : 'Show'}>
+                      {tmpl.isActive ? <ToggleRight size={20} className="text-blue-500" /> : <ToggleLeft size={20} className="text-gray-300" />}
+                    </button>
+                  </div>
+                  <div className="w-1/5 flex justify-center">
+                    {alreadyRequested ? (
+                      <span title={`Already requested from ${selectedEmployeeName}`}>
+                        <CheckCircle size={16} className="text-emerald-500" />
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleRequestForEmployee(tmpl)}
+                        disabled={actionId === tmpl.id || !tmpl.isActive}
+                        title={`Request "${tmpl.name}" from ${selectedEmployeeName}`}
+                        className="p-1.5 rounded-lg text-varistor-lime hover:bg-varistor-lime/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Plus size={16} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="w-1/5 flex justify-end">
+                    <button onClick={() => handleDelete(tmpl)} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
-                <div className="w-1/5 flex justify-center">
-                  <button onClick={() => handleToggleRequired(tmpl)} disabled={actionId === tmpl.id} title={tmpl.isRequired ? 'Make Optional' : 'Make Required'}>
-                    {tmpl.isRequired ? <ToggleRight size={20} className="text-varistor-lime" /> : <ToggleLeft size={20} className="text-gray-300" />}
-                  </button>
-                </div>
-                <div className="w-1/5 flex justify-center">
-                  <button onClick={() => handleToggleActive(tmpl)} disabled={actionId === tmpl.id} title={tmpl.isActive ? 'Hide' : 'Show'}>
-                    {tmpl.isActive ? <ToggleRight size={20} className="text-blue-500" /> : <ToggleLeft size={20} className="text-gray-300" />}
-                  </button>
-                </div>
-                <div className="w-1/5 flex justify-end">
-                  <button onClick={() => handleDelete(tmpl)} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="px-4 py-4 border-t border-varistor-border bg-gray-50/60">
             <p className="text-xs font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><Plus size={12} /> Add new document type</p>
@@ -565,7 +601,7 @@ export const DocumentVault: React.FC = () => {
         </div>
       </div>
 
-      {canManage && (
+     {canManage && (
         <TemplateManager
           templates={templates}
           onTemplateUpdate={updated => setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t))}
@@ -574,19 +610,19 @@ export const DocumentVault: React.FC = () => {
           onSlotsChanged={(templateId, change) => {
             setSlots(prev => prev.map(slot => {
               if (slot.templateId !== templateId || slot.isCustom) return slot;
-              // Required toggle: flip isRequired on the slot card immediately
               if (change.isRequired !== undefined) return { ...slot, isRequired: change.isRequired };
-              // Visible/active toggle: mark slot hidden so it drops out of view
-              // We use a sentinel: filter it out entirely when hidden
               return slot;
             }).filter(slot => {
               if (slot.templateId !== templateId || slot.isCustom) return true;
-              // If isActive just turned false, remove from local view
               if (change.isActive === false) return false;
               return true;
             }));
           }}
           addToast={addToast}
+          selectedEmployeeId={selectedEmployeeId}
+          selectedEmployeeName={selectedEmployee?.fullName ?? ''}
+          requestedTemplateIds={new Set(slots.filter(s => s.templateId).map(s => s.templateId!))}
+          onSlotAdded={newSlot => setSlots(prev => [...prev, newSlot])}
         />
       )}
 

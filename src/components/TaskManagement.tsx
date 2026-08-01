@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
+import { useVariPoints } from '../hooks/useVariPoints';
 import { getEmployees, type Employee } from '../api/employees';
 import type { TaskPriority } from '../types';
 
 export const TaskManagement: React.FC = () => {
   const { currentRole, createTask, tasks, approveTask, rejectTask } = useKanbanTasks();
-  const MOCK_MANAGER_ID = 'VAR-001'; // Simulated logged-in manager
+  const { currentUser } = useVariPoints();
 
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
 
@@ -14,9 +15,10 @@ export const TaskManagement: React.FC = () => {
     getEmployees().then(setAllEmployees);
   }, []);
 
-  // Subordinates are anyone whose reportingManager is the current manager. Or if Admin/HR, everyone.
+  // Subordinates are anyone whose reportingManagerId matches the current logged-in
+  // manager's real id. Or if Admin/HR, everyone.
   const subordinates = allEmployees.filter(emp => 
-    (currentRole === 'Admin' || currentRole === 'HR') ? true : emp.reportingManager === MOCK_MANAGER_ID
+    (currentRole === 'Admin' || currentRole === 'HR') ? true : emp.reportingManagerId === currentUser?.id
   );
 
   const [title, setTitle] = useState('');

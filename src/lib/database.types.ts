@@ -1024,6 +1024,7 @@ export type Database = {
           assignee_id: string | null
           checklist: Json | null
           comments: Json | null
+          completedAt?: string;
           attachments: Json | null
           points_processed: boolean | null
           is_overdue_swept: boolean | null

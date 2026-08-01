@@ -62,6 +62,17 @@ export async function uploadDocument(
     return { success: false, error: 'Upload failed.' };
   }
 }
+export async function requestTemplateForEmployee(
+  employeeId: string,
+  templateId: string
+): Promise<{ success: boolean; slot?: EmployeeDocumentSlot; error: string | null }> {
+  const res = await apiFetch(`/api/employee-document-slots/${employeeId}/request/${templateId}`, {
+    method: 'POST',
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result) return { success: false, error: result?.error || 'Failed to request document.' };
+  return { success: true, slot: result, error: null };
+}
 
 // ─── Replace / Update file ──────────────────────────────────────────────────
 
