@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Task, LedgerEntry, ToastMessage, TaskStatus, UserRole, TaskPriority, AnnouncementDTO, LeaveRequest, LeaveBalance } from '../types';
 import { announcementsApi } from '../api/announcements';
-import { mockEmployeeStore, updateEmployee } from '../api/employees';
+import { mockEmployeeStore } from '../api/employees';
 import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest } from '../api/leaves';
 import { tasksApi } from '../api/tasks';
 import { API_URL } from '../config/api';
@@ -19,6 +19,7 @@ export interface CurrentUser {
   email: string;
   department: string;
   avatarUrl: string;
+  variPoints?: number;
   role: UserRole;
   dob?: string;
   is_field_employee?: boolean;
