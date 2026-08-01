@@ -292,7 +292,7 @@ const AppContent: React.FC = () => {
     : currentRole === 'HR' 
     ? ['dashboard', 'admin', 'task-management', 'attendance', 'field-tracker', 'vault', 'announcements', 'policy', 'payroll', 'leaves', 'chat', 'engine-simulation', 'training']
     : currentRole === 'Reporting Manager' 
-    ? ['dashboard', 'task-management', 'kanban', 'attendance', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training']
+    ? ['dashboard', 'task-management', 'kanban', 'attendance', 'vault', 'ledger', 'announcements', 'policy', 'leaves', 'payroll', 'chat', 'training']
     : ['dashboard', 'kanban', 'attendance', 'field-tracker', 'ledger', 'announcements', 'policy', 'vault', 'leaves', 'payroll', 'chat', 'training'];
 
   allowedRoutes.push('field-punch');

@@ -7,6 +7,7 @@ import { getLeaveBalance, getLeaveRequestsAsync, submitLeaveRequest, approveLeav
 import { tasksApi } from '../api/tasks';
 import { API_URL } from '../config/api';
 import { supabase } from '../lib/supabase';
+import { awardPoints } from '../api/vpTransactions';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -340,31 +341,28 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const CONSECUTIVE_LATE_PENALTY = 50; // Configurable flat penalty for 3+ consecutive late tasks
 
-  const awardPointsForTask = (task: Task) => {
+  const awardPointsForTask = async (task: Task) => {
     if (task.pointsProcessed) return null;
+    if (!task.assigneeId) return null;
 
     const taskDueDate = new Date(`${task.dueDate}T23:59:59`);
     const completedOnTime = SIMULATED_TODAY <= taskDueDate;
 
     const ruleConfig = POINT_MATRIX[task.priority];
 
-    // eslint-disable-next-line no-useless-assignment
     let netPoints = 0;
-    // eslint-disable-next-line no-useless-assignment
     let reasonMessage = '';
 
     if (completedOnTime) {
       netPoints = ruleConfig.onTime;
       reasonMessage = `Task completed before due date (${task.priority.toUpperCase()} priority)`;
     } else {
-      // Algebraic sum: Credit - Debit (since debit is stored as a positive number in the matrix)
       netPoints = ruleConfig.onTime - ruleConfig.missed;
       reasonMessage = `Task completed past due date (${task.priority.toUpperCase()} priority)`;
 
-      // Consecutive Deadline Penalty Logic
       const completionEntries = ledger.filter(l =>
         l.employeeId === task.assigneeId &&
-        l.taskId !== undefined // Only look at task completion entries
+        l.taskId !== undefined
       );
 
       if (completionEntries.length >= 2 &&
@@ -378,6 +376,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const pointsValue = Math.abs(netPoints);
     const pointType: 'credit' | 'debit' = netPoints >= 0 ? 'credit' : 'debit';
 
+    const apiResult = await awardPoints(task.assigneeId, pointsValue, pointType, reasonMessage);
+    if (!apiResult.success) {
+      addToast(apiResult.error ?? 'Failed to award points', 0, 'debit');
+      return null;
+    }
+
     const newLedgerEntry: LedgerEntry = {
       id: `led-${Date.now()}-${task.id}`,
       taskId: task.id,
@@ -388,6 +392,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       timestamp: new Date().toISOString(),
       employeeId: task.assigneeId
     };
+
+    // If the recipient is the currently logged-in user, reflect their new
+    // balance immediately rather than waiting for a full employee refetch.
+    if (currentUser && task.assigneeId === currentUser.id && apiResult.newBalance !== undefined) {
+      setCurrentUser({ ...currentUser, variPoints: apiResult.newBalance });
+    }
 
     return { newLedgerEntry, pointsValue, pointType, completedOnTime };
   };
@@ -412,10 +422,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Points Balance Calculation (Sum credits - Sum debits)
   // Let's set a base starting score of 1240 for Aarav
-  const pointsBalance = 1190 + ledger.reduce((acc, curr) => {
-    return curr.type === 'credit' ? acc + curr.points : acc - curr.points;
-  }, 0);
-
+  const pointsBalance = currentUser?.variPoints ?? 0;
   // Toast Management
   const addToast = (message: string, points: number, type: 'credit' | 'debit') => {
     // eslint-disable-next-line react-hooks/purity
@@ -435,19 +442,17 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   // Kanban State Actions
-  const moveTask = (taskId: string, newStatus: TaskStatus) => {
+  const moveTask = async (taskId: string, newStatus: TaskStatus) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
     const oldStatus = task.status;
 
-    // Block employee manually moving tasks from in_progress to awaiting_approval
     if ((currentRole === 'Employee' || currentRole === 'Field Employee') && oldStatus === 'in_progress' && newStatus === 'awaiting_approval') {
       addToast('Error: Employees cannot manually submit tasks for approval. Complete all checklist items to auto-submit.', 0, 'debit');
       return;
     }
 
-    // Prevent manual moving to 'done' without approval
     let statusToSet = newStatus;
     if (statusToSet === 'done' && oldStatus !== 'awaiting_approval') {
       statusToSet = 'awaiting_approval';
@@ -455,7 +460,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     let awardResult = null;
     if (statusToSet === 'done' && oldStatus !== 'done') {
-      awardResult = awardPointsForTask(task);
+      awardResult = await awardPointsForTask(task);
     }
 
     setTasks((prevTasks) => {
@@ -467,10 +472,8 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
 
       if (statusToSet === 'in_progress') {
-        // Prepend task when transitioning/dropped into IN PROGRESS
         return [updatedTask, ...filtered];
       } else {
-        // Maintain original position for other transitions
         const originalIndex = prevTasks.findIndex((t) => t.id === taskId);
         filtered.splice(originalIndex, 0, updatedTask);
         return filtered;
@@ -492,7 +495,7 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   // Manager Approval (Restricted to Admin, HR, Reporting Manager)
-  const approveTask = (taskId: string) => {
+  const approveTask = async (taskId: string) => {
     if (currentRole === 'Employee' || currentRole === 'Field Employee') {
       addToast('Error: Employees do not have permission to approve tasks.', 0, 'debit');
       return;
@@ -502,13 +505,13 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!task) return;
 
     const taskAssigneeDetails = mockEmployeeStore.find(e => e.id === task.assigneeId);
-    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManager !== MOCK_USER_ID) {
+    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManagerId !== currentUser?.id) {
       addToast('Error: You can only approve tasks for your direct subordinates.', 0, 'debit');
       return;
     }
 
     if (task.status !== 'done') {
-      const awardResult = awardPointsForTask(task);
+      const awardResult = await awardPointsForTask(task);
 
       setTasks((prevTasks) =>
         prevTasks.map((t) =>
@@ -694,17 +697,18 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Manual Administrative Transaction
   // Restricted to Admin and HR roles
-  const assertAdministrativeTransaction = (
+  const assertAdministrativeTransaction = async (
     type: 'misconduct' | 'late_entry' | 'custom_debit' | 'custom_credit',
     reason: string,
     customPoints?: number,
     employeeId?: string,
     isAutomated?: boolean
-  ) => {
+   ) => {
     if (!isAutomated && currentRole !== 'Admin' && currentRole !== 'HR') {
       addToast('Access Denied: Only Admin and HR can manually process points.', 0, 'debit');
       return;
     }
+    if (!employeeId) return;
 
     const isMisconduct = type === 'misconduct';
     const isLateEntry = type === 'late_entry';
@@ -717,7 +721,13 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (type === 'custom_debit') ruleTitle = 'Custom Penalty';
     if (isCredit) ruleTitle = 'Custom Credit';
 
-    const transactionType = isCredit ? 'credit' : 'debit';
+    const transactionType: 'credit' | 'debit' = isCredit ? 'credit' : 'debit';
+
+    const apiResult = await awardPoints(employeeId, pointsAmount, transactionType, `${ruleTitle}: ${reason}`);
+    if (!apiResult.success) {
+      addToast(apiResult.error ?? 'Failed to process points', 0, 'debit');
+      return;
+    }
 
     const newLedgerEntry: LedgerEntry = {
       id: `led-admin-${Date.now()}`,
@@ -732,43 +742,12 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setLedger((prevLedger) => [newLedgerEntry, ...prevLedger]);
     addToast(`${ruleTitle} applied: "${reason}"`, pointsAmount, transactionType);
 
-    // ── Persist VP change to Supabase so dashboard and employee master reflect it ──
-    if (employeeId) {
-      const emp = mockEmployeeStore.find(e => e.id === employeeId);
-      if (emp) {
-        const currentVP = emp.variPoints ?? 0;
-        const newVP = isCredit
-          ? currentVP + pointsAmount
-          : Math.max(0, currentVP - pointsAmount);
-        // Update local mock store so UI reflects immediately
-        emp.variPoints = newVP;
-        // Persist vari_points to Supabase
-        updateEmployee(employeeId, { variPoints: newVP }).catch((err) => {
-          console.error('[VP] Failed to sync vari_points to Supabase:', err);
-        });
-        // Log transaction to activity_log for audit history
-        supabase.from('activity_log').insert({
-          action: 'VP_TRANSACTION',
-          performed_by: currentUser?.id ?? 'system',
-          details: `${ruleTitle}: "${reason}" — ${isCredit ? '+' : '-'}${pointsAmount} VP for ${emp.fullName} (${emp.employeeId})`,
-          metadata: {
-            transaction_type: transactionType,
-            rule_type: type,
-            points: pointsAmount,
-            reason,
-            employee_id: employeeId,
-            employee_name: emp.fullName,
-            employee_code: emp.employeeId,
-            performed_by_id: currentUser?.id ?? 'system',
-            performed_by_name: currentUser?.name ?? 'System',
-            performed_by_role: currentRole,
-            vp_before: currentVP,
-            vp_after: newVP,
-          }
-        }).then(({ error }) => {
-          if (error) console.error('[VP] Failed to log to activity_log:', error.message);
-        });
-      }
+    const emp = mockEmployeeStore.find(e => e.id === employeeId);
+    if (emp && apiResult.newBalance !== undefined) {
+      emp.variPoints = apiResult.newBalance;
+    }
+    if (currentUser && employeeId === currentUser.id && apiResult.newBalance !== undefined) {
+      setCurrentUser({ ...currentUser, variPoints: apiResult.newBalance });
     }
   };
 
