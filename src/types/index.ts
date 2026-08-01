@@ -68,6 +68,7 @@ export interface Task {
   dueDate: string;
   priority: TaskPriority;
   status: TaskStatus;
+  completedAt?: string;
   assignee: TaskAssignee;
   checklist: ChecklistItem[];
   comments: Comment[];

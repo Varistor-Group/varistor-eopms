@@ -25,7 +25,7 @@ import {
   getEmployeesWithPendingDocuments,
 } from '../api/vault';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { getEmployees,  Employee } from '../api/employees';
+import { getEmployees, type Employee } from '../api/employees';
 import type { DocumentStatus, DocumentTemplate, EmployeeDocumentSlot } from '../types';
 
 interface StatusConfig { icon: React.ElementType; className: string; label: string; }
