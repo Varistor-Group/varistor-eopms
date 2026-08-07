@@ -233,7 +233,7 @@ export const KanbanBoard: React.FC = () => {
   // Employees/Field Employees: only their own tasks.
   // Reporting Managers: only tasks assigned to their direct reports.
   // HR/Admin: everyone's tasks.
-  const visibleTasks = (() => {
+ const visibleTasks = (() => {
     if (currentRole === 'Employee' || currentRole === 'Field Employee') {
       return tasks.filter(t => t.assigneeId === currentUser?.id);
     }
@@ -241,7 +241,9 @@ export const KanbanBoard: React.FC = () => {
       const subordinateIds = new Set(
         allEmployees.filter(e => e.reportingManagerId === currentUser?.id).map(e => e.id)
       );
-      return tasks.filter(t => t.assigneeId && subordinateIds.has(t.assigneeId));
+      return tasks.filter(t => 
+        t.assigneeId && (t.assigneeId === currentUser?.id || subordinateIds.has(t.assigneeId))
+      );
     }
     return tasks; // HR / Admin
   })();

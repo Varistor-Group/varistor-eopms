@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Calendar, Check } from 'lucide-react';
-import type { Task } from '../types';
+import { X, CheckSquare, Calendar, Check, Pencil, Save, XCircle } from 'lucide-react';
+import type { Task, TaskPriority } from '../types';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
 
 interface TaskDrawerProps {
@@ -10,17 +10,27 @@ interface TaskDrawerProps {
 
 export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
   const { 
-    toggleChecklistItem
+    toggleChecklistItem,
+    updateTaskDetails,
+    currentRole
   } = useKanbanTasks();
 
-
   const [isClosing, setIsClosing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState<TaskPriority>('medium');
+  const [editDueDate, setEditDueDate] = useState('');
+
+  const canEdit = currentRole === 'HR' || currentRole === 'Admin' || currentRole === 'Reporting Manager';
 
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
       onClose();
       setIsClosing(false);
+      setIsEditing(false);
     }, 200);
   };
 
@@ -33,47 +43,98 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
     return () => window.removeEventListener('app_back_button', handleBackButton);
   }, [onClose]);
 
+  useEffect(() => {
+    if (task) {
+      setEditTitle(task.title);
+      setEditDescription(task.description);
+      setEditPriority(task.priority);
+      setEditDueDate(task.dueDate);
+      setIsEditing(false);
+    }
+  }, [task]);
+
   if (!task) return null;
 
-
-
-  // Checklist statistics
   const completedCount = task.checklist.filter(c => c.completed).length;
   const totalCount = task.checklist.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  const handleSave = async () => {
+    if (!editTitle.trim() || !editDueDate) return;
+    setIsSaving(true);
+    await updateTaskDetails(task.id, editTitle.trim(), editDescription.trim(), editPriority, editDueDate);
+    setIsSaving(false);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditTitle(task.title);
+    setEditDescription(task.description);
+    setEditPriority(task.priority);
+    setEditDueDate(task.dueDate);
+    setIsEditing(false);
+  };
+
   return (
     <>
-      {/* Backdrop overlay */}
       <div 
         className={`fixed inset-0 bg-black/30 z-40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'animate-fade-in opacity-100'}`}
         onClick={handleClose}
       />
 
-      {/* Drawer Body */}
       <div className={`fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white border-l border-varistor-border shadow-2xl z-50 flex flex-col transition-transform duration-200 ease-out transform ${isClosing ? 'translate-x-full' : 'translate-x-0 animate-[slideIn_200ms_ease-out]'}`}>
         
-        {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-varistor-border flex-shrink-0">
           <span className="text-xs font-bold text-varistor-limeText bg-varistor-limeLight px-2.5 py-0.5 rounded-full uppercase tracking-wider">
             {task.status.replace('_', ' ')}
           </span>
-          <button 
-            onClick={handleClose}
-            className="p-1 rounded-full text-varistor-muted hover:text-black hover:bg-gray-100 transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {canEdit && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="p-1.5 rounded-full text-varistor-muted hover:text-varistor-dark hover:bg-gray-100 transition-colors"
+                title="Edit task"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+            <button 
+              onClick={handleClose}
+              className="p-1 rounded-full text-varistor-muted hover:text-black hover:bg-gray-100 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Title & Description */}
           <div>
-            <h2 className="text-lg font-bold text-varistor-dark leading-snug">{task.title}</h2>
-            <p className="text-xs text-varistor-muted mt-2 leading-relaxed whitespace-pre-line">
-              {task.description}
-            </p>
+            {isEditing ? (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full text-lg font-bold text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:border-varistor-lime"
+                  placeholder="Task title"
+                />
+                <textarea
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs text-varistor-dark border border-varistor-border rounded-lg px-3 py-2 focus:outline-none focus:border-varistor-lime resize-none"
+                  placeholder="Description"
+                />
+              </div>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold text-varistor-dark leading-snug">{task.title}</h2>
+                <p className="text-xs text-varistor-muted mt-2 leading-relaxed whitespace-pre-line">
+                  {task.description}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Meta Details */}
@@ -92,12 +153,58 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
 
             <div className="space-y-1">
               <span className="text-[10px] text-varistor-muted font-semibold uppercase tracking-wider block">Due Date</span>
-              <div className="flex items-center gap-1.5 text-xs text-varistor-dark font-semibold">
-                <Calendar size={14} className="text-varistor-muted" />
-                <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
+              {isEditing ? (
+                <input
+                  type="date"
+                  value={editDueDate}
+                  onChange={e => setEditDueDate(e.target.value)}
+                  className="w-full text-xs text-varistor-dark border border-varistor-border rounded-lg px-2 py-1.5 focus:outline-none focus:border-varistor-lime"
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-varistor-dark font-semibold">
+                  <Calendar size={14} className="text-varistor-muted" />
+                  <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              )}
             </div>
+
+            {isEditing && (
+              <div className="space-y-1 col-span-2">
+                <span className="text-[10px] text-varistor-muted font-semibold uppercase tracking-wider block">Priority</span>
+                <select
+                  value={editPriority}
+                  onChange={e => setEditPriority(e.target.value as TaskPriority)}
+                  className="w-full text-xs text-varistor-dark border border-varistor-border rounded-lg px-2 py-1.5 focus:outline-none focus:border-varistor-lime"
+                >
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            )}
           </div>
+
+          {isEditing && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving || !editTitle.trim() || !editDueDate}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-varistor-lime text-black text-xs font-bold py-2 rounded-lg hover:bg-[#7bc012] transition-colors disabled:opacity-50"
+              >
+                <Save size={14} />
+                {isSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={isSaving}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-gray-100 text-varistor-dark text-xs font-bold py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <XCircle size={14} />
+                Cancel
+              </button>
+            </div>
+          )}
 
           {/* Checklist */}
           <div className="space-y-3">
@@ -111,7 +218,6 @@ export const TaskDrawer: React.FC<TaskDrawerProps> = ({ task, onClose }) => {
               </span>
             </div>
             
-            {/* Progress bar */}
             <div className="w-full bg-varistor-pageBg h-1.5 rounded-full overflow-hidden">
               <div 
                 className="bg-varistor-lime h-full transition-all duration-300"

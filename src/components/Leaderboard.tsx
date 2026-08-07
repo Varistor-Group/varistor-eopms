@@ -230,7 +230,7 @@ export const Leaderboard: React.FC = () => {
                           <div>
                             <div className="font-bold text-varistor-dark flex items-center gap-2">
                               {emp.fullName}
-                              {isCurrentUser(emp) && <span className="bg-varistor-lime text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">You</span>}
+                              {isCurrentUser(emp.fullName) && <span className="bg-varistor-lime text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">You</span>}
                             </div>
                             <div className="text-xs text-gray-400">{emp.role}</div>
                           </div>
