@@ -13,19 +13,12 @@ export const Leaderboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
   
-  const { currentRole } = useVariPoints();
-  
+  const { currentRole, currentUser } = useVariPoints();
   // A crude way to identify the current user using currentRole logic since we don't have a real auth context right now.
   // In a real app, you'd compare employee.id to currentUser.id.
-  const isCurrentUser = (emp: Employee) => {
-    if (currentRole === 'Admin' && emp.role === 'Admin') return true;
-    if (currentRole === 'HR' && emp.role === 'HR') return true;
-    if (currentRole === 'Reporting Manager' && emp.role === 'Reporting Manager') return true;
-    if (currentRole === 'Employee' && emp.role === 'Employee') return true;
-    if (currentRole === 'Field Employee' && emp.role === 'Field Employee') return true;
-    return false;
-  };
-
+ const isCurrentUser = (emp: Employee) => {
+  return emp.id === currentUser?.id;
+};
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
@@ -230,7 +223,7 @@ export const Leaderboard: React.FC = () => {
                           <div>
                             <div className="font-bold text-varistor-dark flex items-center gap-2">
                               {emp.fullName}
-                              {isCurrentUser(emp.employeeId) && <span className="bg-varistor-lime text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">You</span>}
+                              {isCurrentUser(emp) && <span className="bg-varistor-lime text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">You</span>}
                             </div>
                             <div className="text-xs text-gray-400">{emp.role}</div>
                           </div>
