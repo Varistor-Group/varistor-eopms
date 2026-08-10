@@ -13,7 +13,7 @@ export const Leaderboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
   
-  const { currentRole, currentUser } = useVariPoints();
+  const { currentUser } = useVariPoints();
   // A crude way to identify the current user using currentRole logic since we don't have a real auth context right now.
   // In a real app, you'd compare employee.id to currentUser.id.
  const isCurrentUser = (emp: Employee) => {
