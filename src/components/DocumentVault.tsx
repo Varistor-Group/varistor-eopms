@@ -474,7 +474,7 @@ export const DocumentVault: React.FC = () => {
   const [seededEmployees, setSeededEmployees] = useState<Set<string>>(new Set());
 
   // Fallback to VAR-024 only if somehow both ID and employeeId are missing
-  const loggedInEmployeeId = (currentUser as any)?.employeeId || currentUser?.id || 'VAR-024';
+  const loggedInEmployeeId = currentUser?.id ?? '';
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(loggedInEmployeeId);
 
   const canManage = currentRole === 'Admin' || currentRole === 'HR';
