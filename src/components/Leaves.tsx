@@ -6,6 +6,15 @@ import type { LeaveTypeModel, EmployeeLeaveBalance } from '../types';
 import { LeaveTypeManager } from './LeaveTypeManager';
 import { LeaveBalanceManager } from './LeaveBalanceManager';
 
+// Display-only formatter: raw dates from the backend are ISO (YYYY-MM-DD).
+// Matches the date display convention already used in Attendance.tsx / PolicyPage.tsx.
+const formatDate = (iso: string): string => {
+  if (!iso) return '';
+  const d = new Date(`${iso}T00:00:00`);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 const Leaves: React.FC = () => {
   const { currentRole, leaveRequests, submitLeave, approveLeave, rejectLeave, currentUser } = useVariPoints();
   
@@ -287,9 +296,9 @@ const Leaves: React.FC = () => {
                         <td className="px-4 py-3 font-semibold text-varistor-dark">{item.type}</td>
                         <td className="px-4 py-3 font-mono text-varistor-dark">
                           <div className="flex items-center gap-1">
-                            <span>{item.from}</span>
+                            <span>{formatDate(item.from)}</span>
                             <ArrowRight size={10} className="text-gray-400" />
-                            <span>{item.to}</span>
+                            <span>{formatDate(item.to)}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-varistor-dark font-mono">{item.days}</td>
