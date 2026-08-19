@@ -607,6 +607,32 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     addToast(`Task request sent: "${title}" — awaiting manager review`, 0, 'credit');
+
+    // Fire-and-forget notification to the employee's real reporting manager,
+    // same pattern as submitLeave — silently skipped if no manager email on file.
+    const requesterEmployee = mockEmployeeStore.find(e => e.id === currentUser.id);
+    const requestManagerEmployee = requesterEmployee?.reportingManagerId
+      ? mockEmployeeStore.find(e => e.id === requesterEmployee.reportingManagerId)
+      : undefined;
+    const requestManagerEmail = requestManagerEmployee?.personalEmail;
+
+    if (requestManagerEmail) {
+      fetch(`${API_URL}/api/tasks/notify-manager-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeName: currentUser.name,
+          managerEmail: requestManagerEmail,
+          taskTitle: title,
+          description,
+          dueDate,
+          priority,
+          notes: notes && notes.trim() ? notes.trim() : '',
+        }),
+      }).catch(() => { /* email server unreachable — non-blocking */ });
+    } else {
+      console.warn('[requestTask] No reporting manager email on file — skipping notification email.');
+    }
   };
 
   // Manager (Admin/HR/Reporting Manager) approves an employee's task request,
