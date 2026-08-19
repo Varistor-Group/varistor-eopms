@@ -6,7 +6,7 @@ import { getEmployees, type Employee } from '../api/employees';
 import type { TaskPriority } from '../types';
 
 export const TaskManagement: React.FC = () => {
-  const { currentRole, createTask, tasks, approveTask, rejectTask } = useKanbanTasks();
+  const { currentRole, createTask, tasks, approveTask, rejectTask, updateTaskDetails } = useKanbanTasks();
   const { currentUser } = useVariPoints();
 
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
@@ -59,6 +59,29 @@ export const TaskManagement: React.FC = () => {
     : [];
   const pendingTasks = selectedEmployeeTasks.filter(t => t.status === 'todo' || t.status === 'in_progress');
   const completedTasks = selectedEmployeeTasks.filter(t => t.status === 'done' || t.status === 'awaiting_approval');
+
+  // Edit-task state (RM / Admin / HR can edit title, description, priority, due date)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState<TaskPriority>('medium');
+  const [editDueDate, setEditDueDate] = useState('');
+
+  const startEditingTask = (t: { id: string; title: string; description: string; priority: TaskPriority; dueDate: string }) => {
+    setEditingTaskId(t.id);
+    setEditTitle(t.title);
+    setEditDescription(t.description);
+    setEditPriority(t.priority);
+    setEditDueDate(t.dueDate ? t.dueDate.slice(0, 10) : '');
+  };
+
+  const cancelEditingTask = () => setEditingTaskId(null);
+
+  const saveEditingTask = () => {
+    if (!editingTaskId || !editTitle.trim() || !editDueDate) return;
+    updateTaskDetails(editingTaskId, editTitle, editDescription, editPriority, editDueDate);
+    setEditingTaskId(null);
+  };
 
   return (
     <div className="space-y-6 animate-[fadeInPage_250ms_ease-out]">
@@ -195,12 +218,63 @@ export const TaskManagement: React.FC = () => {
                 <div className="space-y-3">
                   {pendingTasks.map(t => (
                     <div key={t.id} className="p-3 bg-varistor-pageBg border border-[#f1f3f0] rounded-lg">
-                      <p className="font-bold text-xs text-varistor-dark">{t.title}</p>
-                      <p className="text-[10px] text-varistor-muted mt-1 truncate">{t.description}</p>
-                      <div className="mt-2 flex justify-between items-center text-[10px]">
-                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase">{t.status.replace('_', ' ')}</span>
-                        <span className="text-varistor-muted">Due: {new Date(t.dueDate).toLocaleDateString()}</span>
-                      </div>
+                      {editingTaskId === t.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full border border-varistor-border rounded px-2 py-1 text-xs font-bold bg-white"
+                            placeholder="Title"
+                          />
+                          <textarea
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            rows={2}
+                            className="w-full border border-varistor-border rounded px-2 py-1 text-[10px] bg-white"
+                            placeholder="Description"
+                          />
+                          <div className="flex gap-2">
+                            <select
+                              value={editPriority}
+                              onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                              className="flex-1 border border-varistor-border rounded px-2 py-1 text-[10px] bg-white"
+                            >
+                              <option value="critical">Critical</option>
+                              <option value="high">High</option>
+                              <option value="medium">Medium</option>
+                              <option value="low">Low</option>
+                            </select>
+                            <input
+                              type="date"
+                              value={editDueDate}
+                              onChange={(e) => setEditDueDate(e.target.value)}
+                              className="flex-1 border border-varistor-border rounded px-2 py-1 text-[10px] bg-white"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button onClick={cancelEditingTask} className="text-[10px] text-gray-500 hover:text-gray-800 font-semibold px-2 py-1">Cancel</button>
+                            <button onClick={saveEditingTask} className="text-[10px] bg-varistor-lime text-varistor-dark font-bold px-3 py-1 rounded-full hover:brightness-105">Save</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-start gap-2">
+                            <p className="font-bold text-xs text-varistor-dark">{t.title}</p>
+                            <button
+                              onClick={() => startEditingTask(t)}
+                              className="text-[10px] text-blue-500 hover:text-blue-700 font-semibold shrink-0"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-varistor-muted mt-1 truncate">{t.description}</p>
+                          <div className="mt-2 flex justify-between items-center text-[10px]">
+                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase">{t.status.replace('_', ' ')}</span>
+                            <span className="text-varistor-muted">Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
