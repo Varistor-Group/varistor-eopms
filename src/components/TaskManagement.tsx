@@ -247,7 +247,7 @@ export const TaskManagement: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
-        <h2 className="text-lg font-bold text-varistor-dark mb-4">Tasks Awaiting Approval</h2>
+        <h2 className="text-lg font-bold text-varistor-dark mb-4">Task Awaiting Approvable for Completion</h2>
         {awaitingApprovalTasks.length === 0 ? (
           <p className="text-sm text-varistor-muted">No tasks currently awaiting approval.</p>
         ) : (
