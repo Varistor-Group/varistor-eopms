@@ -62,6 +62,7 @@ $routes = [
     ['POST', '#^/api/quiz/submit$#',                'quiz_submit.php'],
     ['POST', '#^/api/leave/notify-manager$#',       'leave_notify_manager.php'],
     ['POST', '#^/api/leave/notify-employee$#',      'leave_notify_employee.php'],
+    ['POST', '#^/api/tasks/notify-assignee$#',      'task_notify_assignee.php'],
 
     // Payroll (legacy akash endpoints — kept as-is, still functional)
     ['POST', '#^/api/payroll/send-slips$#',         'payroll_send_slips.php'],

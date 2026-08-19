@@ -195,20 +195,33 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setLeaveRequests(prev => [optimistic, ...prev]);
     addToast('Leave request submitted successfully', 0, 'credit');
 
-    // Fire-and-forget manager notification email (same pattern as createEmployee)
-    fetch(`${API_URL}/api/leave/notify-manager`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        employeeName: input.employeeName,
-        leaveType: input.type,
-        from: input.from,
-        to: input.to,
-        days: input.days,
-        reason: input.reason,
-        managerEmail: 'manager@varistor.in',
-      }),
-    }).catch(() => { /* email server unreachable — ignore in mock mode */ });
+    // Look up the employee's real reporting manager so the notification goes
+    // to an actual inbox — this previously always sent to a hardcoded placeholder
+    // address regardless of who submitted the request.
+    const submitterEmployee = mockEmployeeStore.find(e => e.id === (currentUser?.id ?? MOCK_USER_ID));
+    const managerEmployee = submitterEmployee?.reportingManagerId
+      ? mockEmployeeStore.find(e => e.id === submitterEmployee.reportingManagerId)
+      : undefined;
+    const managerEmail = managerEmployee?.personalEmail;
+
+    if (managerEmail) {
+      // Fire-and-forget manager notification email (same pattern as createEmployee)
+      fetch(`${API_URL}/api/leave/notify-manager`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeName: input.employeeName,
+          leaveType: input.type,
+          from: input.from,
+          to: input.to,
+          days: input.days,
+          reason: input.reason,
+          managerEmail,
+        }),
+      }).catch(() => { /* email server unreachable — non-blocking */ });
+    } else {
+      console.warn('[submitLeave] No reporting manager email on file — skipping notification email.');
+    }
   };
 
   const approveLeave = (leaveId: string) => {
@@ -653,8 +666,13 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => {
-    // Determine assignee details from mock store, fallback to default
-    const assigneeDetails = { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
+    // Look up the real assignee so the card shows their actual name/avatar
+    // (previously this always fell through to a hardcoded "Unknown" placeholder).
+    const assigneeEmployee = mockEmployeeStore.find(e => e.id === assigneeId);
+    const assigneeDetails = {
+      name: assigneeEmployee?.fullName ?? 'Unknown',
+      avatarUrl: assigneeEmployee?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60'
+    };
 
     const checklistItems = checkpoints?.map((cp, idx) => ({
       id: `cp-${Date.now()}-${idx}`,
@@ -679,6 +697,23 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setTasks((prevTasks) => [newTask, ...prevTasks]);
     tasksApi.createTask(newTask).catch(console.error);
     addToast(`Task assigned: "${title}"`, 0, 'credit');
+
+    // Fire-and-forget assignment email to the employee's real address (same
+    // pattern as leave notifications) — skipped silently if we have no email on file.
+    if (assigneeEmployee?.personalEmail) {
+      fetch(`${API_URL}/api/tasks/notify-assignee`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assigneeName: assigneeDetails.name,
+          assigneeEmail: assigneeEmployee.personalEmail,
+          taskTitle: title,
+          description,
+          dueDate,
+          priority,
+        }),
+      }).catch(() => { /* email server unreachable — non-blocking */ });
+    }
 
     // Dispatch real-time notification
     const channel = new BroadcastChannel('eopms_notifications');
