@@ -244,9 +244,10 @@ const AppContent: React.FC = () => {
     const channel = new BroadcastChannel('eopms_notifications');
     channel.onmessage = (event) => {
       if (event.data.type === 'TASK_ASSIGNED') {
-        const MOCK_CURRENT_USER_ID = currentRole === 'Reporting Manager' ? '2131' : '2';
-        // Simulating matching assignee to currently logged in user context
-        if (event.data.assigneeId === MOCK_CURRENT_USER_ID) {
+        // Previously compared against a hardcoded mock ID ('2' / '2131') left
+        // over from before real auth existed, so this never matched a real
+        // logged-in user. Now compares against the actual current user's id.
+        if (event.data.assigneeId === currentUser?.id) {
           setTaskNotification({ title: event.data.title, show: true });
           setTimeout(() => {
             setTaskNotification(prev => prev ? { ...prev, show: false } : null);
@@ -255,7 +256,7 @@ const AppContent: React.FC = () => {
       }
     };
     return () => channel.close();
-  }, [currentRole]);
+  }, [currentUser?.id]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -338,7 +339,14 @@ const AppContent: React.FC = () => {
               {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
             </button>
             {/* Notification Bell */}
-            <NotificationBell onNavigateToChat={() => setActiveTab('chat')} />
+            <NotificationBell
+              onNavigateToChat={() => setActiveTab('chat')}
+              onNavigateToTasks={() => setActiveTab(
+                (currentRole === 'Admin' || currentRole === 'HR' || currentRole === 'Reporting Manager')
+                  ? 'task-management'
+                  : 'kanban'
+              )}
+            />
 
             {/* User Profile */}
             {/* User Profile + Logout */}
