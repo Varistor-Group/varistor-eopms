@@ -219,10 +219,32 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
 };
 
 export const KanbanBoard: React.FC = () => {
-  const { tasks, moveTask, currentRole, currentUser } = useKanbanTasks();
+  const { tasks, moveTask, currentRole, currentUser, requestTask, cancelTaskRequest } = useKanbanTasks();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+
+  const canRequestTask = currentRole === 'Employee' || currentRole === 'Field Employee';
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [reqTitle, setReqTitle] = useState('');
+  const [reqDescription, setReqDescription] = useState('');
+  const [reqDueDate, setReqDueDate] = useState('');
+  const [reqPriority, setReqPriority] = useState<TaskPriority>('medium');
+  const [reqNotes, setReqNotes] = useState('');
+
+  const myPendingRequests = tasks.filter(t => t.status === 'pending_review' && t.assigneeId === currentUser?.id);
+
+  const handleSubmitRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reqTitle || !reqDescription || !reqDueDate) return;
+    requestTask(reqTitle, reqDescription, reqDueDate, reqPriority, reqNotes);
+    setReqTitle('');
+    setReqDescription('');
+    setReqDueDate('');
+    setReqPriority('medium');
+    setReqNotes('');
+    setShowRequestForm(false);
+  };
 
   useEffect(() => {
     if (currentRole === 'Reporting Manager') {
@@ -290,7 +312,80 @@ export const KanbanBoard: React.FC = () => {
           <h1 className="text-xl font-bold text-varistor-dark">Task Board</h1>
           <p className="text-xs text-varistor-muted mt-0.5">Drag tasks across columns or approve completions to adjust Vari Points.</p>
         </div>
+        {canRequestTask && (
+          <button
+            onClick={() => setShowRequestForm(!showRequestForm)}
+            className="bg-varistor-lime text-varistor-dark font-bold text-xs px-4 py-2 rounded-full hover:brightness-105 transition-all cursor-pointer"
+          >
+            {showRequestForm ? 'Cancel' : '+ Request a Task'}
+          </button>
+        )}
       </div>
+
+      {canRequestTask && showRequestForm && (
+        <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
+          <h2 className="text-sm font-bold text-varistor-dark mb-4">Request a New Task</h2>
+          <p className="text-xs text-varistor-muted -mt-3 mb-4">Your manager will review this before it becomes an active task.</p>
+          <form onSubmit={handleSubmitRequest} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Task Title</label>
+                <input type="text" value={reqTitle} onChange={(e) => setReqTitle(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Priority</label>
+                <select value={reqPriority} onChange={(e) => setReqPriority(e.target.value as TaskPriority)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark">
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Description</label>
+                <textarea value={reqDescription} onChange={(e) => setReqDescription(e.target.value)} required rows={3} className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Due Date</label>
+                <input type="date" value={reqDueDate} onChange={(e) => setReqDueDate(e.target.value)} required className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-semibold text-varistor-dark block mb-1.5">Notes for your manager (optional)</label>
+                <textarea value={reqNotes} onChange={(e) => setReqNotes(e.target.value)} rows={2} placeholder="Any context that helps your manager review this request..." className="w-full border border-varistor-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-varistor-lime bg-varistor-pageBg text-varistor-dark" />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" className="bg-varistor-lime text-varistor-dark font-bold text-sm px-6 py-2 rounded-full hover:brightness-105 transition-all">Send Request</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {canRequestTask && myPendingRequests.length > 0 && (
+        <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
+          <h2 className="text-sm font-bold text-varistor-dark mb-4">Your Task Requests ({myPendingRequests.length})</h2>
+          <div className="space-y-3">
+            {myPendingRequests.map(t => (
+              <div key={t.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-4 border border-[#f1f3f0] rounded-lg gap-3 bg-varistor-pageBg">
+                <div>
+                  <h3 className="font-bold text-xs text-varistor-dark">{t.title}</h3>
+                  <p className="text-[10px] text-varistor-muted mt-1">{t.description}</p>
+                  <div className="mt-2 flex items-center gap-2 text-[10px]">
+                    <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase">Pending Manager Review</span>
+                    <span className="text-varistor-muted">Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => cancelTaskRequest(t.id)}
+                  className="text-[10px] text-red-600 hover:text-red-800 font-semibold shrink-0 bg-red-50 border border-red-100 px-3 py-1.5 rounded-full"
+                >
+                  Cancel Request
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">

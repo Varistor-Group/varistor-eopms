@@ -6,7 +6,7 @@ import { getEmployees, type Employee } from '../api/employees';
 import type { TaskPriority } from '../types';
 
 export const TaskManagement: React.FC = () => {
-  const { currentRole, createTask, tasks, approveTask, rejectTask, updateTaskDetails } = useKanbanTasks();
+  const { currentRole, createTask, tasks, approveTask, rejectTask, updateTaskDetails, approveTaskRequest, rejectTaskRequest } = useKanbanTasks();
   const { currentUser } = useVariPoints();
 
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
@@ -51,6 +51,9 @@ export const TaskManagement: React.FC = () => {
   // Find tasks awaiting approval for subordinates
   const subordinateIds = new Set(subordinates.map(emp => emp.id));
   const awaitingApprovalTasks = tasks.filter(t => t.status === 'awaiting_approval' && subordinateIds.has(t.assigneeId!));
+
+  // Employee-requested tasks awaiting manager review (a separate flow from completion approval)
+  const taskRequests = tasks.filter(t => t.status === 'pending_review' && subordinateIds.has(t.assigneeId!));
 
   // State for Employee Overview
   const [selectedOverviewEmployeeId, setSelectedOverviewEmployeeId] = useState('');
@@ -164,6 +167,83 @@ export const TaskManagement: React.FC = () => {
             <button type="submit" className="bg-varistor-lime text-varistor-dark font-bold text-sm px-6 py-2 rounded-full hover:brightness-105 transition-all">Assign Task</button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">
+        <h2 className="text-lg font-bold text-varistor-dark mb-4">Task Requests Pending Approval</h2>
+        <p className="text-xs text-varistor-muted -mt-3 mb-4">Employee-submitted task requests. Review, edit if needed (e.g. deadline), then approve or reject.</p>
+        {taskRequests.length === 0 ? (
+          <p className="text-sm text-varistor-muted">No task requests currently pending.</p>
+        ) : (
+          <div className="space-y-3">
+            {taskRequests.map(task => (
+              <div key={task.id} className="p-4 border border-[#f1f3f0] rounded-lg bg-varistor-pageBg">
+                {editingTaskId === task.id ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full border border-varistor-border rounded px-2 py-1.5 text-sm font-bold bg-white"
+                      placeholder="Title"
+                    />
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={2}
+                      className="w-full border border-varistor-border rounded px-2 py-1.5 text-xs bg-white"
+                      placeholder="Description"
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={editPriority}
+                        onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                        className="flex-1 border border-varistor-border rounded px-2 py-1.5 text-xs bg-white"
+                      >
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={editDueDate}
+                        onChange={(e) => setEditDueDate(e.target.value)}
+                        className="flex-1 border border-varistor-border rounded px-2 py-1.5 text-xs bg-white"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button onClick={cancelEditingTask} className="text-xs text-gray-500 hover:text-gray-800 font-semibold px-2 py-1">Cancel</button>
+                      <button onClick={saveEditingTask} className="text-xs bg-varistor-lime text-varistor-dark font-bold px-3 py-1.5 rounded-full hover:brightness-105">Save Changes</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                    <div>
+                      <h3 className="font-bold text-sm text-varistor-dark">{task.title}</h3>
+                      <p className="text-xs text-varistor-muted mt-1">{task.description}</p>
+                      {task.comments.length > 0 && (
+                        <p className="text-[10px] text-varistor-dark bg-white border border-varistor-border rounded px-2 py-1 mt-2 italic">
+                          Note: {task.comments[task.comments.length - 1].text}
+                        </p>
+                      )}
+                      <div className="mt-2 flex items-center gap-2 text-[10px]">
+                        <span className="text-varistor-limeText font-semibold">Requested by: {subordinates.find(e => e.id === task.assigneeId)?.fullName || 'Unknown'}</span>
+                        <span className="text-varistor-muted">· Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                        <span className="text-varistor-muted capitalize">· {task.priority} priority</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => startEditingTask(task)} className="bg-white border border-varistor-border text-varistor-dark text-xs font-bold px-3 py-2 rounded-full hover:bg-varistor-pageBg transition-all cursor-pointer">Edit</button>
+                      <button onClick={() => approveTaskRequest(task.id)} className="bg-varistor-lime text-varistor-dark text-xs font-bold px-4 py-2 rounded-full hover:brightness-105 transition-all cursor-pointer">Approve</button>
+                      <button onClick={() => rejectTaskRequest(task.id)} className="bg-red-50 text-red-600 border border-red-200 text-xs font-bold px-4 py-2 rounded-full hover:bg-red-100 transition-all cursor-pointer">Reject</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor p-6">

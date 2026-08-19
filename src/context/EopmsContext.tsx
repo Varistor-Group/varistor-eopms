@@ -40,6 +40,10 @@ interface EopmsContextType {
   approveTask: (taskId: string) => void;
   rejectTask: (taskId: string) => void;
   createTask: (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => void;
+  requestTask: (title: string, description: string, dueDate: string, priority: TaskPriority, notes?: string) => void;
+  approveTaskRequest: (taskId: string) => void;
+  rejectTaskRequest: (taskId: string) => void;
+  cancelTaskRequest: (taskId: string) => void;
   updateTaskDetails: (taskId: string, title: string, description: string, priority: TaskPriority, dueDate: string) => void;
   addComment: (taskId: string, text: string) => void;
   toggleChecklistItem: (taskId: string, itemId: string) => void;
@@ -560,6 +564,94 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     addToast(`Rejected: "${task.title}" returned to In Progress`, 0, 'debit');
   };
 
+  // Employee self-requests a task. Goes to their Reporting Manager (or HR/Admin)
+  // for review before it becomes an actionable 'todo' item — NOT auto-approved.
+  const requestTask = (title: string, description: string, dueDate: string, priority: TaskPriority, notes?: string) => {
+    if (!currentUser) return;
+
+    const assigneeDetails = { name: currentUser.name, avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
+    const taskId = `task-${Date.now()}`;
+
+    const newTask: Task = {
+      id: taskId,
+      title,
+      description,
+      dueDate,
+      priority,
+      status: 'pending_review',
+      assigneeId: currentUser.id,
+      assignee: assigneeDetails,
+      checklist: [],
+      comments: [],
+      attachments: []
+    };
+
+    setTasks((prevTasks) => [newTask, ...prevTasks]);
+    tasksApi.createTask(newTask).catch(console.error);
+
+    if (notes && notes.trim()) {
+      addComment(taskId, notes.trim());
+    }
+
+    addToast(`Task request sent: "${title}" — awaiting manager review`, 0, 'credit');
+  };
+
+  // Manager (Admin/HR/Reporting Manager) approves an employee's task request,
+  // turning it into a normal actionable task.
+  const approveTaskRequest = async (taskId: string) => {
+    if (currentRole === 'Employee' || currentRole === 'Field Employee') {
+      addToast('Error: Employees do not have permission to approve task requests.', 0, 'debit');
+      return;
+    }
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const taskAssigneeDetails = mockEmployeeStore.find(e => e.id === task.assigneeId);
+    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManagerId !== currentUser?.id) {
+      addToast('Error: You can only approve requests for your direct subordinates.', 0, 'debit');
+      return;
+    }
+
+    setTasks((prevTasks) =>
+      prevTasks.map((t) => (t.id === taskId ? { ...t, status: 'todo' } : t))
+    );
+    tasksApi.updateTaskStatus(taskId, 'todo').catch(console.error);
+    addToast(`Approved task request: "${task.title}"`, 0, 'credit');
+  };
+
+  // Manager rejects an employee's task request — it's removed entirely rather
+  // than left in limbo, matching how a declined request should behave.
+  const rejectTaskRequest = (taskId: string) => {
+    if (currentRole === 'Employee' || currentRole === 'Field Employee') {
+      addToast('Error: Employees do not have permission to reject task requests.', 0, 'debit');
+      return;
+    }
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const taskAssigneeDetails = mockEmployeeStore.find(e => e.id === task.assigneeId);
+    if (currentRole === 'Reporting Manager' && taskAssigneeDetails?.reportingManagerId !== currentUser?.id) {
+      addToast('Error: You can only reject requests for your direct subordinates.', 0, 'debit');
+      return;
+    }
+
+    setTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskId));
+    tasksApi.deleteTask(taskId).catch(console.error);
+    addToast(`Rejected task request: "${task.title}"`, 0, 'debit');
+  };
+
+  // Employee cancels their own not-yet-approved task request.
+  const cancelTaskRequest = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status !== 'pending_review' || task.assigneeId !== currentUser?.id) return;
+
+    setTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskId));
+    tasksApi.deleteTask(taskId).catch(console.error);
+    addToast(`Cancelled task request: "${task.title}"`, 0, 'debit');
+  };
+
   const createTask = (title: string, description: string, dueDate: string, priority: TaskPriority, assigneeId: string, checkpoints?: string[]) => {
     // Determine assignee details from mock store, fallback to default
     const assigneeDetails = { name: 'Unknown', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' };
@@ -767,6 +859,10 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         approveTask,
         rejectTask,
         createTask,
+        requestTask,
+        approveTaskRequest,
+        rejectTaskRequest,
+        cancelTaskRequest,
         updateTaskDetails,
         addComment,
         toggleChecklistItem,

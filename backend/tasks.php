@@ -6,7 +6,10 @@
  *                                    marking status='done' requires HR/Admin, or the
  *                                    assignee's actual Reporting Manager, matched by
  *                                    employees.reporting_manager_id)
- * DELETE /api/tasks/:id            — delete (HR/Admin only)
+ * DELETE /api/tasks/:id            — delete (HR/Admin always; a Reporting Manager
+ *                                    may reject a direct report's pending_review
+ *                                    request; an employee may cancel their own
+ *                                    pending_review request)
  */
 
 $db = get_db();
@@ -74,7 +77,6 @@ if ($method === 'PUT') {
     // Guard: marking a task 'done' requires approval-capable role.
     // HR/Admin can approve anyone's task. A Reporting Manager can only
     // approve tasks for employees whose reporting_manager_id matches them.
-    // Guard: marking a task 'done' requires approval-capable role.
     if (isset($input['status']) && $input['status'] === 'done') {
         if (!in_array($role, ['HR', 'Admin', 'Reporting Manager'], true)) {
             json_error('Only HR, Admin, or a Reporting Manager can approve task completion.', 403);
@@ -98,6 +100,28 @@ if ($method === 'PUT') {
         // Stamp completion time — this is what lets us later tell whether
         // the task was finished on-time or late, comparing against due_date.
         $input['completedAt'] = date('Y-m-d H:i:s');
+    }
+
+    // Guard: approving an employee-requested task (status pending_review -> anything else,
+    // typically 'todo') requires the same approval-capable roles as completion approval.
+    if (isset($input['status']) && $input['status'] !== 'pending_review') {
+        $curStmt = $db->prepare('SELECT assignee_id, status FROM tasks WHERE id = ? LIMIT 1');
+        $curStmt->execute([$id]);
+        $curRow = $curStmt->fetch();
+
+        if ($curRow && $curRow['status'] === 'pending_review') {
+            if (!in_array($role, ['HR', 'Admin', 'Reporting Manager'], true)) {
+                json_error('Only HR, Admin, or a Reporting Manager can approve task requests.', 403);
+            }
+            if ($role === 'Reporting Manager') {
+                $assigneeStmt = $db->prepare('SELECT reporting_manager_id FROM employees WHERE id = ? LIMIT 1');
+                $assigneeStmt->execute([$curRow['assignee_id']]);
+                $assignee = $assigneeStmt->fetch();
+                if (!$assignee || $assignee['reporting_manager_id'] !== $myId) {
+                    json_error('You can only approve requests for your direct reports.', 403);
+                }
+            }
+        }
     }
     $setClauses = [];
     $values = [];
@@ -146,8 +170,32 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
-    requireRole(['HR', 'Admin']);
     if (!$id) json_error('Task ID required.', 400);
+
+    $taskStmt = $db->prepare('SELECT assignee_id, status FROM tasks WHERE id = ? LIMIT 1');
+    $taskStmt->execute([$id]);
+    $taskRow = $taskStmt->fetch();
+    if (!$taskRow) json_error('Task not found.', 404);
+
+    $canDelete = in_array($role, ['HR', 'Admin'], true);
+
+    // Task requests (status pending_review) are a special case: the employee who
+    // requested it can cancel it, and their Reporting Manager can reject it.
+    if (!$canDelete && $taskRow['status'] === 'pending_review') {
+        if ($taskRow['assignee_id'] === $myId) {
+            $canDelete = true;
+        } elseif ($role === 'Reporting Manager') {
+            $assigneeStmt = $db->prepare('SELECT reporting_manager_id FROM employees WHERE id = ? LIMIT 1');
+            $assigneeStmt->execute([$taskRow['assignee_id']]);
+            $assignee = $assigneeStmt->fetch();
+            if ($assignee && $assignee['reporting_manager_id'] === $myId) {
+                $canDelete = true;
+            }
+        }
+    }
+
+    if (!$canDelete) json_error('Not authorized to delete this task.', 403);
+
     $db->prepare('DELETE FROM tasks WHERE id = ?')->execute([$id]);
     json_ok(['success' => true]);
 }
