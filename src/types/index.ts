@@ -2,7 +2,7 @@ export type UserRole = 'Employee' | 'Field Employee' | 'Reporting Manager' | 'HR
 
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 
-export type TaskStatus = 'todo' | 'in_progress' | 'awaiting_approval' | 'done';
+export type TaskStatus = 'pending_review' | 'todo' | 'in_progress' | 'awaiting_approval' | 'done';
 
 export type DocumentStatus = 'Verified' | 'Pending' | 'Rejected' | 'Under Review';
 
