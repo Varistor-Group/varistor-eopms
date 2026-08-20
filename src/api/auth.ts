@@ -13,6 +13,7 @@ export interface AuthUser {
   avatarUrl: string;
   role: UserRole;
   is_field_employee?: boolean;
+  dob?: string;
 }
 
 const loginAttempts: Record<string, { count: number; lockedUntil: number }> = {};

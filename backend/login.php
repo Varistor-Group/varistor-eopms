@@ -14,7 +14,7 @@ if ($email === '' || $password === '') {
     json_error('Email and password are required.', 422);
 }
 
-$stmt = $db->prepare('SELECT id, full_name, personal_email, department, role, avatar_url, is_field_employee, password_hash, status FROM employees WHERE personal_email = ? LIMIT 1');
+$stmt = $db->prepare('SELECT id, full_name, personal_email, department, role, avatar_url, is_field_employee, password_hash, status, date_of_birth FROM employees WHERE personal_email = ? LIMIT 1');
 $stmt->execute([$email]);
 $emp = $stmt->fetch();
 
@@ -43,5 +43,6 @@ json_ok([
         'avatarUrl' => $emp['avatar_url'] ?? '',
         'role' => $emp['role'],
         'is_field_employee' => (bool)$emp['is_field_employee'],
+        'dob' => $emp['date_of_birth'] ?? null,
     ],
 ]);
