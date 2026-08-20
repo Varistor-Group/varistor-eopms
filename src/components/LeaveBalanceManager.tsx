@@ -138,6 +138,7 @@ export const LeaveBalanceManager: React.FC = () => {
             <input
               type="number"
               min="0"
+              step="0.5"
               value={newTotal}
               onChange={e => setNewTotal(Number(e.target.value))}
               className="w-full text-sm border border-varistor-border rounded px-3 py-2 bg-varistor-surface"
@@ -176,14 +177,14 @@ export const LeaveBalanceManager: React.FC = () => {
                       
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
-                          <input type="number" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editTotal} onChange={e => setEditTotal(Number(e.target.value))} />
+                          <input type="number" step="0.5" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editTotal} onChange={e => setEditTotal(Number(e.target.value))} />
                         ) : (
                           bal.total
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
-                          <input type="number" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editUsed} onChange={e => setEditUsed(Number(e.target.value))} />
+                          <input type="number" step="0.5" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editUsed} onChange={e => setEditUsed(Number(e.target.value))} />
                         ) : (
                           bal.used
                         )}
