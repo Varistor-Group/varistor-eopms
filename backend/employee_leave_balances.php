@@ -28,7 +28,7 @@ if ($method === 'GET') {
     }
 
     requireRole(['HR', 'Admin']);
-    $rows = $db->query('SELECT * FROM employee_leave_balances')->fetchAll();
+    $rows = $db->query('SELECT * FROM employee_leave_balances ORDER BY employee_id')->fetchAll();
     json_ok($rows);
 }
 

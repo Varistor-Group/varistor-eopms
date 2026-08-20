@@ -29,9 +29,14 @@ export const LeaveBalanceManager: React.FC = () => {
       getLeaveTypes(),
       getEmployees()
     ]);
-    setBalances(bals);
+    // Sort by employee ID (numeric-aware, so "VTPL-2" sorts before "VTPL-10")
+    // as a defensive fallback in case the backend's own ORDER BY isn't applied
+    // (e.g. cached responses) — matches the backend fix in employee_leave_balances.php.
+    const byEmployeeId = (a: { id: string }, b: { id: string }) =>
+      a.id.localeCompare(b.id, undefined, { numeric: true });
+    setBalances([...bals].sort((a, b) => a.employee_id.localeCompare(b.employee_id, undefined, { numeric: true })));
     setLeaveTypes(types);
-    setEmployees(emps);
+    setEmployees([...emps].sort((a, b) => byEmployeeId({ id: a.employeeId }, { id: b.employeeId })));
     setLoading(false);
   };
 
