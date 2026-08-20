@@ -28,7 +28,7 @@ if ($method === 'POST') {
         $id,
         $name,
         $input['description'] ?? null,
-        (int)($input['default_allocation'] ?? 0),
+        (float)($input['default_allocation'] ?? 0),
     ]);
 
     $fetch = $db->prepare('SELECT * FROM leave_types WHERE id = ? LIMIT 1');

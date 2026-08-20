@@ -40,8 +40,8 @@ if ($method === 'PUT') {
     $leaveTypeName = trim($input['leaveTypeName'] ?? '');
     if ($leaveTypeName === '') json_error('leaveTypeName is required.', 422);
 
-    $total = (int)($input['total'] ?? 0);
-    $used = (int)($input['used'] ?? 0);
+    $total = (float)($input['total'] ?? 0);
+    $used = (float)($input['used'] ?? 0);
 
     // Upsert: check if a row exists for this employee+leave type
     $find = $db->prepare('SELECT id FROM employee_leave_balances WHERE employee_id = ? AND leave_type_name = ? LIMIT 1');

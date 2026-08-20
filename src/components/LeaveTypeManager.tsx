@@ -88,6 +88,7 @@ export const LeaveTypeManager: React.FC = () => {
             <input
               type="number"
               min="0"
+              step="0.5"
               value={defaultAllocation}
               onChange={e => setDefaultAllocation(Number(e.target.value))}
               className="w-full text-sm border border-varistor-border rounded px-3 py-2 bg-varistor-surface focus:outline-none focus:ring-1 focus:ring-varistor-lime"
