@@ -296,8 +296,10 @@ export const TaskManagement: React.FC = () => {
                 <p className="text-xs text-varistor-muted italic">No pending tasks.</p>
               ) : (
                 <div className="space-y-3">
-                  {pendingTasks.map(t => (
-                    <div key={t.id} className="p-3 bg-varistor-pageBg border border-[#f1f3f0] rounded-lg">
+                  {pendingTasks.map(t => {
+                    const isOverdue = t.status !== 'done' && new Date(t.dueDate + 'T23:59:59') < new Date();
+                    return (
+                    <div key={t.id} className={`p-3 bg-varistor-pageBg border rounded-lg ${isOverdue ? 'border-l-4 border-l-red-500 border-[#f1f3f0]' : 'border-[#f1f3f0]'}`}>
                       {editingTaskId === t.id ? (
                         <div className="space-y-2">
                           <input
@@ -351,12 +353,15 @@ export const TaskManagement: React.FC = () => {
                           <p className="text-[10px] text-varistor-muted mt-1 truncate">{t.description}</p>
                           <div className="mt-2 flex justify-between items-center text-[10px]">
                             <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase">{t.status.replace('_', ' ')}</span>
-                            <span className="text-varistor-muted">Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                            <span className={isOverdue ? 'text-red-700 font-bold' : 'text-varistor-muted'}>
+                              Due: {new Date(t.dueDate).toLocaleDateString()}{isOverdue ? ' · Overdue' : ''}
+                            </span>
                           </div>
                         </>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

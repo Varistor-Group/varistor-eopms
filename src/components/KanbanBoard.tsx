@@ -124,6 +124,10 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
   const completedChecklist = task.checklist.filter(c => c.completed).length;
   const totalChecklist = task.checklist.length;
 
+  // A task is overdue if its due date has passed and it hasn't been completed —
+  // matches the same condition the backend's overdue-sweep job uses for emails.
+  const isOverdue = task.status !== 'done' && new Date(task.dueDate + 'T23:59:59') < new Date();
+
   const getPointsText = (priority: TaskPriority) => {
     switch (priority) {
       case 'critical': return '+100';
@@ -142,7 +146,7 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
       {...attributes}
       className={`bg-white rounded-lg border border-varistor-border p-4 shadow-varistor hover:shadow-md cursor-grab active:cursor-grabbing select-none transition-varistor group relative ${
         isDragging ? 'shadow-lg border-varistor-lime border-2' : ''
-      }`}
+      } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}
       onClick={handleCardClick}
     >
       {/* Top row: Priority & Points */}
@@ -182,9 +186,12 @@ const KanbanCard: React.FC<CardProps> = ({ task, onClick, onApprove, onReject })
 
       {/* Card Footer: Date chip and Avatar */}
       <div className="flex justify-between items-center pt-3 border-t border-[#f1f3f0]">
-        <div className="flex items-center gap-1 text-[10px] text-[#555a52] bg-varistor-pageBg px-2 py-0.5 rounded-full">
-          <Calendar size={11} className="text-[#888]" />
+        <div className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
+          isOverdue ? 'text-red-700 bg-red-50 font-bold' : 'text-[#555a52] bg-varistor-pageBg'
+        }`}>
+          <Calendar size={11} className={isOverdue ? 'text-red-600' : 'text-[#888]'} />
           <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          {isOverdue && <span className="uppercase tracking-wide">· Overdue</span>}
         </div>
         
         <img 
