@@ -87,6 +87,7 @@ HTML;
 $sweptCount = 0;
 $emailsSent = 0;
 $emailsFailed = 0;
+$failures = [];
 
 foreach ($overdueTasks as $task) {
     $empStmt->execute([$task['assignee_id']]);
@@ -117,6 +118,7 @@ foreach ($overdueTasks as $task) {
                 $emailsSent++;
             } catch (\Exception $e) {
                 $emailsFailed++;
+                $failures[] = ['email' => $email, 'error' => $e->getMessage()];
             }
         }
     }
@@ -130,4 +132,5 @@ json_ok([
     'tasksSwept' => $sweptCount,
     'emailsSent' => $emailsSent,
     'emailsFailed' => $emailsFailed,
+    'failures' => $failures,
 ]);
