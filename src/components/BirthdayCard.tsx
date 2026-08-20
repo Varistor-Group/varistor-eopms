@@ -1,23 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Cake, Gift, X, Sparkles } from 'lucide-react';
+import { useVariPoints } from '../hooks/useVariPoints';
 
 export const BirthdayCard: React.FC = () => {
+  const { currentUser } = useVariPoints();
   const [showCard, setShowCard] = useState(false);
-  const currentYear = new Date().getFullYear(); // 2026
+  const currentYear = new Date().getFullYear();
+
+  const isBirthdayToday = () => {
+    const dob = currentUser?.dob;
+    if (!dob) return false;
+    const today = new Date();
+    const dobDate = new Date(dob);
+    return today.getMonth() === dobDate.getMonth() && today.getDate() === dobDate.getDate();
+  };
 
   useEffect(() => {
-    // Current date check (simulate employee birthday is June 30)
-    const today = new Date();
-    const isJune30 = today.getMonth() === 5 && today.getDate() === 30; // 0-indexed month (5 = June)
-    
     // Check if user already dismissed it for this year
     const isDismissed = localStorage.getItem(`birthday_dismissed_${currentYear}`);
-    
-    if (isJune30 && !isDismissed) {
+
+    if (isBirthdayToday() && !isDismissed) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowCard(true);
     }
-  }, [currentYear]);
+  }, [currentYear, currentUser?.dob]);
 
   const handleDismiss = () => {
     localStorage.setItem(`birthday_dismissed_${currentYear}`, 'true');
@@ -25,6 +31,8 @@ export const BirthdayCard: React.FC = () => {
   };
 
   if (!showCard) return null;
+
+  const firstName = currentUser?.name?.split(' ')[0] ?? 'there';
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-[#f7fee7] to-[#ecfccb] border border-varistor-successBorder rounded-varistor p-5 shadow-[0_4px_16px_rgba(132,204,22,0.12)] transition-varistor hover:shadow-lg animate-[fadeInScale_300ms_ease-out] col-span-full">
@@ -42,7 +50,7 @@ export const BirthdayCard: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h2 className="text-base font-bold text-varistor-dark">Happy Birthday, Aarav!</h2>
+              <h2 className="text-base font-bold text-varistor-dark">Happy Birthday, {firstName}!</h2>
               <Sparkles size={16} className="text-yellow-600 animate-pulse" />
             </div>
             <p className="text-xs text-varistor-limeText font-medium mt-0.5">
