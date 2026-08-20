@@ -164,12 +164,12 @@ export const LeaveBalanceManager: React.FC = () => {
             <table className="w-full text-sm text-left">
               <thead className="bg-varistor-pageBg border-b border-varistor-border text-xs text-varistor-muted uppercase sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2 font-bold">Employee ID</th>
-                  <th className="px-4 py-2 font-bold">Leave Type</th>
-                  <th className="px-4 py-2 font-bold text-center">Total Allocated</th>
-                  <th className="px-4 py-2 font-bold text-center">Days Used</th>
-                  <th className="px-4 py-2 font-bold text-center">Remaining</th>
-                  <th className="px-4 py-2 font-bold text-right">Actions</th>
+                  <th className="px-3 py-2 font-bold whitespace-nowrap">Employee ID</th>
+                  <th className="px-3 py-2 font-bold whitespace-nowrap">Leave Type</th>
+                  <th className="px-3 py-2 font-bold text-center">Allocated</th>
+                  <th className="px-3 py-2 font-bold text-center">Used</th>
+                  <th className="px-3 py-2 font-bold text-center">Remaining</th>
+                  <th className="px-3 py-2 font-bold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,27 +177,27 @@ export const LeaveBalanceManager: React.FC = () => {
                   const isEditing = editingId === bal.id;
                   return (
                     <tr key={bal.id} className="border-b border-varistor-border hover:bg-varistor-pageBg">
-                      <td className="px-4 py-3 font-semibold">{bal.employee_id}</td>
-                      <td className="px-4 py-3 text-varistor-muted">{bal.leave_type_name}</td>
+                      <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{bal.employee_id}</td>
+                      <td className="px-3 py-2.5 text-varistor-muted whitespace-nowrap">{bal.leave_type_name}</td>
                       
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2.5 text-center">
                         {isEditing ? (
                           <input type="number" step="0.5" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editTotal} onChange={e => setEditTotal(Number(e.target.value))} />
                         ) : (
                           bal.total
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2.5 text-center">
                         {isEditing ? (
                           <input type="number" step="0.5" className="w-16 border border-varistor-border bg-varistor-surface rounded px-1 text-center" value={editUsed} onChange={e => setEditUsed(Number(e.target.value))} />
                         ) : (
                           bal.used
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center font-bold text-varistor-dark">
+                      <td className="px-3 py-2.5 text-center font-bold text-varistor-dark">
                         {(isEditing ? editTotal : bal.total) - (isEditing ? editUsed : bal.used)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-2.5 text-right">
                         {isEditing ? (
                           <div className="flex justify-end gap-2">
                             <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 hover:text-gray-800">Cancel</button>
