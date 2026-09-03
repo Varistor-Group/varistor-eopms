@@ -31,7 +31,8 @@ import {
   type SlipRow,
   type BulkSendResult,
   type PayslipSchedule,
-  getDaysInMonth
+  getDaysInMonth,
+  formatMonthToMMMYear
 } from '../api/payroll';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
@@ -45,7 +46,9 @@ import logoUrl from '../assets/logo.png';
 const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-const MONTH = 'Jun 2026';
+const MONTH = formatMonthToMMMYear(
+  `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+);
 
 
 // Column name aliases — tolerant parsing of Excel headers
