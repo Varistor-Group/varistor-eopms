@@ -538,14 +538,21 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
   }
 
   try {
-    const employees = await getEmployees();
-    const targetMonth = 'Jun 2026';
+    let employees: Awaited<ReturnType<typeof getEmployees>> = [];
+    try {
+      employees = await getEmployees();
+    } catch (e) {
+      console.error('[getPayrollRecords] getEmployees() failed — cannot sync payroll from employee master:', e);
+    }
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const targetMonth = formatMonthToMMMYear(currentMonthStr);
     const toSync: PayrollRecord[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let attendanceReports: any[] = [];
     try {
-      attendanceReports = await getMonthlyReport('2026-06');
+      attendanceReports = await getMonthlyReport(currentMonthStr);
     } catch (e) {
       console.warn('Could not fetch attendance reports for payroll', e);
     }
@@ -632,7 +639,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
         const defaultCtc = 30000;
         const comp = computeNet({
           monthlySalary: defaultCtc,
-          totalDays: getDaysInMonth('June 2026'),
+          totalDays: getDaysInMonth(targetMonth),
           payDays: 30,
           medical: 1250,
           ta: 2500,
@@ -680,7 +687,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
           status: 'draft',
           revision: 1,
           autoFormula: true,
-          totalDays: getDaysInMonth('June 2026'),
+          totalDays: getDaysInMonth(targetMonth),
           payDays: 30,
           clBalance: 12,
           pfUan: emp.uanNumber || '—',
@@ -711,7 +718,7 @@ export async function getPayrollRecords(employeeId?: string): Promise<PayrollRec
       if (res.ok) records = await res.json();
     }
   } catch (err) {
-    console.error('Error syncing payroll records with employees list:', err);
+    console.error('[getPayrollRecords] Error syncing payroll records with employees list — Salary Engine may show stale or missing data:', err);
   }
 
   if (employeeId) {
