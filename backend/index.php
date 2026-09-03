@@ -71,7 +71,7 @@ $routes = [
     ['POST', '#^/api/payroll/send-slips$#',         'payroll_send_slips.php'],
     ['GET',  '#^/api/payroll/schedule$#',           'payroll_schedule.php'],
     ['PUT',  '#^/api/payroll/schedule$#',           'payroll_schedule.php'],
-    ['POST', '#^/api/payroll/records$#',            'payroll_records.php'],
+    ['POST', '#^/api/payroll-records$#',            'payroll_records.php'],
     ['POST', '#^/api/payroll/trigger-send$#',       'payroll_trigger.php'],
 
     // Payroll Records (new MySQL-backed API)
