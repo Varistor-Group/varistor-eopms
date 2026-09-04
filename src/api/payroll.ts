@@ -328,10 +328,19 @@ export function computeNet(params: {
 
   const refAmt = monthlySalary || (params.employeeId ? employeeDetails[params.employeeId] : 0) || 0;
 
-  const present = params.attendanceBreakdown?.present ?? payDays;
-  const weekOff = params.attendanceBreakdown?.weekOff ?? 0;
-  const leaves = params.attendanceBreakdown?.leaves ?? 0;
-  const holidays = params.attendanceBreakdown?.holidays ?? 0;
+  const rawPresent = params.attendanceBreakdown?.present ?? payDays;
+  const rawWeekOff = params.attendanceBreakdown?.weekOff ?? 0;
+  const rawLeaves = params.attendanceBreakdown?.leaves ?? 0;
+  const rawHolidays = params.attendanceBreakdown?.holidays ?? 0;
+  // If no attendance has been recorded yet this month (all zeros), assume
+  // full pay days rather than zero salary -- avoids every additive formula
+  // (Basic/HRA/Medical/TA/LTA) collapsing to 0 early in the month before
+  // any attendance has been marked.
+  const attendanceRecorded = rawPresent + rawWeekOff + rawLeaves + rawHolidays > 0;
+  const present = attendanceRecorded ? rawPresent : payDays;
+  const weekOff = attendanceRecorded ? rawWeekOff : 0;
+  const leaves = attendanceRecorded ? rawLeaves : 0;
+  const holidays = attendanceRecorded ? rawHolidays : 0;
 
   const context: Record<string, number> = {
     '$BS': refAmt,
@@ -886,9 +895,9 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
       monthlySalary,
       totalDays: r.totalDays,
       payDays: r.payDays,
-      medical: r.components.medical,
-      ta: r.components.ta,
-      lta: r.components.lta,
+      // medical/ta/lta intentionally omitted -- "Apply Formulas to All"
+      // should always recompute them from the configured formulas instead
+      // of re-using possibly-stale (or zero) previously stored values.
       reimbursement: r.components.reimbursement,
       incentives: r.components.incentives,
       overtime: r.components.overtime,

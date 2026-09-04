@@ -1890,10 +1890,23 @@ const SalaryEngine: React.FC = () => {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
-  // Keep only the latest revision for each employee in the month to avoid duplicate keys and rows
+  // Which month is currently being viewed in the Salary Engine table.
+  // Defaults to the current month; HR/Admin can step backward/forward to
+  // review payroll for other months.
+  const [selectedMonth, setSelectedMonth] = useState(MONTH);
+  const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const shiftSelectedMonth = (delta: number) => {
+    const [mon, yr] = selectedMonth.split(' ');
+    const idx = MONTH_ABBR.indexOf(mon);
+    const d = new Date(parseInt(yr, 10), idx + delta, 1);
+    setSelectedMonth(formatMonthToMMMYear(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`));
+  };
+  const isCurrentMonth = selectedMonth === MONTH;
+
+  // Keep only the latest revision for each employee in the selected month to avoid duplicate keys and rows
   const monthRecords = Object.values(
     records
-      .filter(r => r.month === MONTH)
+      .filter(r => r.month === selectedMonth)
       .reduce((acc, r) => {
         const existing = acc[r.employeeId];
         if (!existing || r.revision > existing.revision) {
@@ -2038,7 +2051,13 @@ const SalaryEngine: React.FC = () => {
             <DollarSign size={20} className="text-varistor-lime" />
             Payroll — Salary Engine
           </h1>
-          <p className="text-sm text-varistor-muted mt-0.5">Excel-driven formula engine · {MONTH} · {monthRecords.length} employees</p>
+          <p className="text-sm text-varistor-muted mt-0.5 flex items-center gap-1.5">
+            Excel-driven formula engine ·
+            <button onClick={() => shiftSelectedMonth(-1)} className="px-1.5 py-0.5 rounded hover:bg-varistor-surface font-bold" title="Previous month">‹</button>
+            <span className="font-semibold text-varistor-dark">{selectedMonth}</span>
+            <button onClick={() => shiftSelectedMonth(1)} disabled={isCurrentMonth} className="px-1.5 py-0.5 rounded hover:bg-varistor-surface font-bold disabled:opacity-30 disabled:cursor-not-allowed" title="Next month">›</button>
+            · {monthRecords.length} employees
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'engine' && (
@@ -2110,7 +2129,7 @@ const SalaryEngine: React.FC = () => {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Employees', val: records.length, icon: Users, color: 'text-blue-500' },
+              { label: 'Total Employees', val: monthRecords.length, icon: Users, color: 'text-blue-500' },
               { label: 'Draft Slips', val: draftCount, icon: FileText, color: 'text-yellow-500' },
               { label: 'Approved Slips', val: approvedCount, icon: ShieldCheck, color: 'text-varistor-lime' },
               { label: 'Total Net Payroll', val: fmt(totalNetPay), icon: TrendingUp, color: 'text-varistor-lime' },
