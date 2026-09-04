@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, CheckCircle2, Clock, Loader2, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { isFieldEmployeePunchedIn } from '../api/attendance';
-import { API_URL } from '../config/api';
 import { apiFetch } from '../api/httpClient';
 import { Camera as CapCamera } from '@capacitor/camera';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
