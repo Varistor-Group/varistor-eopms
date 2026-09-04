@@ -32,8 +32,11 @@ import {
   type BulkSendResult,
   type PayslipSchedule,
   getDaysInMonth,
-  formatMonthToMMMYear
+  formatMonthToMMMYear,
+  loadPayrollSettings,
+  savePayrollSetting
 } from '../api/payroll';
+import { apiFetch } from '../api/httpClient';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
 // We import the type only; actual lib loaded at runtime
@@ -1058,46 +1061,25 @@ const SalaryHeadMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [esiPercentage, setEsiPercentage] = useState<number>(0);
   const [ptRanges, setPtRanges] = useState<{ min: number; max: number; amount: number }[]>([]);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
-      const saved = localStorage.getItem('eopms_salary_heads');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.additions) setAdditions(parsed.additions);
-        if (parsed.deductions) {
-          const updatedDeductions = [...parsed.deductions];
-          if (!updatedDeductions.includes('ESI')) {
-            const emptyIdx = updatedDeductions.findIndex(d => d === '');
-            if (emptyIdx !== -1) updatedDeductions[emptyIdx] = 'ESI';
-          }
-          if (!updatedDeductions.includes('PT')) {
-            const emptyIdx = updatedDeductions.findIndex(d => d === '');
-            if (emptyIdx !== -1) updatedDeductions[emptyIdx] = 'PT';
-          }
-          setDeductions(updatedDeductions);
-        } else {
-          setDeductions(["PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""]);
-        }
-        if (parsed.pfPercentage !== undefined) setPfPercentage(parsed.pfPercentage);
-        if (parsed.esiPercentage !== undefined) setEsiPercentage(parsed.esiPercentage);
-        if (parsed.ptRanges) setPtRanges(parsed.ptRanges);
-        return;
-      }
+      const res = await apiFetch('/api/payroll-settings');
+      const data = res.ok ? await res.json() : {};
+      const heads = data.heads;
+      setAdditions(heads?.additions ?? ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""]);
+      setDeductions(heads?.deductions ?? ["PF Employee", "PF Employer", "ESI", "PT", "Advance salary adjut", "", "", "", "", ""]);
+      setPfPercentage(heads?.pfPercentage ?? 12);
+      setEsiPercentage(heads?.esiPercentage ?? 0);
+      setPtRanges(heads?.ptRanges ?? [
+        { min: 0, max: 2999, amount: 0 },
+        { min: 3000, max: 5999, amount: 20 },
+        { min: 6000, max: 8999, amount: 80 },
+        { min: 9000, max: 11999, amount: 150 },
+        { min: 12000, max: 500000, amount: 200 }
+      ]);
     } catch (e) {
       console.error(e);
     }
-    // Defaults
-    setAdditions(["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "", "", "", ""]);
-    setDeductions(["PF", "ESI", "PT", "Advance salary adjut", "", "", "", "", "", ""]);
-    setPfPercentage(12);
-    setEsiPercentage(0);
-    setPtRanges([
-      { min: 0, max: 2999, amount: 0 },
-      { min: 3000, max: 5999, amount: 20 },
-      { min: 6000, max: 8999, amount: 80 },
-      { min: 9000, max: 11999, amount: 150 },
-      { min: 12000, max: 500000, amount: 200 }
-    ]);
   };
 
   useEffect(() => {
@@ -1105,15 +1087,10 @@ const SalaryHeadMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     loadData();
   }, []);
 
-  const handleSave = () => {
-    const data = {
-      additions,
-      deductions,
-      pfPercentage,
-      esiPercentage,
-      ptRanges
-    };
-    localStorage.setItem('eopms_salary_heads', JSON.stringify(data));
+  const handleSave = async () => {
+    const data = { additions, deductions, pfPercentage, esiPercentage, ptRanges };
+    await savePayrollSetting('heads', data);
+    await loadPayrollSettings();
     setIsEditing(false);
   };
 
@@ -1307,34 +1284,29 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [formData, setFormData] = useState({ code: '', name: '', equation: '' });
   const [search, setSearch] = useState('');
 
-  const loadData = () => {
+  const loadData = async () => {
+    const defaults = [
+      { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
+      { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
+      { code: "F3", name: "MEDICAL ALLOWANCE", equation: "Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
+      { code: "F6", name: "SPECIAL ALLOWANCE", equation: "$Prorata - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA)" },
+      { code: "F7", name: "PF", equation: "($Basic >= 15000 ? 1800 : Math.round($Basic * 12%)) * $haspf" },
+      { code: "F8", name: "ESI", equation: "($Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)) * $hasesi" },
+      { code: "F9", name: "PT", equation: "($Gross >= 15001 ? 200 : 0) * $haspt" }
+    ];
     try {
-      const saved = localStorage.getItem('eopms_salary_formulas');
-      const defaults = [
-        { code: "F1", name: "Basic", equation: "(($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)" },
-        { code: "F2", name: "HRA", equation: "((($BS * 0.50) / $DIM) * ($SP + $SW + $SL + $SH)) * 0.50" },
-        { code: "F3", name: "MEDICAL ALLOWANCE", equation: "Math.round(1250 / $DIM * ($SP + $SW + $SL + $SH))" },
-        { code: "F4", name: "TA", equation: "Math.round(2500 / $DIM * ($SP + $SW + $SL + $SH))" },
-        { code: "F5", name: "LTA", equation: "Math.round(3500 / $DIM * ($SP + $SW + $SL + $SH))" },
-        { code: "F6", name: "SPECIAL ALLOWANCE", equation: "Math.max(0, $BS - ($Basic + $HRA + $MEDICALALLOWANCE + $TA + $LTA))" },
-        { code: "F7", name: "PF Employee", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
-        { code: "F10", name: "PF Employer", equation: "$Basic >= 15000 ? 1800 : Math.round($Basic * 12%)" },
-        { code: "F8", name: "ESI", equation: "$Gross > 21000 ? 0 : Math.ceil($Gross * 3.25%)" },
-        { code: "F9", name: "PT", equation: "$Gross >= 15001 ? 200 : 0" }
-      ];
-      let loaded = saved ? JSON.parse(saved) : [];
-      if (loaded.length < 10) {
-        loaded = defaults;
-        localStorage.setItem('eopms_salary_formulas', JSON.stringify(defaults));
-      }
+      const res = await apiFetch('/api/payroll-settings');
+      const data = res.ok ? await res.json() : {};
+      const loaded = Array.isArray(data.formulas) && data.formulas.length >= 9 ? data.formulas : defaults;
       setFormulas(loaded);
 
-      const headsRaw = localStorage.getItem('eopms_salary_heads');
+      const heads = data.heads;
       let headsList: string[] = [];
-      if (headsRaw) {
-        const parsed = JSON.parse(headsRaw);
-        if (parsed.additions) headsList = [...headsList, ...parsed.additions];
-        if (parsed.deductions) headsList = [...headsList, ...parsed.deductions];
+      if (heads) {
+        if (heads.additions) headsList = [...headsList, ...heads.additions];
+        if (heads.deductions) headsList = [...headsList, ...heads.deductions];
       } else {
         headsList = ["Basic", "HRA", "MEDICAL ALLOWANCE", "TA", "LTA", "SPECIAL ALLOWANCE", "PF Employee", "PF Employer", "ESI", "PT", "Advance salary adjut"];
       }
@@ -1349,9 +1321,10 @@ const SalaryFormulaMaster: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     loadData();
   }, []);
 
-  const saveFormulas = (newFormulas: typeof formulas) => {
+  const saveFormulas = async (newFormulas: typeof formulas) => {
     setFormulas(newFormulas);
-    localStorage.setItem('eopms_salary_formulas', JSON.stringify(newFormulas));
+    await savePayrollSetting('formulas', newFormulas);
+    await loadPayrollSettings();
   };
 
   const handleOpenAdd = () => {
@@ -2346,6 +2319,7 @@ const SalaryEngine: React.FC = () => {
                           <td className="px-4 py-3">
                             {isAdmin && !isApproved ? (
                               <input
+                                key={rec.id}
                                 type="number"
                                 defaultValue={rec.deduction ?? 0}
                                 onBlur={e => handleDeductionChange(rec.id, e.target.value)}

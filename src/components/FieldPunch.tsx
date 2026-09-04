@@ -3,6 +3,7 @@ import { Camera, MapPin, CheckCircle2, Clock, Loader2, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { isFieldEmployeePunchedIn } from '../api/attendance';
 import { API_URL } from '../config/api';
+import { apiFetch } from '../api/httpClient';
 import { Camera as CapCamera } from '@capacitor/camera';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
 import { WfhApprovalDashboard } from './WfhApprovalDashboard';
@@ -24,13 +25,17 @@ export const FieldPunch: React.FC = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    checkPunchStatus();
-    startCamera();
+    // Admin/HR land on the WFH Approvals view instead of the punch UI --
+    // never activate their camera or fetch punch status.
+    if (currentRole !== 'Admin' && currentRole !== 'HR') {
+      checkPunchStatus();
+      startCamera();
+    }
     return () => {
       isMountedRef.current = false;
       stopCamera();
     };
-  }, [currentUser]);
+  }, [currentUser, currentRole]);
 
   const checkPunchStatus = async () => {
     if (!currentUser) return;
@@ -133,9 +138,8 @@ export const FieldPunch: React.FC = () => {
 
       const punchType = isPunchedIn ? 'out' : 'in';
       
-      const response = await fetch(`${API_URL}/api/attendance/punch`, {
+      const response = await apiFetch('/api/attendance/punch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: currentUser.id,
           employeeName: currentUser.name,

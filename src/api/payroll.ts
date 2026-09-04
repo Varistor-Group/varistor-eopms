@@ -266,7 +266,7 @@ export async function loadPayrollSettings(): Promise<void> {
 }
 
 /** Persist one settings key (heads/formulas/employeeDetails) to MySQL and update the local cache. */
-async function savePayrollSetting(key: 'heads' | 'formulas' | 'employeeDetails', value: unknown): Promise<void> {
+export async function savePayrollSetting(key: 'heads' | 'formulas' | 'employeeDetails', value: unknown): Promise<void> {
   try {
     await apiFetch(`/api/payroll-settings/${key}`, {
       method: 'PUT',
