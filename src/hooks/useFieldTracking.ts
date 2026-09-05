@@ -53,8 +53,9 @@ export function useFieldTracking(employeeId: string | null, isFieldEmployee: boo
             lastUpdateRef.current = now;
             lastCoordsRef.current = { lat: latitude, lng: longitude };
             
+            // employeeId no longer sent -- backend derives it from the
+            // authenticated session, never trusting a client-supplied id.
             logLocation({
-              employeeId,
               latitude,
               longitude,
               accuracy,

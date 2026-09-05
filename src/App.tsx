@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Bell, Menu, X, LogOut, Sun, Moon } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { useTrainingGate } from './hooks/useTrainingGate';
+import { useFieldTracking } from './hooks/useFieldTracking';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
@@ -44,6 +45,10 @@ const AppContent: React.FC = () => {
   const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification, addAnnouncement, announcements } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole, currentUser?.department);
+  // Runs globally whenever a field employee is logged in -- continuously
+  // tracks and submits location while punched in, stops automatically on
+  // punch-out (see useFieldTracking.ts for the throttling/start-stop logic).
+  useFieldTracking(currentUser?.id ?? null, !!currentUser?.is_field_employee);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
