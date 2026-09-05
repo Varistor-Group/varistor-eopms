@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAdminOrHR = currentRole === 'Admin' || currentRole === 'HR';
   const isFieldEmployee = !!currentUser?.is_field_employee;
   if (!menuItems.find(m => m.id === 'field-punch') && (isAdminOrHR || !isFieldEmployee)) {
-    const punchLabel = isAdminOrHR ? 'WFH Approval' : 'Punch In/Out';
+    const punchLabel = isAdminOrHR ? 'WFH/Field Approval' : 'Punch In/Out';
     const attIdx = menuItems.findIndex(m => m.id === 'attendance');
     if (attIdx >= 0) {
       menuItems.splice(attIdx + 1, 0, { id: 'field-punch', label: punchLabel, icon: Camera, enabled: true });
