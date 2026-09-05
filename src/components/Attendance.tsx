@@ -1249,15 +1249,17 @@ export const Attendance: React.FC = () => {
                 />
               )}
 
-              {!photoPreview && !currentUser?.is_field_employee ? (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-40 border-2 border-dashed border-varistor-border rounded-varistor flex flex-col items-center justify-center gap-2 text-varistor-muted hover:border-varistor-lime hover:text-varistor-lime transition-varistor"
-                >
-                  <Camera size={28} strokeWidth={1.5} />
-                  <span className="text-sm font-semibold">Tap to take photo or select</span>
-                  <span className="text-xs">JPEG · PNG · WebP · max 5MB</span>
-                </button>
+              {!photoPreview ? (
+                !currentUser?.is_field_employee ? (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-40 border-2 border-dashed border-varistor-border rounded-varistor flex flex-col items-center justify-center gap-2 text-varistor-muted hover:border-varistor-lime hover:text-varistor-lime transition-varistor"
+                  >
+                    <Camera size={28} strokeWidth={1.5} />
+                    <span className="text-sm font-semibold">Tap to take photo or select</span>
+                    <span className="text-xs">JPEG · PNG · WebP · max 5MB</span>
+                  </button>
+                ) : null
               ) : (
                 <div className="flex flex-col items-center gap-4">
                   <div className="relative">
