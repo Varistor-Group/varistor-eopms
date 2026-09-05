@@ -15,6 +15,38 @@ function generateUuidV4(): string {
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
+function notify_hr_punch(string $empId, string $action, string $time): void {
+    $db = get_db();
+    $empStmt = $db->prepare('SELECT full_name FROM employees WHERE id = ? LIMIT 1');
+    $empStmt->execute([$empId]);
+    $emp = $empStmt->fetch();
+    $empName = $emp['full_name'] ?? $empId;
+
+    $hrStmt = $db->query("SELECT personal_email FROM employees WHERE role IN ('HR','Admin') AND personal_email IS NOT NULL AND personal_email != ''");
+    $hrEmails = $hrStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($hrEmails)) return;
+
+    $actionLabel = $action === 'in' ? 'Punched In' : 'Punched Out';
+    $html = "<div style=\"font-family: Inter, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;\">"
+        . "<div style=\"background: #84CC16; padding: 16px 24px; border-radius: 8px 8px 0 0;\"><h1 style=\"color:#000;margin:0;font-size:20px;font-weight:700;\">Varistor EOPMS</h1></div>"
+        . "<div style=\"background:#fff;padding:32px;border:1px solid #D8DED2;border-radius:0 0 8px 8px;\">"
+        . "<h2 style=\"font-size:18px;font-weight:600;color:#111;\">Attendance: {$actionLabel}</h2>"
+        . "<p style=\"color:#444;line-height:1.6;\"><strong>{$empName}</strong> {$actionLabel} at {$time}.</p>"
+        . "</div></div>";
+
+    try {
+        $mail = make_mailer();
+        foreach ($hrEmails as $email) {
+            $mail->addAddress($email);
+        }
+        $mail->Subject = "{$empName} {$actionLabel}";
+        $mail->Body = $html;
+        $mail->send();
+    } catch (\Exception $e) {
+        error_log('notify_hr_punch failed: ' . $e->getMessage());
+    }
+}
+
 function calcWorkHours($punchIn, $punchOut) {
     if (!$punchIn || !$punchOut) return null;
     $diff = (strtotime($punchOut) - strtotime($punchIn)) / 3600;
@@ -81,6 +113,7 @@ if ($method === 'POST') {
             )->execute([$newId, $myId, $today, $now, $status, 'self_punch', (int)($emp['is_field_employee'] ?? 0)]);
         }
 
+        notify_hr_punch($myId, 'in', $now);
         json_ok(['success' => true, 'type' => 'in', 'time' => $now, 'status' => $status]);
     }
 
@@ -89,6 +122,7 @@ if ($method === 'POST') {
         $workHours = calcWorkHours($existing['punch_in'], $now);
         $db->prepare('UPDATE attendance_ledger SET punch_out = ?, work_hours = ? WHERE id = ?')
            ->execute([$now, $workHours, $existing['id']]);
+        notify_hr_punch($myId, 'out', $now);
         json_ok(['success' => true, 'type' => 'out', 'time' => $now, 'workHours' => $workHours]);
     }
 
