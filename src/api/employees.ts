@@ -298,11 +298,10 @@ export const mockFieldLocations: FieldEmployeeLocation[] = [
   { employeeId: 'VAR-033', employeeName: 'Mohammed Faisal', department: 'Sales', lat: 13.0067, lng: 77.5890, accuracy: 25, batteryLevel: 31, status: 'Idle', lastUpdated: minutesAgo(24), todayCheckIn: todayAt(9, 30), distanceTravelledKm: 21.5, routeHistory: [[12.9716, 77.5946], [13.0067, 77.5890]] },
 ];
 
-export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void> {
+export async function logLocation(data: Omit<LocationEntry, 'id' | 'employeeId'>): Promise<void> {
   try {
-    await fetch(`${API_URL}/api/employees/location`, {
+    await apiFetch('/api/employees/location', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
   } catch {}
@@ -310,7 +309,7 @@ export async function logLocation(data: Omit<LocationEntry, 'id'>): Promise<void
 
 export async function getLatestLocations(): Promise<LatestLocation[]> {
   try {
-    const res = await fetch(`${API_URL}/api/employees/locations`);
+    const res = await apiFetch('/api/employees/locations');
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -320,7 +319,7 @@ export async function getLatestLocations(): Promise<LatestLocation[]> {
 
 export async function getLocationHistory(employeeId: string, from: Date, to: Date): Promise<LocationEntry[]> {
   try {
-    const res = await fetch(`${API_URL}/api/employees/locations?history=true&employeeId=${employeeId}&from=${from.toISOString()}&to=${to.toISOString()}`);
+    const res = await apiFetch(`/api/employees/locations?history=true&employeeId=${employeeId}&from=${from.toISOString()}&to=${to.toISOString()}`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
