@@ -195,6 +195,14 @@ export const Attendance: React.FC = () => {
   const [faceLoading, setFaceLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Live camera capture (field employees) -- forces camera-only capture,
+  // no gallery/file picker, unlike the <input type="file" capture> below
+  // which only advisory-suggests the camera on some browsers.
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const camCanvasRef = useRef<HTMLCanvasElement>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+  const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const [camError, setCamError] = useState('');
 
   // ── Field: verification queue ──────────────────────────────────────────────
   const [pendingPhotos, setPendingPhotos] = useState<FieldPhotoEntry[]>([]);
@@ -402,9 +410,7 @@ export const Attendance: React.FC = () => {
   }
 
   // ── Photo upload (field employees) ────────────────────────────────────────
-  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function processCapturedFile(file: File) {
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
     setFaceConfidence(null);
@@ -453,6 +459,59 @@ export const Attendance: React.FC = () => {
     } finally {
       setFaceLoading(false);
     }
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processCapturedFile(file);
+  }
+
+  useEffect(() => {
+    if (currentUser?.is_field_employee && !photoPreview) {
+      startPunchCamera();
+    }
+    return () => {
+      stopPunchCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.is_field_employee, photoPreview]);
+
+  async function startPunchCamera() {
+    setCamError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      camStreamRef.current = stream;
+      setCamStream(stream);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      setCamError('Camera access denied or unavailable. Please grant permissions.');
+    }
+  }
+
+  function stopPunchCamera() {
+    if (camStreamRef.current) {
+      camStreamRef.current.getTracks().forEach(track => track.stop());
+      camStreamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCamStream(null);
+  }
+
+  function captureFromPunchCamera() {
+    const video = videoRef.current;
+    const canvas = camCanvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob], `punch-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      processCapturedFile(file);
+      stopPunchCamera();
+    }, 'image/jpeg', 0.9);
   }
 
   async function handlePhotoUpload() {
@@ -1149,16 +1208,48 @@ export const Attendance: React.FC = () => {
               </div>
 
               {/* Camera / file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoSelect}
-                className="hidden"
-              />
+              {currentUser?.is_field_employee ? (
+                <>
+                  {!photoPreview && (
+                    <div className="mb-3">
+                      {camError ? (
+                        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center text-sm w-full font-medium">
+                          {camError}
+                          <button onClick={startPunchCamera} className="mt-3 bg-red-100 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors w-full">
+                            Retry Camera
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative w-full aspect-[3/4] max-h-80 bg-black rounded-2xl overflow-hidden">
+                          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <canvas ref={camCanvasRef} className="hidden" />
+                      {!camError && (
+                        <button
+                          onClick={captureFromPunchCamera}
+                          disabled={!camStream}
+                          className="mt-3 w-full py-3 rounded-xl font-bold text-varistor-dark bg-varistor-lime hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Camera size={18} strokeWidth={1.5} />
+                          Capture Photo
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+              )}
 
-              {!photoPreview ? (
+              {!photoPreview && !currentUser?.is_field_employee ? (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full h-40 border-2 border-dashed border-varistor-border rounded-varistor flex flex-col items-center justify-center gap-2 text-varistor-muted hover:border-varistor-lime hover:text-varistor-lime transition-varistor"
