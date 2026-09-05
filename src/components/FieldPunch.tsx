@@ -26,7 +26,7 @@ export const FieldPunch: React.FC = () => {
     isMountedRef.current = true;
     // Admin/HR land on the WFH Approvals view instead of the punch UI --
     // never activate their camera or fetch punch status.
-    if (currentRole !== 'Admin' && currentRole !== 'HR') {
+    if (currentRole !== 'Admin' && currentRole !== 'HR' && !currentUser?.is_field_employee) {
       checkPunchStatus();
       startCamera();
     }
@@ -175,6 +175,18 @@ export const FieldPunch: React.FC = () => {
 
   if (currentRole === 'Admin' || currentRole === 'HR') {
     return <WfhApprovalDashboard />;
+  }
+
+  // Field employees punch in/out via the Attendance tab's own photo +
+  // geolocation flow instead -- this tab is for non-field employees only.
+  // Defense-in-depth: also enforced by hiding this tab in Sidebar.tsx, but
+  // guarded here too in case the tab is reached any other way.
+  if (currentUser?.is_field_employee) {
+    return (
+      <div className="max-w-md mx-auto mt-12 text-center text-varistor-muted">
+        <p>Please use the <strong>Attendance</strong> tab to punch in and out.</p>
+      </div>
+    );
   }
 
   if (loading) {

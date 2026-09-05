@@ -134,8 +134,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ];
   }
 
-  if (!menuItems.find(m => m.id === 'field-punch')) {
-    const isAdminOrHR = currentRole === 'Admin' || currentRole === 'HR';
+  // Field employees punch in/out through the Attendance tab (photo +
+  // geolocation flow there already), not this tab -- only show it to
+  // non-field employees (regular Punch In/Out) and Admin/HR (WFH Approval,
+  // who need this tab regardless of their own field-employee status since
+  // they're the approvers, not the ones punching in).
+  const isAdminOrHR = currentRole === 'Admin' || currentRole === 'HR';
+  const isFieldEmployee = !!currentUser?.is_field_employee;
+  if (!menuItems.find(m => m.id === 'field-punch') && (isAdminOrHR || !isFieldEmployee)) {
     const punchLabel = isAdminOrHR ? 'WFH Approval' : 'Punch In/Out';
     const attIdx = menuItems.findIndex(m => m.id === 'attendance');
     if (attIdx >= 0) {
