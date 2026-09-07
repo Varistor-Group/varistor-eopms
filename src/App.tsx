@@ -13,7 +13,6 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Bell, Menu, X, LogOut, Sun, Moon } from 'lucide-react';
 import { useVariPoints } from './hooks/useVariPoints';
 import { useTrainingGate } from './hooks/useTrainingGate';
-import { useFieldTracking } from './hooks/useFieldTracking';
 import { Login } from './components/Login';
 import { DocumentVault } from './components/DocumentVault';
 import { EmployeeManagementPortal } from './components/EmployeeManagementPortal';
@@ -28,16 +27,15 @@ import { Attendance } from './components/Attendance';
 import Leaves from './components/Leaves';
 import { ProfilePictureEditor } from './components/ProfilePictureEditor';
 import { useFieldTracking } from './hooks/useFieldTracking';
-import { mockEmployeeStore } from './api/employees';
 import { FieldPunch } from './components/FieldPunch';
 import { getCurrentUser, signOut } from './api/auth';
 
 const FieldTrackerBackground: React.FC = () => {
-  const { currentRole, currentUser } = useVariPoints();
-  const mockCurrentUserId = currentRole === 'Reporting Manager' ? '2131' : '2';
-  const mockStoreUser = mockEmployeeStore.find(e => e.id === mockCurrentUserId) || mockEmployeeStore[0];
-
-  useFieldTracking(currentUser?.id || mockStoreUser?.employeeId || null, !!mockStoreUser?.is_field_employee);
+  const { currentUser } = useVariPoints();
+  // Was previously driven by a hardcoded mock employee lookup, completely
+  // ignoring the real logged-in user's field-employee status -- fixed to
+  // use the actual currentUser flag.
+  useFieldTracking(currentUser?.id ?? null, !!currentUser?.is_field_employee);
   return null;
 };
 
@@ -45,10 +43,6 @@ const AppContent: React.FC = () => {
   const { currentRole, currentUser, setCurrentUser, setCurrentRole, policyNotification, setPolicyNotification, addAnnouncement, announcements } = useVariPoints();
   const { theme, toggleTheme } = useTheme();
   const { locked: trainingLocked, refresh: refreshTrainingGate } = useTrainingGate(currentUser?.id, currentRole, currentUser?.department);
-  // Runs globally whenever a field employee is logged in -- continuously
-  // tracks and submits location while punched in, stops automatically on
-  // punch-out (see useFieldTracking.ts for the throttling/start-stop logic).
-  useFieldTracking(currentUser?.id ?? null, !!currentUser?.is_field_employee);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser);
