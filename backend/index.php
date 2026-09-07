@@ -114,7 +114,7 @@ $routes = [
     ['POST',   '#^/api/employee-document-slots/(?P<employeeId>[^/]+)/seed$#',      'employee_document_slots.php'],
     ['GET',    '#^/api/employee-document-slots/(?P<employeeId>[^/]+)$#',           'employee_document_slots.php'],
     ['POST',   '#^/api/employee-document-slots$#',                                 'employee_document_slots.php'],
-    ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)/link$#',              'employee_document_slots.php'],
+    ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)/(?P<action>link)$#',  'employee_document_slots.php'],
     ['PUT',    '#^/api/employee-document-slots/sync/(?P<templateId>[^/]+)$#',      'employee_document_slots.php'],
     ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)$#',                   'employee_document_slots.php'],
     ['DELETE', '#^/api/employee-document-slots/(?P<id>[^/]+)$#',                   'employee_document_slots.php'],

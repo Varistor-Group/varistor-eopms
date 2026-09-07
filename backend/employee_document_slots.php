@@ -134,9 +134,16 @@ if ($method === 'PUT' && $id !== null && $action === 'link') {
     $documentId = $input['documentId'] ?? '';
     if ($documentId === '') json_error('documentId is required.', 422);
 
-    $db->prepare('UPDATE employee_document_slots SET document_id = ?, status = ? WHERE id = ?')
-       ->execute([$documentId, 'Pending', $id]);
-    json_ok(['success' => true]);
+    // Verify the slot actually exists before claiming success -- a route/param
+    // bug previously caused this whole block to be unreachable, silently
+    // no-op'ing every document upload for weeks without any error surfacing.
+    $checkStmt = $db->prepare('SELECT id FROM employee_document_slots WHERE id = ? LIMIT 1');
+    $checkStmt->execute([$id]);
+    if (!$checkStmt->fetch()) json_error('Document slot not found.', 404);
+
+    $stmt = $db->prepare('UPDATE employee_document_slots SET document_id = ?, status = ? WHERE id = ?');
+    $stmt->execute([$documentId, 'Pending', $id]);
+    json_ok(['success' => true, 'rowsAffected' => $stmt->rowCount()]);
 }
 function logSlotActivity($db, $action, $performedBy, $details, $metadata) {
     $db->prepare('INSERT INTO activity_log (id, action, performed_by, details, metadata) VALUES (?, ?, ?, ?, ?)')
