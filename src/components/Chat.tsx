@@ -666,8 +666,18 @@ export const Chat: React.FC = () => {
                       type="checkbox"
                       checked={newChannelDepts.includes(d)}
                       onChange={(e) => {
-                        if (e.target.checked) setNewChannelDepts(prev => [...prev, d]);
-                        else setNewChannelDepts(prev => prev.filter(dept => dept !== d));
+                        const deptMemberIds = employees.filter(emp => emp.department === d).map(emp => emp.id);
+                        if (e.target.checked) {
+                          setNewChannelDepts(prev => [...prev, d]);
+                          // Auto-select this department's employees in the
+                          // adjacent list too, so it's visually clear who's
+                          // actually included -- previously these two lists
+                          // were entirely disconnected.
+                          setNewChannelMembers(prev => Array.from(new Set([...prev, ...deptMemberIds])));
+                        } else {
+                          setNewChannelDepts(prev => prev.filter(dept => dept !== d));
+                          setNewChannelMembers(prev => prev.filter(id => !deptMemberIds.includes(id)));
+                        }
                       }}
                       className="rounded text-varistor-lime focus:ring-varistor-lime"
                     />
