@@ -89,6 +89,21 @@ if ($method === 'POST') {
     $insert = $db->prepare($sql);
     $insert->execute($values);
 
+    // Auto-create the standard document vault slots for the new employee --
+    // previously this only ever happened via a manual POST .../seed call,
+    // and that route had its own separate bug (never fixed until now) that
+    // made it fail silently every time it was tried. Doing it here means
+    // every new employee gets a working Document Vault immediately, with no
+    // separate step to remember. id has a DEFAULT (uuid()) so it's omitted.
+    $templates = $db->query('SELECT * FROM document_templates WHERE is_active = 1')->fetchAll();
+    $slotInsert = $db->prepare(
+        'INSERT INTO employee_document_slots (employee_id, template_id, document_name, is_required, is_custom)
+         VALUES (?, ?, ?, ?, 0)'
+    );
+    foreach ($templates as $t) {
+        $slotInsert->execute([$empId, $t['id'], $t['name'], (int)$t['is_required']]);
+    }
+
     $myId = currentEmployeeId();
     $log = $db->prepare('INSERT INTO activity_log (action, performed_by, details) VALUES (?, ?, ?)');
     $log->execute([
