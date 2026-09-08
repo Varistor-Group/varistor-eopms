@@ -9,6 +9,12 @@ require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 
+// PHP's default timezone was UTC while the server's system clock and the
+// business itself operate in India Standard Time -- a consistent 5.5 hour
+// gap that made every punch time, 'today' date calculation, and timestamp
+// across the entire backend wrong. Setting this once here fixes it globally.
+date_default_timezone_set('Asia/Kolkata');
+
 // Apply CORS on every request
 cors_headers();
 
