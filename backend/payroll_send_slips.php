@@ -7,7 +7,12 @@
 
 requireRole(['HR', 'Admin']); // SECURITY FIX: this endpoint had zero access control before
 
-$body  = request_body();
+// Respect a pre-set $body from payroll_trigger.php (which builds slip
+// data from the database and require()s this file directly) -- previously
+// this always re-parsed the raw HTTP request body regardless, which was
+// empty when called that way, causing 'No slip data provided.' even though
+// the trigger endpoint had already assembled real data to send.
+$body  = $body ?? request_body();
 $slips = $body['slips'] ?? null;
 
 if (!is_array($slips) || count($slips) === 0) {
