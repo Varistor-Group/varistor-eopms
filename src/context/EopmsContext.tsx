@@ -174,19 +174,16 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     loadTasks();
 
-    const channel = supabase.channel('public:tasks')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        () => {
-          // Re-fetch tasks on any DB event to ensure consistent UI
-          loadTasks();
-        }
-      )
-      .subscribe();
+    // Previously relied entirely on a Supabase realtime subscription to
+    // re-fetch tasks on any change -- dead since the MySQL migration, with
+    // no fallback at all, so tasks (and anything derived from them, like
+    // the dashboard performance meter) never updated after initial mount
+    // except on a full page reload. Poll instead, matching the same
+    // fallback pattern already used successfully for announcements.
+    const pollInterval = setInterval(() => loadTasks(), 15000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, []);
 
