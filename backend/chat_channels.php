@@ -83,7 +83,18 @@ if ($method === 'POST') {
     $slug = trim($slug, '-') . '-' . substr(bin2hex(random_bytes(3)), 0, 4);
 
     $departments = !empty($input['departments']) ? json_encode($input['departments']) : null;
-    $allowedIds = !empty($input['allowedEmployeeIds']) ? json_encode($input['allowedEmployeeIds']) : null;
+
+    // Always include the creator's own id in a restricted member list --
+    // otherwise a non-Admin creator (e.g. HR) who picks specific members
+    // without including themselves gets immediately filtered out of
+    // buildChannelsList()'s visibility check for the channel they just
+    // made, so the frontend can't find it in the response and shows a
+    // false "Could not create channel" error even though it was created.
+    $inputAllowedIds = $input['allowedEmployeeIds'] ?? [];
+    if (!empty($inputAllowedIds) && !in_array($myId, $inputAllowedIds, true)) {
+        $inputAllowedIds[] = $myId;
+    }
+    $allowedIds = !empty($inputAllowedIds) ? json_encode($inputAllowedIds) : null;
 
     $db->prepare('INSERT INTO chat_channels (id, name, departments, allowed_employee_ids) VALUES (?, ?, ?, ?)')
        ->execute([$slug, $name, $departments, $allowedIds]);
@@ -97,7 +108,14 @@ if ($method === 'PUT') {
     if ($name === '') json_error('Channel name is required.', 422);
 
     $departments = !empty($input['departments']) ? json_encode($input['departments']) : null;
-    $allowedIds = !empty($input['allowedEmployeeIds']) ? json_encode($input['allowedEmployeeIds']) : null;
+
+    // Same protection as POST: never let the editor filter themselves out
+    // of a channel they're actively editing.
+    $inputAllowedIds = $input['allowedEmployeeIds'] ?? [];
+    if (!empty($inputAllowedIds) && !in_array($myId, $inputAllowedIds, true)) {
+        $inputAllowedIds[] = $myId;
+    }
+    $allowedIds = !empty($inputAllowedIds) ? json_encode($inputAllowedIds) : null;
 
     $db->prepare('UPDATE chat_channels SET name = ?, departments = ?, allowed_employee_ids = ? WHERE id = ?')
        ->execute([$name, $departments, $allowedIds, $id]);
