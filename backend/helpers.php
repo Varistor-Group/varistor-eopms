@@ -153,6 +153,12 @@ function make_mailer(): \PHPMailer\PHPMailer\PHPMailer {
 
 // ── Number to Indian words (mirrors Node version) ─────────────────────────────
 function number_to_words(float $num): string {
+    // Defensive: a bad/placeholder negative value in payroll data (e.g. a
+    // corrupted final_pay = -1) previously crashed this ENTIRE function with
+    // an uncaught TypeError, which killed the whole bulk payslip send for
+    // every employee, not just the one with bad data. A payslip should never
+    // legitimately show negative rupees, so just take the magnitude.
+    $num = abs($num);
     if ($num == 0) return 'Rupees Zero Only';
 
     $singles  = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
