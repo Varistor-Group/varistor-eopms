@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, ShieldAlert, History, TrendingDown, TrendingUp, Clock, User, RefreshCw } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { mockEmployeeStore } from '../api/employees';
-import { supabase } from '../lib/supabase';
+import { getEmployees, type Employee } from '../api/employees';
+import { getAllPointsHistory } from '../api/vpTransactions';
 
 interface VPLogEntry {
   id: string;
@@ -18,8 +18,8 @@ interface VPLogEntry {
     employee_code: string;
     performed_by_name: string;
     performed_by_role: string;
-    vp_before: number;
-    vp_after: number;
+    vp_before?: number;
+    vp_after?: number;
   } | null;
 }
 
@@ -31,6 +31,13 @@ export const EngineSimulationConsole: React.FC = () => {
   const [customPoints, setCustomPoints] = useState<number | ''>('');
   const [employeeId, setEmployeeId] = useState('');
 
+  // Real employee list -- previously mockEmployeeStore, a stale hardcoded
+  // array that never reflected actual current employees.
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  useEffect(() => {
+    getEmployees().then(setEmployees).catch(() => {});
+  }, []);
+
   // History state
   const [history, setHistory] = useState<VPLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -40,16 +47,29 @@ export const EngineSimulationConsole: React.FC = () => {
 
   const fetchHistory = async () => {
     setHistoryLoading(true);
-    const { data, error } = await supabase
-      .from('activity_log')
-      .select('*')
-      .eq('action', 'VP_TRANSACTION')
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (!error && data) {
-      setHistory(data as unknown as VPLogEntry[]);
-    }
+    // Previously queried the legacy Supabase 'activity_log' table directly,
+    // which was dead after the MySQL migration -- silently failed every
+    // time, leaving this tab permanently empty. Now uses the real
+    // vp-transactions endpoint and maps its shape into what this screen's
+    // existing render logic already expects.
+    const transactions = await getAllPointsHistory();
+    const mapped: VPLogEntry[] = transactions.map(t => ({
+      id: t.id,
+      created_at: t.created_at,
+      details: t.reason,
+      performed_by: t.admin_id,
+      metadata: {
+        transaction_type: t.type,
+        rule_type: t.reason,
+        points: t.points,
+        reason: t.reason,
+        employee_name: t.recipient_name ?? t.recipient_id,
+        employee_code: t.recipient_id,
+        performed_by_name: t.admin_name ?? t.admin_id,
+        performed_by_role: '',
+      },
+    }));
+    setHistory(mapped);
     setHistoryLoading(false);
   };
 
@@ -166,7 +186,7 @@ export const EngineSimulationConsole: React.FC = () => {
                     required
                   >
                     <option value="" disabled>Select Employee</option>
-                    {mockEmployeeStore.map(emp => (
+                    {employees.map(emp => (
                       <option key={emp.id} value={emp.id}>{emp.fullName}</option>
                     ))}
                   </select>

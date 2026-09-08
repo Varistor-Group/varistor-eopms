@@ -80,6 +80,14 @@ $routes = [
     ['POST', '#^/api/payroll-records$#',            'payroll_records.php'],
     ['POST', '#^/api/payroll/trigger-send$#',       'payroll_trigger.php'],
 
+    // VP (Vari Points) Transactions -- handler file already existed and is
+    // fully built, but was never actually wired up to any route at all,
+    // so the entire VP Management feature (award/deduct + history) has
+    // been hitting a 404 this whole time.
+    ['POST', '#^/api/vp-transactions$#',                              'vp_transactions.php'],
+    ['GET',  '#^/api/vp-transactions$#',                              'vp_transactions.php'],
+    ['GET',  '#^/api/vp-transactions/(?P<employeeId>[^/]+)$#',        'vp_transactions.php'],
+
     // Payroll Records (new MySQL-backed API)
     ['GET',    '#^/api/payroll-records$#',                                'payroll_records.php'],
     ['PUT',    '#^/api/payroll-records/(?P<id>[^/]+)$#',                  'payroll_records.php'],
