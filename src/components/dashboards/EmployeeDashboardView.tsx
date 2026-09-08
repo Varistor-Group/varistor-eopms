@@ -12,6 +12,8 @@ import { useVariPoints } from '../../hooks/useVariPoints';
 import { useFieldTracking } from '../../hooks/useFieldTracking';
 import { mockEmployeeStore } from '../../api/employees';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
+import { getEmployeeBalances } from '../../api/leaves';
+import type { EmployeeLeaveBalance } from '../../types';
 
 export const EmployeeDashboardView: React.FC = () => {
   const { tasks } = useKanbanTasks();
@@ -29,6 +31,20 @@ export const EmployeeDashboardView: React.FC = () => {
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'done').length;
   const performanceScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Real leave balances -- this whole widget was previously 100%
+  // hardcoded static numbers (explicitly commented 'Mocked for complete
+  // shell structure'), so it never reflected the actual employee's
+  // leave usage no matter what.
+  const [leaveBalances, setLeaveBalances] = useState<EmployeeLeaveBalance[]>([]);
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    getEmployeeBalances(currentUser.id).then(setLeaveBalances).catch(() => {});
+  }, [currentUser?.id]);
+  const findBalance = (nameMatch: string) =>
+    leaveBalances.find(b => b.leave_type_name?.toLowerCase().includes(nameMatch));
+  const casualBal = findBalance('casual');
+  const sickBal = findBalance('sick');
 
   const formatRelativeTime = (dateString: string) => {
     // eslint-disable-next-line react-hooks/purity
@@ -246,27 +262,39 @@ export const EmployeeDashboardView: React.FC = () => {
           >
             <div className="flex justify-between items-center pb-2 border-b border-varistor-border">
               <h3 className="text-sm font-semibold text-varistor-dark">Casual leaves</h3>
-              <span className="text-xs font-extrabold text-varistor-dark">7 / 12</span>
+              <span className="text-xs font-extrabold text-varistor-dark">
+                {casualBal ? `${casualBal.used} / ${casualBal.total}` : '—'}
+              </span>
             </div>
 
             <div className="space-y-4 my-2">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Casual Leaves taken</span>
-                  <span className="font-semibold text-varistor-dark">5 left</span>
+                  <span className="font-semibold text-varistor-dark">
+                    {casualBal ? `${casualBal.total - casualBal.used} left` : '—'}
+                  </span>
                 </div>
                 <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-varistor-lime h-full w-[58%]" /> {/* 7 / 12 = 58% */}
+                  <div
+                    className="bg-varistor-lime h-full"
+                    style={{ width: `${casualBal ? Math.min(100, (casualBal.used / (casualBal.total || 1)) * 100) : 0}%` }}
+                  />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between text-[10px] text-varistor-muted">
                   <span>Sick Leaves taken</span>
-                  <span className="font-semibold text-varistor-dark">2 left (4/6 taken)</span>
+                  <span className="font-semibold text-varistor-dark">
+                    {sickBal ? `${sickBal.total - sickBal.used} left (${sickBal.used}/${sickBal.total} taken)` : '—'}
+                  </span>
                 </div>
                 <div className="w-full bg-varistor-surfaceMuted h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-amber-400 h-full w-[66%]" />
+                  <div
+                    className="bg-amber-400 h-full"
+                    style={{ width: `${sickBal ? Math.min(100, (sickBal.used / (sickBal.total || 1)) * 100) : 0}%` }}
+                  />
                 </div>
               </div>
             </div>
