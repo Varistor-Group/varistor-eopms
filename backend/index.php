@@ -125,7 +125,7 @@ $routes = [
 
     // Employee Document Slots
     ['GET',    '#^/api/employee-document-slots-pending-summary$#',                 'employee_document_slots.php'],
-    ['POST',   '#^/api/employee-document-slots/(?P<employeeId>[^/]+)/seed$#',      'employee_document_slots.php'],
+    ['POST',   '#^/api/employee-document-slots/(?P<employeeId>[^/]+)/(?P<action>seed)$#',      'employee_document_slots.php'],
     ['GET',    '#^/api/employee-document-slots/(?P<employeeId>[^/]+)$#',           'employee_document_slots.php'],
     ['POST',   '#^/api/employee-document-slots$#',                                 'employee_document_slots.php'],
     ['PUT',    '#^/api/employee-document-slots/(?P<id>[^/]+)/(?P<action>link)$#',  'employee_document_slots.php'],
