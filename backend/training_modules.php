@@ -169,6 +169,28 @@ if ($method === 'POST' && $id === null) {
         json_encode($visibleToRoles),
     ]);
 
+    // Save quiz questions -- previously this field was sent by the upload
+    // form but never read here at all, so every module was created with
+    // zero questions and the quiz screen always showed "No questions found."
+    $questions = json_decode($_POST['questions'] ?? '[]', true) ?? [];
+    if (is_array($questions)) {
+        $qStmt = $db->prepare(
+            'INSERT INTO quiz_questions (id, module_id, question, options, correct_index) VALUES (?, ?, ?, ?, ?)'
+        );
+        foreach ($questions as $q) {
+            $questionText = trim($q['question'] ?? '');
+            $options = $q['options'] ?? [];
+            if ($questionText === '' || !is_array($options) || count($options) < 2) continue;
+            $qStmt->execute([
+                generateUuidV4(),
+                $newId,
+                $questionText,
+                json_encode(array_values($options)),
+                (int)($q['correct_index'] ?? 0),
+            ]);
+        }
+    }
+
     $fetch = $db->prepare('SELECT * FROM training_modules WHERE id = ?');
     $fetch->execute([$newId]);
     json_ok(rowToModule($fetch->fetch()));
