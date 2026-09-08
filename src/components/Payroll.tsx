@@ -1556,19 +1556,9 @@ export const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit
     try {
       const emps = await getEmployees();
       setEmployees(emps);
-      const saved = localStorage.getItem('eopms_employee_salary_details');
-      if (saved) {
-        setSalaryDetails(JSON.parse(saved));
-      } else {
-        const initialDetails: Record<string, number> = {
-          "VAR-001": 150000,
-          "VAR-002": 50000,
-          "VAR-003": 35000,
-          "VAR-004": 45000
-        };
-        setSalaryDetails(initialDetails);
-        localStorage.setItem('eopms_employee_salary_details', JSON.stringify(initialDetails));
-      }
+      const res = await apiFetch('/api/payroll-settings');
+      const data = res.ok ? await res.json() : {};
+      setSalaryDetails(data.employeeDetails ?? {});
     } catch (e) {
       console.error(e);
     }
@@ -1580,12 +1570,13 @@ export const EmployeeSalaryDetails: React.FC<{ onExit: () => void }> = ({ onExit
     loadData();
   }, []);
 
-  const handleEditSave = (e: React.FormEvent) => {
+  const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingEmployee) {
       const next = { ...salaryDetails, [editingEmployee.employeeId]: editValue };
       setSalaryDetails(next);
-      localStorage.setItem('eopms_employee_salary_details', JSON.stringify(next));
+      await savePayrollSetting('employeeDetails', next);
+      await loadPayrollSettings();
       setEditingEmployee(null);
     }
   };
