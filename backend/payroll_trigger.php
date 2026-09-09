@@ -9,15 +9,24 @@ requireRole(['HR', 'Admin']); // SECURITY FIX: was completely open before
 
 $db = get_db();
 
-// Get latest revision per employee (any status — matches old behavior,
-// which didn't filter by draft/approved)
+// Get each employee's single most-recent record: latest MONTH first
+// (by actual calendar date, not string sort, since 'Jun 2026' vs 'Sep 2026'
+// only happens to sort correctly by coincidence), then latest revision
+// within that month. The previous query found 'latest revision' per
+// employee_id alone with no month scoping at all -- so any employee with
+// the same revision number in two different months (extremely common,
+// since revision starts at 1 every month) matched BOTH months' rows,
+// silently sending every affected employee two payslip emails at once,
+// including a stale email for an old month they weren't even asking about.
 $records = $db->query(
-    'SELECT pr.* FROM payroll_records pr
-     INNER JOIN (
-         SELECT employee_id, MAX(revision) AS max_rev
+    "SELECT pr.* FROM (
+         SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY employee_id
+                    ORDER BY STR_TO_DATE(CONCAT('01 ', month), '%d %b %Y') DESC, revision DESC
+                ) AS rn
          FROM payroll_records
-         GROUP BY employee_id
-     ) latest ON pr.employee_id = latest.employee_id AND pr.revision = latest.max_rev'
+     ) pr WHERE pr.rn = 1"
 )->fetchAll();
 
 if (count($records) === 0) {
