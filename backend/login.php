@@ -14,7 +14,7 @@ if ($email === '' || $password === '') {
     json_error('Email and password are required.', 422);
 }
 
-$stmt = $db->prepare('SELECT id, full_name, personal_email, department, role, avatar_url, is_field_employee, password_hash, status, date_of_birth FROM employees WHERE personal_email = ? LIMIT 1');
+$stmt = $db->prepare('SELECT id, full_name, personal_email, department, role, avatar_url, is_field_employee, password_hash, status, date_of_birth, vari_points FROM employees WHERE personal_email = ? LIMIT 1');
 $stmt->execute([$email]);
 $emp = $stmt->fetch();
 
@@ -44,5 +44,10 @@ json_ok([
         'role' => $emp['role'],
         'is_field_employee' => (bool)$emp['is_field_employee'],
         'dob' => $emp['date_of_birth'] ?? null,
+        // Was never selected or returned at all -- every employee's Vari
+        // Points balance display always fell back to a hardcoded 0,
+        // regardless of their real balance, because currentUser.variPoints
+        // was always undefined.
+        'variPoints' => (int)($emp['vari_points'] ?? 0),
     ],
 ]);
