@@ -106,7 +106,7 @@ $routes = [
 
    // Documents
     ['GET',    '#^/api/documents/single/(?P<id>[^/]+)$#',      'documents.php'],
-    ['GET',    '#^/api/documents/(?P<id>[^/]+)/download$#',    'documents.php'],
+    ['GET',    '#^/api/documents/(?P<id>[^/]+)/(?P<action>download)$#',    'documents.php'],
     ['PUT',    '#^/api/documents/(?P<id>[^/]+)/status$#',      'documents.php'],
     ['PUT',    '#^/api/documents/(?P<id>[^/]+)$#',             'documents.php'],
     ['POST',   '#^/api/documents$#',                           'documents.php'],

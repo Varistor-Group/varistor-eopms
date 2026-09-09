@@ -109,21 +109,23 @@ export async function downloadDecryptedDocument(
   documentId: string
 ): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
   try {
-    // Need the filename for the decrypted result — fetch metadata first.
-    // NOTE: this costs one extra request vs. the original (which had the
-    // filename from a single `.select('storage_path, filename')` call before
-    // downloading). Acceptable trade-off since the backend now serves the
-    // raw encrypted stream directly rather than a queryable row + blob.
-   const metaRes = await apiFetch(`/api/documents/single/${documentId}`);
-    // ^ NOTE: this endpoint doesn't exist as a single-document GET yet —
-    // see flag below.
-
     const fileRes = await apiFetch(`/api/documents/${documentId}/download`);
     if (!fileRes.ok) return { success: false, error: 'Download failed.' };
 
+    // Filename comes straight from this same response's Content-Disposition
+    // header -- there was a second, separate request here to a
+    // '/api/documents/single/:id' endpoint that was flagged in a comment as
+    // not existing, and its silently-caught failure meant the real filename
+    // (and therefore the real file extension used to pick a MIME type) was
+    // never actually used at all.
+    const disposition = fileRes.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const rawFilename = match ? match[1] : 'document';
+    // Stored filenames end in a literal '.enc' suffix (e.g. 'Payslip.pdf.enc')
+    // -- strip that to recover the real original name and extension.
+    const filename = rawFilename.replace(/\.enc$/i, '');
+
     const key = await getMasterKey();
-    const meta = await metaRes.json().catch(() => null);
-    const filename = meta?.filename ?? meta?.name ?? 'document';
     const ext = filename.split('.').pop()?.toLowerCase() ?? '';
     const mimeTypes: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
     const mimeType = mimeTypes[ext] ?? 'application/octet-stream';

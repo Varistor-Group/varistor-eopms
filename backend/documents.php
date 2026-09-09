@@ -84,7 +84,7 @@ if ($method === 'GET' && $id !== null && $action === 'download') {
     if (!file_exists($filePath)) json_error('File missing on server.', 404);
 
     header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . basename($doc['storage_path']) . '"');
+    header('Content-Disposition: attachment; filename="' . $doc['filename'] . '"');
     header('Content-Length: ' . filesize($filePath));
     readfile($filePath);
     exit;
