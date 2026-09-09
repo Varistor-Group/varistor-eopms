@@ -235,10 +235,17 @@ foreach ($slips as $slip) {
         $mail->send();
 
         $sent[] = ['email' => $slip['email'], 'name' => $slip['name']];
-        usleep(120000);
     } catch (\Exception $e) {
         $failed[] = ['email' => $slip['email'], 'name' => $slip['name'], 'error' => $e->getMessage()];
     }
+
+    // The 120ms delay here was too short to avoid the SMTP host's connection
+    // rate limit during a real bulk send -- the first handful of emails went
+    // through, then every subsequent one failed with 'Could not connect to
+    // SMTP host.' Increased substantially, and now applied after every
+    // attempt (not just successes) so a struggling/throttling server isn't
+    // hammered with rapid retries on failure either.
+    usleep(1500000);
 }
 
 json_ok(['success' => true, 'sent' => count($sent), 'sentList' => $sent, 'failed' => $failed]);
