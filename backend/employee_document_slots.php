@@ -137,9 +137,19 @@ if ($method === 'PUT' && $id !== null && $action === 'link') {
     // Verify the slot actually exists before claiming success -- a route/param
     // bug previously caused this whole block to be unreachable, silently
     // no-op'ing every document upload for weeks without any error surfacing.
-    $checkStmt = $db->prepare('SELECT id FROM employee_document_slots WHERE id = ? LIMIT 1');
+    $checkStmt = $db->prepare('SELECT id, status FROM employee_document_slots WHERE id = ? LIMIT 1');
     $checkStmt->execute([$id]);
-    if (!$checkStmt->fetch()) json_error('Document slot not found.', 404);
+    $existingSlot = $checkStmt->fetch();
+    if (!$existingSlot) json_error('Document slot not found.', 404);
+
+    // A Verified document is locked -- the employee cannot silently replace it
+    // by re-linking a new upload. HR/Admin must reset the status first.
+    if ($existingSlot['status'] === 'Verified') {
+        $role = currentUserRole();
+        if (!in_array($role, ['HR', 'Admin'], true)) {
+            json_error('This document is verified and locked. Ask HR to reset its status before replacing it.', 403);
+        }
+    }
 
     $stmt = $db->prepare('UPDATE employee_document_slots SET document_id = ?, status = ? WHERE id = ?');
     $stmt->execute([$documentId, 'Pending', $id]);

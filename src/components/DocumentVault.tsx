@@ -444,11 +444,16 @@ const SlotCard: React.FC<SlotCardProps> = ({
           </div>
         )}
         <div className="flex flex-wrap gap-2 text-[11px] font-semibold pt-1">
-          {isOwnEmployee && (
+          {isOwnEmployee && docStatus !== 'Verified' && (
             <label className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-varistor-border bg-gray-50 text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
               <Upload size={11} />{hasFile ? 'Replace' : 'Upload'}
               <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
             </label>
+          )}
+          {isOwnEmployee && docStatus === 'Verified' && (
+            <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-400" title="HR must reset status to Pending before this can be replaced">
+              <Lock size={11} />Verified &ndash; Locked
+            </span>
           )}
           {hasFile && slot.documentId && (
             <>
