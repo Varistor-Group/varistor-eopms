@@ -4,6 +4,7 @@
 
 import type { UserRole } from '../types';
 import { API_URL } from '../config/api';
+import { apiFetch } from './httpClient';
 
 export interface AuthUser {
   id: string;
@@ -83,7 +84,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!token) return null;
 
   try {
-    const res = await fetch(`${API_URL}/api/auth/me`, { headers: authHeaders() });
+    // Was a raw fetch() sending only the Authorization: Bearer header --
+    // this host's Apache config strips that header before it reaches PHP,
+    // so this call always 401'd here and currentUser (including variPoints)
+    // was never refreshed after the initial login, only ever read back from
+    // a stale localStorage snapshot. apiFetch also attaches X-Employee-Id,
+    // which does reach PHP and is what every other authenticated call in
+    // the app already relies on.
+    const res = await apiFetch('/api/auth/me', { headers: authHeaders() });
     if (!res.ok) {
       localStorage.removeItem('eopms_auth_token');
       return null;

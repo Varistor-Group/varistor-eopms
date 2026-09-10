@@ -8,6 +8,7 @@ import { tasksApi } from '../api/tasks';
 import { API_URL } from '../config/api';
 import { supabase } from '../lib/supabase';
 import { awardPoints } from '../api/vpTransactions';
+import { getCurrentUser } from '../api/auth';
 
 // Simulated current date for testing due dates
 const SIMULATED_TODAY = new Date('2026-06-29T10:00:00');
@@ -153,6 +154,23 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     getLeaveBalance(empId).then(setLeaveBalance).catch(console.error);
     getLeaveRequestsAsync(currentRole === 'Admin' || currentRole === 'HR' ? undefined : empId).then(setLeaveRequests).catch(console.error);
   }, [currentUser, currentRole, MOCK_USER_ID]);
+
+  // currentUser was initialized straight from a localStorage snapshot cached
+  // at the moment of the last login, and nothing ever refreshed it after
+  // that -- so fields that change server-side after login (Vari Points
+  // balance chief among them) stayed frozen at their login-time value across
+  // every subsequent reload/session-restore until the person logged out and
+  // back in again. Sync it with the server once per mount.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    getCurrentUser().then((fresh) => {
+      if (cancelled || !fresh) return;
+      setCurrentUser((prev) => (prev ? { ...prev, ...fresh } : (fresh as unknown as CurrentUser)));
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Tasks Fetch and Realtime Subscription
   useEffect(() => {
