@@ -11,6 +11,7 @@ export interface AuthUser {
   email: string;
   department: string;
   avatarUrl: string;
+  variPoints?: number;
   role: UserRole;
   is_field_employee?: boolean;
   dob?: string;
