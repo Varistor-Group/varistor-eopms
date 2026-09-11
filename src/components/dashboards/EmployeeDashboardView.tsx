@@ -13,6 +13,7 @@ import { useFieldTracking } from '../../hooks/useFieldTracking';
 import { mockEmployeeStore } from '../../api/employees';
 import { ProfilePictureEditor } from '../ProfilePictureEditor';
 import { getEmployeeBalances } from '../../api/leaves';
+import { getHolidays, type Holiday } from '../../api/attendance';
 import type { EmployeeLeaveBalance } from '../../types';
 
 export const EmployeeDashboardView: React.FC = () => {
@@ -45,6 +46,29 @@ export const EmployeeDashboardView: React.FC = () => {
     leaveBalances.find(b => b.leave_type_name?.toLowerCase().includes(nameMatch));
   const casualBal = findBalance('casual');
   const sickBal = findBalance('sick');
+
+  // Next company holiday -- was a hardcoded "26 Jan (Republic Day)" string
+  // regardless of the actual date or what's configured in the Holiday
+  // Calendar (Attendance -> Holiday Calendar), so it was wrong for most of
+  // the year and never reflected real holidays added there.
+  const [nextHoliday, setNextHoliday] = useState<Holiday | null>(null);
+  useEffect(() => {
+    const year = new Date().getFullYear();
+    Promise.all([getHolidays(String(year)), getHolidays(String(year + 1))])
+      .then(([thisYear, nextYear]) => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const upcoming = [...thisYear, ...nextYear]
+          .filter(h => h.date >= todayStr)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setNextHoliday(upcoming[0] ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  const formatHolidayDate = (dateStr: string) => {
+    const d = new Date(`${dateStr}T00:00:00`);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
 
   const formatRelativeTime = (dateString: string) => {
     // eslint-disable-next-line react-hooks/purity
@@ -301,7 +325,9 @@ export const EmployeeDashboardView: React.FC = () => {
 
             <div className="text-[10px] text-varistor-muted mt-2 pt-2 border-t border-varistor-border flex justify-between">
               <span>Next company holiday:</span>
-              <span className="font-semibold text-varistor-dark">26 Jan (Republic Day)</span>
+              <span className="font-semibold text-varistor-dark">
+                {nextHoliday ? `${formatHolidayDate(nextHoliday.date)} (${nextHoliday.occasion})` : 'None scheduled'}
+              </span>
             </div>
           </div>
 
