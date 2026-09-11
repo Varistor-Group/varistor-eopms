@@ -1787,14 +1787,23 @@ const SalaryEngine: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [data, balances] = await Promise.all([
+    const [data, balances, emps] = await Promise.all([
       getPayrollRecords(),
       fetchAllClBalances(),
+      getEmployees(),
     ]);
+
+    // A deactivated employee's existing payroll records should stay visible
+    // as historical data, but nothing about them should keep being
+    // recomputed or resynced going forward -- previously every non-approved
+    // record was recalculated from live attendance and re-upserted on every
+    // single page load regardless of employee status, so a deactivated
+    // employee's "current" draft kept silently regenerating indefinitely.
+    const inactiveIds = new Set(emps.filter(e => e.status === 'Inactive').map(e => e.id));
 
     let needsSync = false;
     const updatedData = data.map(rec => {
-      if (rec.status === 'approved') return rec;
+      if (rec.status === 'approved' || inactiveIds.has(rec.employeeId)) return rec;
       const clBal = balances[rec.employeeId] ?? { total: 12, used: 0 };
       const lopDays = computeLopDays(clBal);
 
@@ -1843,10 +1852,12 @@ const SalaryEngine: React.FC = () => {
     setRecords(updatedData);
     setLoading(false);
 
-    if (needsSync) {
-      await syncPayrollToServer(updatedData);
-    } else {
-      await syncPayrollToServer(data);
+    // Never resync a deactivated employee's records -- the backend upsert
+    // runs an unconditional UPDATE even when nothing changed, so including
+    // them here would keep bumping their row every load regardless.
+    const syncable = (needsSync ? updatedData : data).filter(r => !inactiveIds.has(r.employeeId));
+    if (syncable.length > 0) {
+      await syncPayrollToServer(syncable);
     }
   }, []);
 
