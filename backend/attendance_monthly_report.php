@@ -43,7 +43,7 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
 }
 
 // ── Holidays ──
-$holStmt = $db->prepare('SELECT date FROM holidays WHERE date >= ? AND date <= ?');
+$holStmt = $db->prepare('SELECT date FROM holidays WHERE date >= ? AND date <= ? AND apply_to_all = 1');
 $holStmt->execute(["$month-01", "$month-31"]);
 $holidaySet = array_flip(array_column($holStmt->fetchAll(), 'date'));
 

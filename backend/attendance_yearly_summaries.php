@@ -20,7 +20,7 @@ $ledgerStmt->execute(["$year-01-01", "$year-12-31"]);
 $ledgerMap = [];
 foreach ($ledgerStmt->fetchAll() as $row) $ledgerMap["{$row['employee_id']}|{$row['date']}"] = $row;
 
-$holStmt = $db->prepare('SELECT date FROM holidays WHERE date LIKE ?');
+$holStmt = $db->prepare('SELECT date FROM holidays WHERE date LIKE ? AND apply_to_all = 1');
 $holStmt->execute(["$year-%"]);
 $holidaySet = array_flip(array_column($holStmt->fetchAll(), 'date'));
 

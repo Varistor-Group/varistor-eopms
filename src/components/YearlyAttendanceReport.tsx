@@ -27,7 +27,7 @@ const CODE_STYLE: Record<DayCode, string> = {
   '-': 'bg-varistor-pageBg text-varistor-muted border border-transparent font-normal',
 };
 
-const DAY_HEADERS = ['M','T','W','T','F','S','S'];
+const DAY_HEADERS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
 // ─── Summary badge ────────────────────────────────────────────────────────────
 
