@@ -49,7 +49,7 @@ const MonthGrid: React.FC<{
   const offset = firstDow === 0 ? 6 : firstDow - 1; // convert to Mon-first
 
   return (
-    <div className="min-w-[200px]">
+    <div className="min-w-[200px] border border-varistor-border rounded-lg p-2 bg-white">
       <p className="text-xs font-bold text-varistor-dark mb-2 text-center">{monthData.monthLabel}</p>
       <div className="grid grid-cols-7 gap-0.5 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
