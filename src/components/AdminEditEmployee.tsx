@@ -52,7 +52,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     reportingManagerId: employee.reportingManagerId || '',
     role: employee.role || 'Employee',
     status: employee.status || 'Active',
-    variPoints: (employee.variPoints ?? 0).toString(),
     shiftStart: employee.shiftStart ?? '09:30',
     shiftEnd: employee.shiftEnd ?? '18:30',
     dateOfJoining: employee.dateOfJoining || '',
@@ -94,7 +93,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
     if (!form.department) errs.department = 'Please select a department.';
     if (!form.reportingManagerId) errs.reportingManagerId = 'Reporting manager is required.';
     if (!form.role) errs.role = 'System role is required.';
-    if (isNaN(Number(form.variPoints)) || Number(form.variPoints) < 0) errs.variPoints = 'Points must be a positive number.';
     if (form.uanNumber && form.uanNumber !== 'NA' && !/^\d+$/.test(form.uanNumber)) {
       errs.uanNumber = 'UAN number must contain only numeric digits or "NA".';
     }
@@ -127,7 +125,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
       reportingManager: selectedManager?.fullName ?? '',
       role: form.role,
       status: form.status,
-      variPoints: Number(form.variPoints),
       shiftStart: form.shiftStart,
       shiftEnd: form.shiftEnd,
       dateOfJoining: form.dateOfJoining,
@@ -222,10 +219,6 @@ export const AdminEditEmployee: React.FC<{ employee: Employee; onCancel: () => v
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
               </select>
-            </Field>
-
-            <Field label="Vari Points" required error={errors.variPoints}>
-              <input type="number" className={inputCls(!!errors.variPoints)} value={form.variPoints} onChange={set('variPoints')} min="0" />
             </Field>
 
             <Field label="Reporting Manager" required error={errors.reportingManagerId}>
