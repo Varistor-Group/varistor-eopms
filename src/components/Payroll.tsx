@@ -1787,9 +1787,8 @@ const SalaryEngine: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [data, balances, emps] = await Promise.all([
+    const [data, emps] = await Promise.all([
       getPayrollRecords(),
-      fetchAllClBalances(),
       getEmployees(),
     ]);
 
@@ -1804,8 +1803,14 @@ const SalaryEngine: React.FC = () => {
     let needsSync = false;
     const updatedData = data.map(rec => {
       if (rec.status === 'approved' || inactiveIds.has(rec.employeeId)) return rec;
-      const clBal = balances[rec.employeeId] ?? { total: 12, used: 0 };
-      const lopDays = computeLopDays(clBal);
+      // Loss-of-Pay days must equal the employee's actual Absent day count
+      // from Attendance for the month, not casual-leave overuse -- this
+      // used to call computeLopDays(clBal), i.e. max(0, CL used - CL
+      // total), which has nothing to do with attendance and silently
+      // overwrote the correct attendance-derived LOP figure (already
+      // stored on the record's attendanceBreakdown by
+      // syncPayrollFromAttendance) every single time this page loaded.
+      const lopDays = rec.attendanceBreakdown?.absent ?? 0;
 
       const comp = computeNet({
         monthlySalary: rec.monthlySalary ?? rec.ctc ?? 0,
