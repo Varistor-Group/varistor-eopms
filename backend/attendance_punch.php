@@ -86,7 +86,7 @@ if ($method === 'POST') {
 
     if (!$existing || !$existing['punch_in']) {
         // ── Punch IN ──
-        $empStmt = $db->prepare('SELECT shift_start, is_field_employee FROM employees WHERE id = ? LIMIT 1');
+        $empStmt = $db->prepare('SELECT full_name, department, shift_start, is_field_employee FROM employees WHERE id = ? LIMIT 1');
         $empStmt->execute([$myId]);
         $emp = $empStmt->fetch();
 
@@ -113,8 +113,33 @@ if ($method === 'POST') {
             )->execute([$newId, $myId, $today, $now, $status, 'self_punch', (int)($emp['is_field_employee'] ?? 0)]);
         }
 
+        // A non-field employee self-punching in via the app (as opposed to
+        // being physically in office) is working from home for the day --
+        // this used to surface to HR as a distinct 'WFH' status the
+        // frontend already has handling for (see FieldPunch.tsx), but the
+        // backend never actually produced it, so no approval request was
+        // ever generated for a regular employee's punch. Field Employees
+        // already get their own separate photo-verification approval via
+        // field_punch.php / field_photos_hr.php, so this only applies here.
+        // Deliberately NOT changing attendance_ledger.status itself --
+        // several report generators (monthly/yearly summaries, payroll)
+        // switch on an exact 'Present'/'Late'/'Absent' set, and a new value
+        // would silently fall through all of them.
+        $wfhMessage = 'Punched in successfully.';
+        if (empty($emp['is_field_employee'])) {
+            $wfhId = generateUuidV4();
+            $db->prepare(
+                'INSERT INTO leave_requests (id, employee_id, employee_name, department, type, from_date, to_date, days, reason, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)'
+            )->execute([
+                $wfhId, $myId, $emp['full_name'] ?? $myId, $emp['department'] ?? '', 'WFH',
+                $today, $today, 'Auto-submitted: punched in remotely via self-punch', 'Pending',
+            ]);
+            $wfhMessage = 'Punched in successfully. Your WFH request has been sent to HR for approval.';
+        }
+
         notify_hr_punch($myId, 'in', $now);
-        json_ok(['success' => true, 'type' => 'in', 'time' => $now, 'status' => $status]);
+        json_ok(['success' => true, 'type' => 'in', 'time' => $now, 'status' => $status, 'message' => $wfhMessage]);
     }
 
     if (!$existing['punch_out']) {
@@ -123,7 +148,7 @@ if ($method === 'POST') {
         $db->prepare('UPDATE attendance_ledger SET punch_out = ?, work_hours = ? WHERE id = ?')
            ->execute([$now, $workHours, $existing['id']]);
         notify_hr_punch($myId, 'out', $now);
-        json_ok(['success' => true, 'type' => 'out', 'time' => $now, 'workHours' => $workHours]);
+        json_ok(['success' => true, 'type' => 'out', 'time' => $now, 'workHours' => $workHours, 'message' => 'Punched out successfully.']);
     }
 
     json_error('Already punched out for today.', 422);
