@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { BookOpen, Lock, CheckCircle, Clock, PlayCircle, RotateCcw, AlertCircle, Plus, Trash2, Users } from 'lucide-react';
+import { BookOpen, Lock, CheckCircle, Clock, PlayCircle, RotateCcw, AlertCircle, Plus, Trash2, Pencil, Users } from 'lucide-react';
 import { trainingApi } from '../api/training';
 import { useVariPoints } from '../hooks/useVariPoints';
 import type { TrainingModuleWithStatus, TrainingStatus, TrainingTrack } from '../types';
@@ -56,11 +56,13 @@ function TrainingCard({
   onStart,
   showAudience = false,
   onDelete,
+  onEdit,
 }: {
   mod: TrainingModuleWithStatus;
   onStart: (mod: TrainingModuleWithStatus) => void;
   showAudience?: boolean;
   onDelete?: (mod: TrainingModuleWithStatus) => void;
+  onEdit?: (mod: TrainingModuleWithStatus) => void;
 }) {
   const isLocked = mod.status === 'locked';
   const isCompleted = mod.status === 'completed';
@@ -121,15 +123,26 @@ function TrainingCard({
             <span className="truncate">
               Audience: {mod.visibleToRoles && mod.visibleToRoles.length > 0 ? mod.visibleToRoles.join(', ') : 'Everyone'}
             </span>
-            {onDelete && trainingApi.isCustomModule(mod.id) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete(mod); }}
-                className="ml-auto flex-shrink-0 text-varistor-muted hover:text-varistor-dangerText transition-colors"
-                title="Delete this uploaded module"
-              >
-                <Trash2 size={12} strokeWidth={1.5} />
-              </button>
-            )}
+            <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+              {onEdit && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(mod); }}
+                  className="text-varistor-muted hover:text-varistor-dark transition-colors"
+                  title="Edit this module"
+                >
+                  <Pencil size={12} strokeWidth={1.5} />
+                </button>
+              )}
+              {onDelete && trainingApi.isCustomModule(mod.id) && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(mod); }}
+                  className="text-varistor-muted hover:text-varistor-dangerText transition-colors"
+                  title="Delete this uploaded module"
+                >
+                  <Trash2 size={12} strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -192,6 +205,7 @@ const TrainingLibrary: React.FC = () => {
   const [view, setView] = useState<InternalView>('library');
   const [selectedModule, setSelectedModule] = useState<TrainingModuleWithStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [editingModule, setEditingModule] = useState<TrainingModuleWithStatus | null>(null);
 
   const { currentRole } = useVariPoints();
   const isManager = currentRole === 'HR' || currentRole === 'Admin';
@@ -239,7 +253,13 @@ const TrainingLibrary: React.FC = () => {
 
   const handleModuleCreated = async () => {
     setShowUpload(false);
+    setEditingModule(null);
     await loadModules();
+  };
+
+  const handleEditModule = (mod: TrainingModuleWithStatus) => {
+    setEditingModule(mod);
+    setShowUpload(true);
   };
 
   const handleDeleteModule = async (mod: TrainingModuleWithStatus) => {
@@ -375,6 +395,7 @@ const TrainingLibrary: React.FC = () => {
                         onStart={handleStartModule}
                         showAudience={isManager}
                         onDelete={isManager ? handleDeleteModule : undefined}
+                        onEdit={isManager ? handleEditModule : undefined}
                       />
                     ))}
                 </div>
@@ -384,11 +405,12 @@ const TrainingLibrary: React.FC = () => {
         </div>
       )}
 
-      {/* Upload modal (HR/Admin only) */}
+      {/* Upload / Edit modal (HR/Admin only) */}
       {showUpload && isManager && (
         <TrainingUploadModal
           modules={modules}
-          onClose={() => setShowUpload(false)}
+          editingModule={editingModule ?? undefined}
+          onClose={() => { setShowUpload(false); setEditingModule(null); }}
           onCreated={handleModuleCreated}
         />
       )}

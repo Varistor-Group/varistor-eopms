@@ -196,6 +196,60 @@ if ($method === 'POST' && $id === null) {
     json_ok(rowToModule($fetch->fetch()));
 }
 
+// PUT /api/training-modules/:id  (JSON body — metadata + quiz only, video/thumbnail
+// stay as originally uploaded; re-upload isn't supported here since PUT requests
+// aren't multipart)
+if ($method === 'PUT' && $id !== null) {
+    requireRole(['HR', 'Admin']);
+
+    $find = $db->prepare('SELECT * FROM training_modules WHERE id = ? AND is_seed = 0 LIMIT 1');
+    $find->execute([$id]);
+    $existing = $find->fetch();
+    if (!$existing) json_error('Module not found.', 404);
+
+    $input = request_body();
+    $visibleToRoles = isset($input['visibleToRoles']) ? json_encode($input['visibleToRoles']) : $existing['visible_to_roles'];
+
+    $db->prepare(
+        'UPDATE training_modules
+         SET title = ?, description = ?, track = ?, department = ?, `order` = ?, prerequisite_id = ?, visible_to_roles = ?
+         WHERE id = ?'
+    )->execute([
+        $input['title'] ?? $existing['title'],
+        $input['description'] ?? $existing['description'],
+        $input['track'] ?? $existing['track'],
+        array_key_exists('department', $input) ? ($input['department'] ?: null) : $existing['department'],
+        $input['order'] ?? $existing['order'],
+        array_key_exists('prerequisite_id', $input) ? ($input['prerequisite_id'] ?: null) : $existing['prerequisite_id'],
+        $visibleToRoles,
+        $id,
+    ]);
+
+    // Replace quiz questions if a new set was sent, same validation as create.
+    if (isset($input['questions']) && is_array($input['questions'])) {
+        $db->prepare('DELETE FROM quiz_questions WHERE module_id = ?')->execute([$id]);
+        $qStmt = $db->prepare(
+            'INSERT INTO quiz_questions (id, module_id, question, options, correct_index) VALUES (?, ?, ?, ?, ?)'
+        );
+        foreach ($input['questions'] as $q) {
+            $questionText = trim($q['question'] ?? '');
+            $options = $q['options'] ?? [];
+            if ($questionText === '' || !is_array($options) || count($options) < 2) continue;
+            $qStmt->execute([
+                generateUuidV4(),
+                $id,
+                $questionText,
+                json_encode(array_values($options)),
+                (int)($q['correct_index'] ?? 0),
+            ]);
+        }
+    }
+
+    $fetch = $db->prepare('SELECT * FROM training_modules WHERE id = ?');
+    $fetch->execute([$id]);
+    json_ok(rowToModule($fetch->fetch()));
+}
+
 // DELETE /api/training-modules/:id
 if ($method === 'DELETE' && $id !== null) {
     requireRole(['HR', 'Admin']);

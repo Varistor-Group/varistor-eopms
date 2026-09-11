@@ -5,12 +5,13 @@ const Player = ReactPlayer as unknown as React.ElementType;
 import { X, Upload, Plus, Trash2, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { trainingApi } from '../api/training';
 import { getDepartments, getEmployees } from '../api/employees';
-import type { TrainingModule, TrainingTrack, UserRole } from '../types';
+import type { TrainingModule, TrainingModuleWithStatus, TrainingTrack, UserRole } from '../types';
 
 interface Props {
   modules: TrainingModule[];
   onClose: () => void;
   onCreated: () => void;
+  editingModule?: TrainingModuleWithStatus;
 }
 
 const LEARNER_ROLES: UserRole[] = ['Employee', 'Field Employee', 'Reporting Manager', 'HR'];
@@ -36,24 +37,47 @@ function extractYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [track, setTrack] = useState<TrainingTrack>('General');
-  const [department, setDepartment] = useState('');
-  const [prerequisiteId, setPrerequisiteId] = useState('');
+const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated, editingModule }) => {
+  const isEditing = !!editingModule;
+  const [title, setTitle] = useState(editingModule?.title ?? '');
+  const [description, setDescription] = useState(editingModule?.description ?? '');
+  const [track, setTrack] = useState<TrainingTrack>(editingModule?.track ?? 'General');
+  const [department, setDepartment] = useState(editingModule?.department ?? '');
+  const [prerequisiteId, setPrerequisiteId] = useState(editingModule?.prerequisite_id ?? '');
   const [file, setFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState('');
-  const [everyone, setEveryone] = useState(true);
-  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
+  const [videoUrl, setVideoUrl] = useState(editingModule?.video_url ?? '');
+  const [everyone, setEveryone] = useState(!editingModule?.visibleToRoles || editingModule.visibleToRoles.length === 0);
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>((editingModule?.visibleToRoles as UserRole[]) ?? []);
   const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
-  const [duration, setDuration] = useState<number | null>(null);
+  // Editing an existing module: we already know its duration, so the video
+  // doesn't need to be re-probed just to unlock the Save button.
+  const [duration, setDuration] = useState<number | null>(editingModule?.duration_seconds ?? null);
   const [durationError, setDurationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [departments, setDepartments] = useState<string[]>(() => getDepartments());
+  const [loadingQuestions, setLoadingQuestions] = useState(isEditing);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editingModule) return;
+    trainingApi.fetchQuizQuestions(editingModule.id).then(existing => {
+      if (existing.length === 0) return;
+      setQuestions(
+        existing.map(q => {
+          const opts = [...q.options];
+          while (opts.length < 4) opts.push('');
+          return {
+            question: q.question,
+            options: opts.slice(0, 4) as QuestionDraft['options'],
+            correct_index: q.correct_index,
+          };
+        })
+      );
+    }).finally(() => setLoadingQuestions(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Hidden <video> source — a blob URL for a picked file, or the pasted URL.
   const videoSrc = useMemo(() => {
@@ -131,9 +155,11 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
   const validate = (): string | null => {
     if (!title.trim()) return 'Title is required.';
     if (!description.trim()) return 'Description is required.';
-    if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a video URL.';
-    if (durationError) return durationError;
-    if (!duration || duration <= 0) return 'Video duration could not be detected yet. Wait a moment or check the file/URL.';
+    if (!isEditing) {
+      if (!file && !videoUrl.trim()) return 'Choose an MP4 file or paste a video URL.';
+      if (durationError) return durationError;
+      if (!duration || duration <= 0) return 'Video duration could not be detected yet. Wait a moment or check the file/URL.';
+    }
     if (!everyone && selectedRoles.length === 0) return 'Select at least one audience role, or choose Everyone.';
     if (questions.length === 0) return 'Add at least one quiz question.';
     for (let i = 0; i < questions.length; i++) {
@@ -152,7 +178,28 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
     }
     setError(null);
     setSubmitting(true);
+
+    const questionsPayload = questions.map(q => ({
+      question: q.question.trim(),
+      options: q.options.map(o => o.trim()),
+      correct_index: q.correct_index,
+    }));
+
     try {
+      if (isEditing && editingModule) {
+        await trainingApi.updateModule(editingModule.id, {
+          title: title.trim(),
+          description: description.trim(),
+          track,
+          department: track === 'Department' ? department.trim() : '',
+          prerequisite_id: prerequisiteId || null,
+          visibleToRoles: everyone ? [] : selectedRoles,
+          questions: questionsPayload,
+        });
+        onCreated();
+        return;
+      }
+
       const sameTrack = modules.filter(m => m.track === track);
       const order = sameTrack.length > 0 ? Math.max(...sameTrack.map(m => m.order)) + 1 : 1;
 
@@ -168,21 +215,12 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
       formData.append('order', String(order));
       if (youtubeId) formData.append('thumbnail_url', `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`);
       formData.append('visibleToRoles', JSON.stringify(everyone ? [] : selectedRoles));
-      formData.append(
-        'questions',
-        JSON.stringify(
-          questions.map(q => ({
-            question: q.question.trim(),
-            options: q.options.map(o => o.trim()),
-            correct_index: q.correct_index,
-          }))
-        )
-      );
+      formData.append('questions', JSON.stringify(questionsPayload));
 
       await trainingApi.createModule(formData);
       onCreated();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create module.');
+      setError(e instanceof Error ? e.message : `Failed to ${isEditing ? 'update' : 'create'} module.`);
       setSubmitting(false);
     }
   };
@@ -222,7 +260,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
         <div className="flex items-center justify-between px-6 py-4 border-b border-varistor-border">
           <div className="flex items-center gap-2">
             <Upload size={18} strokeWidth={1.5} className="text-varistor-lime" />
-            <h2 className="text-base font-bold text-varistor-dark">Upload Training Module</h2>
+            <h2 className="text-base font-bold text-varistor-dark">{isEditing ? 'Edit Training Module' : 'Upload Training Module'}</h2>
           </div>
           <button onClick={onClose} className="text-varistor-muted hover:text-varistor-dark transition-colors" disabled={submitting}>
             <X size={18} strokeWidth={1.5} />
@@ -269,7 +307,12 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
             </div>
           </div>
 
-          {/* Video source */}
+          {/* Video source (create only -- editing keeps the original video/thumbnail) */}
+          {isEditing ? (
+            <div className="text-[11px] text-varistor-muted bg-varistor-pageBg/60 border border-varistor-border rounded-lg px-3 py-2.5">
+              Video and thumbnail stay as originally uploaded. Delete and re-upload the module to replace the video.
+            </div>
+          ) : (
           <div className="space-y-3">
             <label className={labelCls}>Video (MP4 upload, or a YouTube / direct video link)</label>
             <input
@@ -315,6 +358,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
               </div>
             )}
           </div>
+          )}
 
           {/* Audience */}
           <div>
@@ -424,7 +468,7 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated }) =
             className="flex items-center gap-2 bg-varistor-lime text-varistor-dark text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-lime-500 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? <Loader2 size={14} strokeWidth={2} className="animate-spin" /> : <Upload size={14} strokeWidth={2} />}
-            {submitting ? 'Uploading…' : 'Create Module'}
+            {submitting ? (isEditing ? 'Saving…' : 'Uploading…') : (isEditing ? 'Save Changes' : 'Create Module')}
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Link as LinkIcon, X } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
-import { supabase } from '../lib/supabase';
+import { updateEmployee } from '../api/employees';
 
 interface ProfilePictureEditorProps {
   onClose: () => void;
@@ -80,15 +80,14 @@ export const ProfilePictureEditor: React.FC<ProfilePictureEditorProps> = ({ onCl
     if (currentUser && dataUrl.trim()) {
       const newAvatar = dataUrl.trim();
       setCurrentUser({ ...currentUser, avatarUrl: newAvatar });
-      
-      // Persist to Supabase
+
       try {
-        await supabase
-          .from('employees')
-          .update({ avatar_url: newAvatar })
-          .eq('id', currentUser.id);
+        const result = await updateEmployee(currentUser.id, { avatarUrl: newAvatar });
+        if (!result.success) {
+          console.error('Failed to persist avatar:', result.error);
+        }
       } catch (err) {
-        console.error('Failed to persist avatar to Supabase:', err);
+        console.error('Failed to persist avatar:', err);
       }
     }
     onClose();

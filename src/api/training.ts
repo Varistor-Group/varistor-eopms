@@ -115,6 +115,16 @@ export const trainingApi = {
     return result;
   },
 
+  async updateModule(moduleId: string, payload: Record<string, unknown>): Promise<TrainingModule> {
+    const res = await apiFetch(`/api/training-modules/${moduleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json().catch(() => null);
+    if (!res.ok || !result) throw new Error(result?.error || 'Failed to update module.');
+    return result;
+  },
+
   async deleteModule(moduleId: string): Promise<void> {
     const res = await apiFetch(`/api/training-modules/${moduleId}`, { method: 'DELETE' });
     const result = await res.json().catch(() => null);
