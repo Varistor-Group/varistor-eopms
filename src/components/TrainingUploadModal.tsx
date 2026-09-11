@@ -388,7 +388,10 @@ const TrainingUploadModal: React.FC<Props> = ({ modules, onClose, onCreated, edi
           {/* Quiz builder */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className={labelCls}>Quiz Questions (min. 1)</label>
+              <label className={labelCls}>
+                Quiz Questions (min. 1)
+                {loadingQuestions && <span className="normal-case font-normal text-varistor-muted ml-2">Loading existing questions…</span>}
+              </label>
               <button
                 type="button"
                 onClick={() => setQuestions(prev => [...prev, emptyQuestion()])}
