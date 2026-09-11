@@ -131,7 +131,6 @@ export const Attendance: React.FC = () => {
   const { currentRole, currentUser, addToast, assertAdministrativeTransaction } = useVariPoints();
   const isHR = currentRole === 'HR' || currentRole === 'Admin';
   const isAdmin = currentRole === 'Admin';
-  const isManager = currentRole === 'Reporting Manager';
   // Employee self-view: regular employee, field employee, or reporting manager
   const isFieldEmployee = currentRole === 'Field Employee' || !!currentUser?.is_field_employee;
   const isOfficeEmployee = (currentRole === 'Employee' || currentRole === 'Reporting Manager') && !currentUser?.is_field_employee;
@@ -780,8 +779,8 @@ export const Attendance: React.FC = () => {
             </div>
           )}
 
-          {/* ── Section 2: Daily Attendance Table ─────────────────────────── */}
-          {(isHR || isManager) && (
+          {/* ── Section 2: Daily Attendance Table (HR/Admin) ────────────────── */}
+          {isHR && (
             <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor">
               <div className="p-5 border-b border-varistor-border">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -922,8 +921,8 @@ export const Attendance: React.FC = () => {
             </div>
           )}
 
-          {/* ── Section 4: Monthly Report (HR/Admin/Manager) ───────────────── */}
-          {(isHR || isManager) && (
+          {/* ── Section 4: Monthly Report (HR/Admin) ───────────────────────── */}
+          {isHR && (
             <div className="bg-white rounded-varistor border border-varistor-border shadow-varistor">
               <div className="p-5 border-b border-varistor-border">
                 <div className="flex flex-wrap items-start justify-between gap-3">

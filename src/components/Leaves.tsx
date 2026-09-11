@@ -41,7 +41,7 @@ const Leaves: React.FC = () => {
         setLeaveType(types[0].name);
       }
       
-      if (currentRole === 'Employee') {
+      if (currentRole === 'Employee' || currentRole === 'Reporting Manager') {
         const bals = await getEmployeeBalances(LOGGED_IN_EMP);
         setEmployeeBalances(bals);
       }
@@ -73,12 +73,12 @@ const Leaves: React.FC = () => {
       return;
     }
 
-    // Enforce 2-day advance notice for Employee
+    // Enforce 2-day advance notice for Employee / Reporting Manager
     const minAllowedDate = new Date();
     minAllowedDate.setHours(0, 0, 0, 0);
     minAllowedDate.setDate(minAllowedDate.getDate() + 2);
 
-    if (currentRole === 'Employee' && start < minAllowedDate) {
+    if ((currentRole === 'Employee' || currentRole === 'Reporting Manager') && start < minAllowedDate) {
       setErrorMsg('Leaves must be requested at least 2 days in advance.');
       return;
     }
@@ -142,7 +142,7 @@ const Leaves: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Form and Balances Column */}
-        {currentRole === 'Employee' && (
+        {(currentRole === 'Employee' || currentRole === 'Reporting Manager') && (
           <div className="lg:col-span-1 space-y-6">
             {/* Leaves Balance Panel */}
             <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
@@ -251,7 +251,7 @@ const Leaves: React.FC = () => {
         )}
 
         {/* Requests Table Column */}
-        <div className={`${currentRole === 'Employee' ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
+        <div className={`${(currentRole === 'Employee' || currentRole === 'Reporting Manager') ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
           
           {(currentRole === 'Admin' || currentRole === 'HR') && (
             <div className="space-y-6">
