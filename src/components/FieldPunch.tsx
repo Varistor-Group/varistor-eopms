@@ -151,12 +151,16 @@ export const FieldPunch: React.FC = () => {
       const res = await response.json();
       
       if (res.success) {
-        if (res.status === 'Present') {
-          setIsPunchedIn(!isPunchedIn);
-          showToast(res.message, 'success');
-        } else if (res.status === 'WFH') {
-          showToast(res.message, 'success'); // Shows the WFH trigger message
-        }
+        // Was keyed off res.status === 'Present', which the backend also
+        // returns as 'Late' for a late punch-in -- an extremely common
+        // case -- so the button silently never flipped to red/"Punch Out"
+        // for a late punch. Worse, the punch-OUT response has no status
+        // field at all, only type: 'out', so the button never correctly
+        // flipped back to green/"Punch In" after punching out either.
+        // res.type ('in' | 'out') is always present and reliable for both
+        // directions, so use that instead.
+        setIsPunchedIn(res.type === 'in');
+        showToast(res.message || `Punched ${res.type} successfully.`, 'success');
       } else {
         throw new Error(res.error || 'Failed to punch');
       }

@@ -21,6 +21,7 @@ export const LeaveBalanceManager: React.FC = () => {
   const [newTotal, setNewTotal] = useState<number>(0);
   const [migrating, setMigrating] = useState(false);
   const [migrateMsg, setMigrateMsg] = useState('');
+  const [filterType, setFilterType] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -71,6 +72,13 @@ export const LeaveBalanceManager: React.FC = () => {
     fetchData();
   };
 
+  const getEmployeeName = (employeeId: string) =>
+    employees.find(e => e.employeeId === employeeId)?.fullName ?? '—';
+
+  const filteredBalances = filterType
+    ? balances.filter(b => b.leave_type_name === filterType)
+    : balances;
+
   return (
     <div className="bg-white rounded-varistor border border-varistor-border p-5 shadow-varistor">
       <div className="flex justify-between items-center mb-6 border-b border-varistor-border pb-4">
@@ -91,6 +99,20 @@ export const LeaveBalanceManager: React.FC = () => {
             {showAddForm ? 'Cancel' : 'Add Employee Balance'}
           </button>
         </div>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <label className="text-xs font-bold text-varistor-muted uppercase">Filter by Leave Type</label>
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          className="text-sm border border-varistor-border rounded px-3 py-1.5 bg-varistor-surface"
+        >
+          <option value="">All Types</option>
+          {leaveTypes.map(lt => (
+            <option key={lt.id} value={lt.name}>{lt.name}</option>
+          ))}
+        </select>
       </div>
 
       {migrateMsg && (
@@ -165,6 +187,7 @@ export const LeaveBalanceManager: React.FC = () => {
               <thead className="bg-varistor-pageBg border-b border-varistor-border text-xs text-varistor-muted uppercase sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 font-bold whitespace-nowrap">Employee ID</th>
+                  <th className="px-3 py-2 font-bold whitespace-nowrap">Employee Name</th>
                   <th className="px-3 py-2 font-bold whitespace-nowrap">Leave Type</th>
                   <th className="px-3 py-2 font-bold text-center">Allocated</th>
                   <th className="px-3 py-2 font-bold text-center">Used</th>
@@ -173,11 +196,12 @@ export const LeaveBalanceManager: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {balances.map(bal => {
+                {filteredBalances.map(bal => {
                   const isEditing = editingId === bal.id;
                   return (
                     <tr key={bal.id} className="border-b border-varistor-border hover:bg-varistor-pageBg">
                       <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{bal.employee_id}</td>
+                      <td className="px-3 py-2.5 text-varistor-muted whitespace-nowrap">{getEmployeeName(bal.employee_id)}</td>
                       <td className="px-3 py-2.5 text-varistor-muted whitespace-nowrap">{bal.leave_type_name}</td>
                       
                       <td className="px-3 py-2.5 text-center">
@@ -219,9 +243,11 @@ export const LeaveBalanceManager: React.FC = () => {
                     </tr>
                   );
                 })}
-                {balances.length === 0 && (
+                {filteredBalances.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-varistor-muted">No balances recorded yet.</td>
+                    <td colSpan={7} className="px-4 py-8 text-center text-varistor-muted">
+                      {balances.length === 0 ? 'No balances recorded yet.' : 'No balances match this filter.'}
+                    </td>
                   </tr>
                 )}
               </tbody>
