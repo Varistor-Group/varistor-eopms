@@ -9,6 +9,16 @@ requireRole(['HR', 'Admin']); // SECURITY FIX: was completely open before
 
 $db = get_db();
 
+// Optional employeeIds filter -- when the caller has selected specific
+// employees in the UI, only send to those. Previously this endpoint had
+// no way to scope the send at all: it always emailed EVERY active
+// employee's latest payroll record regardless of any selection made on
+// the page, so "send to just this one employee" silently sent to everyone.
+$input = request_body();
+$employeeIds = (isset($input['employeeIds']) && is_array($input['employeeIds']) && count($input['employeeIds']) > 0)
+    ? array_values(array_filter($input['employeeIds'], fn($id) => is_string($id) && $id !== ''))
+    : null;
+
 // Get each employee's single most-recent record: latest MONTH first
 // (by actual calendar date, not string sort, since 'Jun 2026' vs 'Sep 2026'
 // only happens to sort correctly by coincidence), then latest revision
@@ -18,16 +28,23 @@ $db = get_db();
 // since revision starts at 1 every month) matched BOTH months' rows,
 // silently sending every affected employee two payslip emails at once,
 // including a stale email for an old month they weren't even asking about.
-$records = $db->query(
-    "SELECT pr.* FROM (
+$sql = "SELECT pr.* FROM (
          SELECT *,
                 ROW_NUMBER() OVER (
                     PARTITION BY employee_id
                     ORDER BY STR_TO_DATE(CONCAT('01 ', month), '%d %b %Y') DESC, revision DESC
                 ) AS rn
          FROM payroll_records
-     ) pr WHERE pr.rn = 1"
-)->fetchAll();
+     ) pr WHERE pr.rn = 1";
+$queryParams = [];
+if ($employeeIds !== null) {
+    $placeholders = implode(',', array_fill(0, count($employeeIds), '?'));
+    $sql .= " AND pr.employee_id IN ($placeholders)";
+    $queryParams = $employeeIds;
+}
+$stmt = $db->prepare($sql);
+$stmt->execute($queryParams);
+$records = $stmt->fetchAll();
 
 if (count($records) === 0) {
     json_ok(['success' => true, 'sent' => 0, 'failed' => [], 'skipped' => true]);

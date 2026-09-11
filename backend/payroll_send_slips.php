@@ -25,8 +25,16 @@ $db = get_db(); // FIX: was read_db() — that function no longer exists (legacy
 $fmt = function ($n) {
     return '₹' . number_format((float)($n ?? 0), 2, '.', ',');
 };
+// PDF-safe formatter: TCPDF's default core font has no glyph for the
+// Unicode Rupee sign (U+20B9), so every amount rendered as a literal "?"
+// in the attached PDF while the HTML email body (real browser/webmail
+// fonts) always displayed it correctly. Plain "Rs." avoids the problem
+// entirely without depending on a Unicode TTF font being available.
+$fmtPdf = function ($n) {
+    return 'Rs. ' . number_format((float)($n ?? 0), 2, '.', ',');
+};
 
-function build_slip_html(array $slip, callable $fmt): string
+function build_slip_html(array $slip, callable $fmt, bool $forPdf = false): string
 {
     $month    = $slip['month'] ?? date('M Y');
     $finalPay = isset($slip['finalPay']) && $slip['finalPay'] !== 0
@@ -128,6 +136,7 @@ function build_slip_html(array $slip, callable $fmt): string
     $pDays   = $slip['payDays']   ?? 30;
     $pfUan   = htmlspecialchars($slip['pfUan'] ?? '—');
     $clBal   = $slip['clBalance'] ?? 0;
+    $dispatchLine = $forPdf ? 'Auto-dispatched via EOPMS Payroll System' : '&#9993; Auto-dispatched via EOPMS Payroll System';
 
     return <<<HTML
 <!DOCTYPE html>
@@ -181,7 +190,7 @@ function build_slip_html(array $slip, callable $fmt): string
         </td></tr>
         <tr><td style="padding:16px 32px 24px;border-top:1px solid #d8ded2;text-align:center;font-size:11px;color:#868e80;">
           <p style="margin:0;font-weight:bold;">This is a computer generated payslip no signature is required.</p>
-          <p style="margin:6px 0 0;">&#9993; Auto-dispatched via EOPMS Payroll System</p>
+          <p style="margin:6px 0 0;">{$dispatchLine}</p>
         </td></tr>
       </table>
     </td></tr>
@@ -214,6 +223,7 @@ foreach ($slips as $slip) {
     try {
         $month    = $slip['month'] ?? date('M Y');
         $htmlBody = build_slip_html($slip, $fmt);
+        $pdfBody  = build_slip_html($slip, $fmtPdf, true);
 
         $pdf = new \TCPDF('P', 'pt', 'A4', true, 'UTF-8', false);
         $pdf->SetCreator('Varistor EOPMS');
@@ -224,7 +234,7 @@ foreach ($slips as $slip) {
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         $pdf->AddPage();
-        $pdf->writeHTMLCell(0, 0, 40, 40, $htmlBody, 0, 1, false, true, '', true);
+        $pdf->writeHTMLCell(0, 0, 40, 40, $pdfBody, 0, 1, false, true, '', true);
         $pdfBuffer = $pdf->Output('', 'S');
 
         $mail = make_mailer();

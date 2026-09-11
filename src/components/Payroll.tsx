@@ -809,7 +809,7 @@ const ExcelUploadPanel: React.FC<ExcelUploadPanelProps> = ({ onClose }) => {
 
 // ─── Payslip Schedule Panel ──────────────────────────────────────────────────────────
 
-const PayslipSchedulePanel: React.FC = () => {
+const PayslipSchedulePanel: React.FC<{ selectedEmployeeIds?: string[] }> = ({ selectedEmployeeIds }) => {
   const [schedule, setSchedule] = useState<PayslipSchedule | null>(null);
   const [editDay, setEditDay] = useState(10);
   const [editHour, setEditHour] = useState(10);
@@ -851,7 +851,7 @@ const PayslipSchedulePanel: React.FC = () => {
     setTriggering(true);
     setTriggerResult(null);
     try {
-      const result = await triggerManualSend();
+      const result = await triggerManualSend(selectedEmployeeIds);
       setTriggerResult(result);
       // Refresh lastRun
       const s = await getPayslipSchedule();
@@ -902,7 +902,11 @@ const PayslipSchedulePanel: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-varistor-lime text-white rounded-lg hover:bg-[#65a30d] transition-colors disabled:opacity-60"
           >
             {triggering ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
-            {triggering ? 'Sending…' : 'Send Now'}
+            {triggering
+              ? 'Sending…'
+              : selectedEmployeeIds && selectedEmployeeIds.length > 0
+              ? `Send ${selectedEmployeeIds.length} Selected`
+              : 'Send Now (All)'}
           </button>
         </div>
       </div>
@@ -2099,7 +2103,11 @@ const SalaryEngine: React.FC = () => {
       {activeTab === 'engine' && (
         <>
           {/* Payslip Scheduler Panel */}
-          <PayslipSchedulePanel />
+          <PayslipSchedulePanel
+            selectedEmployeeIds={[...selectedIds]
+              .map(id => records.find(r => r.id === id)?.employeeId)
+              .filter((id): id is string => !!id)}
+          />
 
           {/* Excel Upload Panel */}
           {showUploadPanel && (
@@ -2252,13 +2260,9 @@ const SalaryEngine: React.FC = () => {
                       return (
                         <tr key={rec.id} className={`transition-colors ${isSelected ? 'bg-varistor-limeLight' : 'hover:bg-varistor-pageBg'}`}>
                           <td className="px-4 py-3">
-                            {!isApproved ? (
-                              <button onClick={() => toggleSelect(rec.id)}>
-                                {isSelected ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} className="text-gray-300" />}
-                              </button>
-                            ) : (
-                              <Lock size={13} className="text-gray-300 mx-auto" />
-                            )}
+                            <button onClick={() => toggleSelect(rec.id)} title={isApproved ? 'Select to scope a manual payslip resend' : undefined}>
+                              {isSelected ? <CheckSquare size={15} className="text-varistor-lime" /> : <Square size={15} className="text-gray-300" />}
+                            </button>
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-semibold text-varistor-dark">{rec.employeeName}</div>

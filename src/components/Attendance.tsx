@@ -4,7 +4,7 @@ import {
   Upload, Check, X, AlertCircle, Eye, FileSpreadsheet,
   Camera, RefreshCw, Wifi, WifiOff, Edit2,
   CheckCircle2, Plus, Info, Printer,
-  ToggleLeft, ToggleRight, MapPin
+  ToggleLeft, ToggleRight, MapPin, LogIn
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
@@ -304,6 +304,22 @@ export const Attendance: React.FC = () => {
     setEditPunchOut(entry.punch_out ? entry.punch_out.slice(0, 16) : '');
     setEditStatus(entry.status);
     setEditReason('');
+  }
+
+  // Small "punch them in right now" shortcut for the common case of an
+  // employee who forgot to punch and asks HR to mark them in manually --
+  // pre-fills the existing edit-attendance modal with the current time and
+  // a default reason so HR just has to confirm and save, instead of
+  // opening the modal and typing a full datetime + reason from scratch.
+  function quickPunchIn(entry: AttendanceLedgerEntry) {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setEditingEntry(entry);
+    setEditPunchIn(local);
+    setEditPunchOut(entry.punch_out ? entry.punch_out.slice(0, 16) : '');
+    setEditStatus('Present');
+    setEditReason('Manual punch-in by HR/Admin');
   }
 
   async function handleSaveEdit() {
@@ -832,13 +848,24 @@ export const Attendance: React.FC = () => {
                           <td className={tdCls}><AttendanceBadge status={entry.status} /></td>
                           {canEdit && (
                             <td className={tdCls}>
-                              <button
-                                onClick={() => openEdit(entry)}
-                                className="p-1.5 rounded-lg text-varistor-muted hover:text-varistor-dark hover:bg-varistor-limeLight transition-varistor"
-                                title="Edit attendance"
-                              >
-                                <Edit2 size={14} strokeWidth={1.5} />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                {!entry.punch_in && (
+                                  <button
+                                    onClick={() => quickPunchIn(entry)}
+                                    className="p-1.5 rounded-lg text-varistor-muted hover:text-varistor-lime hover:bg-varistor-limeLight transition-varistor"
+                                    title="Manual punch in (now)"
+                                  >
+                                    <LogIn size={14} strokeWidth={1.5} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => openEdit(entry)}
+                                  className="p-1.5 rounded-lg text-varistor-muted hover:text-varistor-dark hover:bg-varistor-limeLight transition-varistor"
+                                  title="Edit attendance"
+                                >
+                                  <Edit2 size={14} strokeWidth={1.5} />
+                                </button>
+                              </div>
                             </td>
                           )}
                         </tr>

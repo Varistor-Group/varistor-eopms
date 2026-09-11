@@ -1303,8 +1303,11 @@ export async function updatePayslipSchedule(schedule: Omit<PayslipSchedule, 'las
   return data.schedule;
 }
 
-export async function triggerManualSend(): Promise<BulkSendResult> {
-  const res = await apiFetch('/api/payroll/trigger-send', { method: 'POST' });
+export async function triggerManualSend(employeeIds?: string[]): Promise<BulkSendResult> {
+  const res = await apiFetch('/api/payroll/trigger-send', {
+    method: 'POST',
+    body: JSON.stringify(employeeIds && employeeIds.length > 0 ? { employeeIds } : {}),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown server error' }));
     throw new Error(err.error || `Server returned ${res.status}`);
