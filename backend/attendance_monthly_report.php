@@ -91,6 +91,7 @@ foreach ($balStmt->fetchAll() as $row) {
 $result = [];
 foreach ($roster as $emp) {
     $present = $late = $leaves = $weekOff = $holidays = $halfDay = $absent = 0;
+    $payableDays = 0.0;
     $totalHrs = 0.0;
     $dailyRecords = [];
 
@@ -131,53 +132,37 @@ foreach ($roster as $emp) {
         ];
 
         switch ($status) {
-            case 'Present': $present++; break;
-            case 'Late': $late++; $present++; break;
-            case 'Half-day': $halfDay++; break;
-            case 'Holiday': $holidays++; break;
-            case 'W.O': $weekOff++; break;
-            case 'Leave': $leaves++; break;
-            case 'Absent': $absent++; break;
+            case 'Present':
+                $present++;
+                $payableDays += 1.0;
+                break;
+            case 'Late':
+                $late++;
+                $present++;
+                $payableDays += ($workHours !== null && round((float)$workHours) >= 9) ? 1.0 : 0.5;
+                break;
+            case 'Half-day':
+                $halfDay++;
+                $payableDays += 0.5;
+                break;
+            case 'Holiday':
+                $holidays++;
+                break;
+            case 'W.O':
+                $weekOff++;
+                break;
+            case 'Leave':
+                $leaves++;
+                $payableDays += 1.0;
+                break;
+            case 'Absent':
+                $absent++;
+                break;
         }
         if ($workHours) $totalHrs += (float)$workHours;
     }
 
     $workingDays = count($dates) - $weekOff - $holidays;
-   $present = $late = $leaves = $weekOff = $holidays = $halfDay = $absent = 0;
-$totalHrs = 0.0;
-$payableDays = 0.0;
-$dailyRecords = [];
-
-// ... (date loop stays the same until the switch block) ...
-
-switch ($status) {
-    case 'Present':
-        $present++;
-        $payableDays += 1.0;
-        break;
-    case 'Late':
-        $late++;
-        $payableDays += ($workHours !== null && round((float)$workHours) >= 9) ? 1.0 : 0.5;
-        break;
-    case 'Half-day':
-        $halfDay++;
-        $payableDays += 0.5;
-        break;
-    case 'Holiday':
-        $holidays++;
-        break;
-    case 'W.O':
-        $weekOff++;
-        break;
-    case 'Leave':
-        $leaves++;
-        $payableDays += 1.0;
-        break;
-    case 'Absent':
-        $absent++;
-        break;
-}
-if ($workHours) $totalHrs += (float)$workHours;
 
     $result[] = [
         'employee_id' => $emp['id'],
