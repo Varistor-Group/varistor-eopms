@@ -37,6 +37,7 @@ import {
   savePayrollSetting
 } from '../api/payroll';
 import { apiFetch } from '../api/httpClient';
+import { getMonthlyReport } from '../api/attendance';
 
 // xlsx is loaded via CDN-style dynamic import to avoid bundler issues
 // We import the type only; actual lib loaded at runtime
@@ -1804,17 +1805,62 @@ const SalaryEngine: React.FC = () => {
     // employee's "current" draft kept silently regenerating indefinitely.
     const inactiveIds = new Set(emps.filter(e => e.status === 'Inactive').map(e => e.id));
 
+    // Draft records were being recomputed every page load using whatever
+    // attendanceBreakdown snapshot happened to already be stored on them --
+    // but nothing ever refreshed that snapshot. syncPayrollFromAttendance
+    // (the only code that ever wrote a fresh one) isn't called from
+    // anywhere in the current UI, so a record's breakdown gets permanently
+    // frozen at whatever it was when the record was first created/touched,
+    // however sparse that was at the time (e.g. day 1 of the month before
+    // most people had punched yet). As the month went on and attendance
+    // actually accumulated, that stale snapshot never caught up, so the
+    // per-employee salary split (Basic/HRA/Medical/TA/LTA vs Special
+    // Allowance) silently drifted further from reality every time this
+    // page loaded -- which employee(s) it hit next depended only on whose
+    // draft record happened to still be carrying an old snapshot, not on
+    // anything about that employee specifically.
+    //
+    // Fix: pull a fresh attendance breakdown straight from the Monthly
+    // Report for every distinct month among the records being recomputed,
+    // and use that instead of the frozen stored value.
+    const draftMonths = [...new Set(
+      data.filter(r => r.status !== 'approved' && !inactiveIds.has(r.employeeId)).map(r => r.month)
+    )];
+    const monthToApiFormat = (displayMonth: string): string | null => {
+      const [mon, yr] = displayMonth.split(' ');
+      const idx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(mon);
+      if (idx === -1 || !yr) return null;
+      return `${yr}-${String(idx + 1).padStart(2, '0')}`;
+    };
+    const freshBreakdownByMonth: Record<string, Record<string, PayrollRecord['attendanceBreakdown']>> = {};
+    await Promise.all(draftMonths.map(async displayMonth => {
+      const apiMonth = monthToApiFormat(displayMonth);
+      if (!apiMonth) return;
+      const report = await getMonthlyReport(apiMonth);
+      freshBreakdownByMonth[displayMonth] = {};
+      for (const row of report) {
+        freshBreakdownByMonth[displayMonth][row.employee_id] = {
+          present: row.present,
+          weekOff: row.weekOff,
+          leaves: row.leaves,
+          holidays: row.holidays,
+          absent: row.absent,
+        };
+      }
+    }));
+
     let needsSync = false;
     const updatedData = data.map(rec => {
       if (rec.status === 'approved' || inactiveIds.has(rec.employeeId)) return rec;
+
+      const freshBreakdown = freshBreakdownByMonth[rec.month]?.[rec.employeeId] ?? rec.attendanceBreakdown;
+
       // Loss-of-Pay days must equal the employee's actual Absent day count
       // from Attendance for the month, not casual-leave overuse -- this
       // used to call computeLopDays(clBal), i.e. max(0, CL used - CL
-      // total), which has nothing to do with attendance and silently
-      // overwrote the correct attendance-derived LOP figure (already
-      // stored on the record's attendanceBreakdown by
-      // syncPayrollFromAttendance) every single time this page loaded.
-      const lopDays = rec.attendanceBreakdown?.absent ?? 0;
+      // total), which has nothing to do with attendance. Now reads it from
+      // the fresh breakdown above rather than a potentially stale one.
+      const lopDays = freshBreakdown?.absent ?? 0;
 
       const comp = computeNet({
         monthlySalary: rec.monthlySalary ?? rec.ctc ?? 0,
@@ -1826,7 +1872,7 @@ const SalaryEngine: React.FC = () => {
         hasEsi: rec.hasEsi !== false,
         hasPt: rec.hasPt !== false,
         employeeId: rec.employeeId,
-        attendanceBreakdown: rec.attendanceBreakdown,
+        attendanceBreakdown: freshBreakdown,
         basic: rec.components?.basic,
         hra: rec.components?.hra,
         reimbursement: rec.components?.reimbursement,
@@ -1834,10 +1880,15 @@ const SalaryEngine: React.FC = () => {
         incentives: rec.components?.incentives,
       });
 
-      if (rec.netPay !== comp.netPay || JSON.stringify(rec.additionValues) !== JSON.stringify(comp.additionValues)) {
+      if (
+        rec.netPay !== comp.netPay ||
+        JSON.stringify(rec.additionValues) !== JSON.stringify(comp.additionValues) ||
+        JSON.stringify(rec.attendanceBreakdown) !== JSON.stringify(freshBreakdown)
+      ) {
         needsSync = true;
         return {
           ...rec,
+          attendanceBreakdown: freshBreakdown,
           components: {
             ...rec.components,
             basic: comp.additionValues[0],
