@@ -1891,8 +1891,18 @@ const SalaryEngine: React.FC = () => {
         hasPt: rec.hasPt !== false,
         employeeId: rec.employeeId,
         attendanceBreakdown: freshBreakdown,
-        basic: rec.components?.basic,
-        hra: rec.components?.hra,
+        // Basic/HRA are normally "pinned" from whatever was already
+        // stored (so a manual override survives future recomputes), but
+        // that pinning is exactly why Sep 2026's full-salary fix kept
+        // silently reverting: once Basic/HRA were saved at a prorated
+        // value from before the fix, every subsequent load() just carried
+        // that stale number forward forever, even after the fresh
+        // full-month attendance breakdown was introduced above -- Medical/
+        // TA/LTA aren't pinned this way, which is why only Basic/HRA
+        // stayed stuck. For Sep 2026 specifically, never pin -- always let
+        // the formula (with the synthetic full breakdown) compute it.
+        basic: rec.month === 'Sep 2026' ? undefined : rec.components?.basic,
+        hra: rec.month === 'Sep 2026' ? undefined : rec.components?.hra,
         reimbursement: rec.components?.reimbursement,
         overtime: rec.components?.overtime,
         incentives: rec.components?.incentives,
