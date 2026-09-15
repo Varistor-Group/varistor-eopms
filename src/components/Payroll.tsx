@@ -1860,7 +1860,16 @@ const SalaryEngine: React.FC = () => {
       // used to call computeLopDays(clBal), i.e. max(0, CL used - CL
       // total), which has nothing to do with attendance. Now reads it from
       // the fresh breakdown above rather than a potentially stale one.
-      const lopDays = freshBreakdown?.absent ?? 0;
+      //
+      // TEMPORARY: Sep 2026 specifically is exempt from LOP deduction --
+      // the attendance-monthly-report bug (fixed separately) was live for
+      // most of this month and was silently discarding most employees'
+      // real attendance, so any Absent count accumulated during that
+      // period isn't trustworthy enough to dock anyone's pay over. Every
+      // other month continues to use real attendance-derived LOP as
+      // normal. Remove this carve-out once September is reconciled/HR is
+      // ready to apply LOP to it again.
+      const lopDays = rec.month === 'Sep 2026' ? 0 : (freshBreakdown?.absent ?? 0);
 
       const comp = computeNet({
         monthlySalary: rec.monthlySalary ?? rec.ctc ?? 0,
