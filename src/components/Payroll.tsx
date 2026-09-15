@@ -1853,7 +1853,16 @@ const SalaryEngine: React.FC = () => {
     const updatedData = data.map(rec => {
       if (rec.status === 'approved' || inactiveIds.has(rec.employeeId)) return rec;
 
-      const freshBreakdown = freshBreakdownByMonth[rec.month]?.[rec.employeeId] ?? rec.attendanceBreakdown;
+      // TEMPORARY: Sep 2026 is set to full salary (no attendance-based
+      // proration) at HR's explicit request, on top of the existing LOP
+      // exemption below -- a synthetic "fully present" breakdown makes
+      // every ratio-based formula (Basic/HRA/Medical/TA/LTA) resolve to
+      // its complete, un-prorated value, matching a real full-month
+      // payslip. Attendance-based proration will be revisited later;
+      // remove this special case to restore it for Sep 2026.
+      const freshBreakdown = rec.month === 'Sep 2026'
+        ? { present: rec.totalDays ?? 30, weekOff: 0, leaves: 0, holidays: 0, absent: 0 }
+        : (freshBreakdownByMonth[rec.month]?.[rec.employeeId] ?? rec.attendanceBreakdown);
 
       // Loss-of-Pay days must equal the employee's actual Absent day count
       // from Attendance for the month, not casual-leave overuse -- this
