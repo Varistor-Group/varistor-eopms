@@ -1999,9 +1999,11 @@ const SalaryEngine: React.FC = () => {
     if (isNaN(ctc) || ctc <= 0) return;
     const updated = await updatePayrollRecord(id, { ctc });
     if (updated) {
-      const next = records.map(r => r.id === id ? updated : r);
-      setRecords(next);
-      await syncPayrollToServer(next);
+      // Re-run the full load() recompute (rather than a manual map+sync
+      // of stale in-memory records) so Basic/HRA/LOP/etc. are always
+      // freshly recalculated -- including the Sep 2026 LOP exemption --
+      // instead of risking a stale cached value getting written back.
+      await load();
     }
   };
 
@@ -2011,9 +2013,7 @@ const SalaryEngine: React.FC = () => {
     if (!rec) return;
     const updated = await updatePayrollRecord(id, { autoFormula: true, components: { ...rec.components, [field]: val } });
     if (updated) {
-      const next = records.map(r => r.id === id ? updated : r);
-      setRecords(next);
-      await syncPayrollToServer(next);
+      await load();
     }
   };
 
@@ -2022,9 +2022,7 @@ const SalaryEngine: React.FC = () => {
     if (isNaN(deduction) || deduction < 0) return;
     const updated = await updatePayrollRecord(id, { deduction });
     if (updated) {
-      const next = records.map(r => r.id === id ? updated : r);
-      setRecords(next);
-      await syncPayrollToServer(next);
+      await load();
     }
   };
   const handleApprove = async () => {
