@@ -1913,6 +1913,8 @@ const SalaryEngine: React.FC = () => {
           deduction: comp.totalDeductions,
           netPay: comp.netPay,
           finalPay: comp.finalPay,
+          lopDays: comp.lopDays,
+          lopDeduction: comp.lopDeduction,
         };
       }
       return rec;
