@@ -891,6 +891,15 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
     const emp = employees.find(e => e.employeeId === r.employeeId);
 
     const monthlySalary = ctcMultiplier ? Math.round(r.monthlySalary * ctcMultiplier) : r.monthlySalary;
+    // TEMPORARY: Sep 2026 uses full salary (no attendance proration) at
+    // HR's explicit request -- same synthetic "fully present" breakdown
+    // as load() in Payroll.tsx, so this button can't undo that fix by
+    // recomputing Basic/HRA from the real (sparse) attendance data
+    // before load() runs afterward and pins them from whatever this just
+    // wrote. Remove this special case together with the one in load().
+    const attendanceBreakdownForCompute = r.month === 'Sep 2026'
+      ? { present: r.totalDays ?? 30, weekOff: 0, leaves: 0, holidays: 0, absent: 0 }
+      : r.attendanceBreakdown;
     const comp = computeNet({
       monthlySalary,
       totalDays: r.totalDays,
@@ -907,7 +916,8 @@ export async function applyFormulaToAll(ctcMultiplier?: number): Promise<void> {
       hasEsi: r.hasEsi,
       hasPt: emp ? !emp.optOutPT : r.hasPt,
       employeeId: r.employeeId,
-      attendanceBreakdown: r.attendanceBreakdown,
+      attendanceBreakdown: attendanceBreakdownForCompute,
+      lopDays: r.month === 'Sep 2026' ? 0 : undefined,
     });
     const updated = {
       ...r,
