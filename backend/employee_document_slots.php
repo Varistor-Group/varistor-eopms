@@ -185,9 +185,17 @@ if ($method === 'PUT' && $id !== null && $action === null) {
     json_ok(['success' => true]);
 }
 
-// DELETE /api/employee-document-slots/:id  — custom slots only
+// DELETE /api/employee-document-slots/:id
+// HR/Admin can delete any slot (custom or standard) for any employee.
 if ($method === 'DELETE' && $id !== null) {
-    $db->prepare('DELETE FROM employee_document_slots WHERE id = ? AND is_custom = 1')->execute([$id]);
+    requireRole(['HR', 'Admin']);
+    $existing = $db->prepare('SELECT id, employee_id, document_name FROM employee_document_slots WHERE id = ? LIMIT 1');
+    $existing->execute([$id]);
+    $slot = $existing->fetch();
+    if (!$slot) json_error('Document slot not found.', 404);
+
+    $db->prepare('DELETE FROM employee_document_slots WHERE id = ?')->execute([$id]);
+    logSlotActivity($db, 'slot_deleted', $myId, "Document slot deleted: {$slot['document_name']} for {$slot['employee_id']}", ['slotId' => $id]);
     json_ok(['success' => true]);
 }
 

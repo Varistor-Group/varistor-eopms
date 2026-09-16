@@ -404,7 +404,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
   };
 
   const handleRemove = async () => {
-    if (!window.confirm(`Remove custom slot "${slot.documentName}"?`)) return;
+    if (!window.confirm(`Delete "${slot.documentName}"? This cannot be undone.`)) return;
     setIsUpdating(true);
     const res = await removeCustomSlot(slot.id);
     setIsUpdating(false);
@@ -493,8 +493,8 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 <StickyNote size={13} />
               </button>
             )}
-            {canManage && slot.isCustom && (
-              <button onClick={handleRemove} disabled={isUpdating} title="Remove custom slot" className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+            {canManage && (
+              <button onClick={handleRemove} disabled={isUpdating} title="Delete this document" className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
                 <Trash2 size={13} />
               </button>
             )}
