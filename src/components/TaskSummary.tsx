@@ -1,13 +1,19 @@
 import React from 'react';
 import { CheckCircle2, Circle } from 'lucide-react';
 import { useKanbanTasks } from '../hooks/useKanbanTasks';
+import { useVariPoints } from '../hooks/useVariPoints';
 import type { TaskPriority } from '../types';
 
 export const TaskSummary: React.FC = () => {
   const { tasks, moveTask } = useKanbanTasks();
+  const { currentUser } = useVariPoints();
 
-  // Active tasks (not done)
-  const activeTasks = tasks.filter(t => t.status !== 'done');
+  // Active tasks (not done) assigned to the logged-in employee only --
+  // useKanbanTasks() returns every task company-wide (correct for the
+  // shared Kanban board), but this personal dashboard widget was showing
+  // that same unfiltered list to everyone, so each employee saw every
+  // other employee's tasks too, not just their own.
+  const activeTasks = tasks.filter(t => t.status !== 'done' && t.assigneeId === currentUser?.id);
 
   const getPriorityStyles = (priority: TaskPriority) => {
     switch (priority) {
