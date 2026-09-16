@@ -481,7 +481,15 @@ export const EopmsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const oldStatus = task.status;
 
-    if ((currentRole === 'Employee' || currentRole === 'Field Employee') && oldStatus === 'in_progress' && newStatus === 'awaiting_approval') {
+    // Tasks WITH a checklist must go through toggleChecklistItem's
+    // auto-submit (checking off every item) rather than a manual submit
+    // button -- that part is intentional. But a task with NO checklist
+    // items at all had no way to ever trigger that auto-submit (an empty
+    // checklist can never be "all completed"), so it got permanently
+    // stuck in in_progress with no path to awaiting_approval. Manual
+    // submission is only blocked when the task actually has checklist
+    // items to complete.
+    if ((currentRole === 'Employee' || currentRole === 'Field Employee') && oldStatus === 'in_progress' && newStatus === 'awaiting_approval' && task.checklist.length > 0) {
       addToast('Error: Employees cannot manually submit tasks for approval. Complete all checklist items to auto-submit.', 0, 'debit');
       return;
     }
