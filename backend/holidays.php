@@ -2,6 +2,7 @@
 /**
  * GET    /api/holidays/:year   — list holidays for a year
  * POST   /api/holidays         — add a holiday (HR/Admin)
+ * PUT    /api/holidays/:id     — edit a holiday (HR/Admin)
  * DELETE /api/holidays/:id     — remove a holiday (HR/Admin)
  */
 
@@ -47,6 +48,33 @@ if ($method === 'POST' && $id === null) {
 
     $fetch = $db->prepare('SELECT * FROM holidays WHERE id = ?');
     $fetch->execute([$newId]);
+    json_ok($fetch->fetch());
+}
+
+// PUT /api/holidays/:id
+if ($method === 'PUT' && $id !== null) {
+    requireRole(['HR', 'Admin']);
+    $existing = $db->prepare('SELECT id FROM holidays WHERE id = ? LIMIT 1');
+    $existing->execute([$id]);
+    if (!$existing->fetch()) json_error('Holiday not found.', 404);
+
+    $input = request_body();
+    $date = $input['date'] ?? '';
+    $occasion = trim($input['occasion'] ?? '');
+    $type = $input['type'] ?? 'National';
+    $applyToAll = (bool)($input['apply_to_all'] ?? true);
+    if ($date === '' || $occasion === '') json_error('date and occasion are required.', 422);
+
+    $dupCheck = $db->prepare('SELECT id FROM holidays WHERE date = ? AND id != ? LIMIT 1');
+    $dupCheck->execute([$date, $id]);
+    if ($dupCheck->fetch()) json_error('A holiday is already recorded for this date.', 422);
+
+    $db->prepare(
+        'UPDATE holidays SET date = ?, occasion = ?, type = ?, apply_to_all = ? WHERE id = ?'
+    )->execute([$date, $occasion, $type, (int)$applyToAll, $id]);
+
+    $fetch = $db->prepare('SELECT * FROM holidays WHERE id = ?');
+    $fetch->execute([$id]);
     json_ok($fetch->fetch());
 }
 

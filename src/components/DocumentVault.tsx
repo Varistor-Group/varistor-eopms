@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Lock, FileText, ShieldCheck, Users, CheckCircle, Clock, XCircle, Eye,
   Settings2, Plus, Trash2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
-  AlertCircle, Upload, Download, Star, Sparkles, X, FileCheck2, Save, StickyNote
+  AlertCircle, Upload, Download, Star, Sparkles, X, FileCheck2, Save, StickyNote, Check, Edit2
 } from 'lucide-react';
 import {
   getEmployeeDocumentSlots,
@@ -71,6 +71,9 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   const [newRequired, setNewRequired] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   const handleToggleRequired = async (tmpl: DocumentTemplate) => {
     const newRequired = !tmpl.isRequired;
@@ -120,6 +123,32 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
       addToast(`"${tmpl.name}" removed`, 0, 'debit');
     } else {
       addToast(res.error ?? 'Delete failed', 0, 'debit');
+    }
+  };
+
+  const handleStartEditTemplate = (tmpl: DocumentTemplate) => {
+    setEditingTemplateId(tmpl.id);
+    setEditName(tmpl.name);
+    setEditDesc(tmpl.description ?? '');
+  };
+
+  const handleCancelEditTemplate = () => {
+    setEditingTemplateId(null);
+    setEditName('');
+    setEditDesc('');
+  };
+
+  const handleSaveEditTemplate = async (tmpl: DocumentTemplate) => {
+    if (!editName.trim()) return;
+    setActionId(tmpl.id);
+    const res = await updateDocumentTemplate(tmpl.id, { name: editName.trim(), description: editDesc.trim() });
+    setActionId(null);
+    if (res.success && res.template) {
+      onTemplateUpdate(res.template);
+      addToast(`"${res.template.name}" updated`, 0, 'credit');
+      handleCancelEditTemplate();
+    } else {
+      addToast(res.error ?? 'Failed to update document type', 0, 'debit');
     }
   };
 
@@ -175,10 +204,33 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
               return (
                 <div key={tmpl.id} className={`flex items-center gap-4 px-3 py-2.5 rounded-xl border transition-all ${tmpl.isActive ? 'bg-gray-50 border-gray-100' : 'bg-gray-50/50 border-dashed border-gray-200 opacity-60'}`}>
                   <div className="w-2/5 flex items-center gap-2 min-w-0">
-                    <FileCheck2 size={14} className={tmpl.isActive ? 'text-varistor-lime shrink-0' : 'text-gray-300 shrink-0'} />
-                    <span className="text-sm font-medium text-brand-ink truncate">{tmpl.name}</span>
-                    {tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200 rounded-full px-1.5 py-0.5">req</span>}
-                    {!tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-sky-50 text-sky-500 border border-sky-200 rounded-full px-1.5 py-0.5">opt</span>}
+                    {editingTemplateId === tmpl.id ? (
+                      <div className="flex flex-col gap-1 w-full">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEditTemplate(tmpl)}
+                          autoFocus
+                          className="text-sm font-medium border border-varistor-lime rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                        />
+                        <input
+                          type="text"
+                          value={editDesc}
+                          onChange={e => setEditDesc(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEditTemplate(tmpl)}
+                          placeholder="Description (optional)"
+                          className="text-xs border border-varistor-border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-varistor-lime"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <FileCheck2 size={14} className={tmpl.isActive ? 'text-varistor-lime shrink-0' : 'text-gray-300 shrink-0'} />
+                        <span className="text-sm font-medium text-brand-ink truncate">{tmpl.name}</span>
+                        {tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200 rounded-full px-1.5 py-0.5">req</span>}
+                        {!tmpl.isRequired && tmpl.isActive && <span className="shrink-0 text-[9px] font-bold uppercase bg-sky-50 text-sky-500 border border-sky-200 rounded-full px-1.5 py-0.5">opt</span>}
+                      </>
+                    )}
                   </div>
                   <div className="w-1/5 flex justify-center">
                     <button onClick={() => handleToggleRequired(tmpl)} disabled={actionId === tmpl.id} title={tmpl.isRequired ? 'Make Optional' : 'Make Required'}>
@@ -206,10 +258,26 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                       </button>
                     )}
                   </div>
-                  <div className="w-1/5 flex justify-end">
-                    <button onClick={() => handleDelete(tmpl)} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                      <Trash2 size={13} />
-                    </button>
+                  <div className="w-1/5 flex justify-end gap-1">
+                    {editingTemplateId === tmpl.id ? (
+                      <>
+                        <button onClick={() => handleSaveEditTemplate(tmpl)} disabled={actionId === tmpl.id || !editName.trim()} className="p-1.5 rounded-lg text-varistor-lime hover:bg-varistor-lime/10 transition-colors disabled:opacity-30" title="Save">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={handleCancelEditTemplate} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Cancel">
+                          <X size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => handleStartEditTemplate(tmpl)} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-300 hover:text-varistor-lime hover:bg-varistor-lime/10 transition-colors" title="Edit">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => handleDelete(tmpl)} disabled={actionId === tmpl.id} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

@@ -323,6 +323,16 @@ export async function addHoliday(data: HolidayInput): Promise<{ success: boolean
   return { success: true, error: null };
 }
 
+export async function updateHoliday(holidayId: string, data: HolidayInput): Promise<{ success: boolean; error: string | null }> {
+  const res = await apiFetch(`/api/holidays/${holidayId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  const result = await res.json().catch(() => null);
+  if (!res.ok || !result) return { success: false, error: result?.error || 'Failed to update holiday.' };
+  return { success: true, error: null };
+}
+
 /** New — didn't exist in the original file, endpoint was added during conversion. */
 export async function deleteHoliday(holidayId: string): Promise<{ success: boolean; error: string | null }> {
   const res = await apiFetch(`/api/holidays/${holidayId}`, { method: 'DELETE' });

@@ -4,7 +4,7 @@ import {
   Upload, Check, X, AlertCircle, Eye, FileSpreadsheet,
   Camera, RefreshCw, Wifi, WifiOff, Edit2,
   CheckCircle2, Plus, Info, Printer,
-  ToggleLeft, ToggleRight, MapPin, LogIn
+  ToggleLeft, ToggleRight, MapPin, LogIn, Trash2
 } from 'lucide-react';
 import { useVariPoints } from '../hooks/useVariPoints';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
@@ -19,6 +19,8 @@ import {
   getMonthlyReport,
   getHolidays,
   addHoliday,
+  updateHoliday,
+  deleteHoliday,
   uploadFieldPhoto,
   getFieldPendingVerifications,
   verifyFieldPhoto,
@@ -171,6 +173,8 @@ export const Attendance: React.FC = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [holidayForm, setHolidayForm] = useState({ date: '', occasion: '', type: 'National' as HolidayType, apply_to_all: true });
   const [savingHoliday, setSavingHoliday] = useState(false);
+  const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null);
 
   // ── Device bridge ──────────────────────────────────────────────────────────
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
@@ -607,15 +611,43 @@ export const Attendance: React.FC = () => {
       addToast('Please fill in date and occasion.', 0, 'debit'); return;
     }
     setSavingHoliday(true);
-    const result = await addHoliday(holidayForm);
+    const result = editingHolidayId
+      ? await updateHoliday(editingHolidayId, holidayForm)
+      : await addHoliday(holidayForm);
     setSavingHoliday(false);
     if (result.success) {
-      addToast('Holiday added. All employee attendance auto-marked.', 0, 'credit');
+      addToast(editingHolidayId ? 'Holiday updated.' : 'Holiday added. All employee attendance auto-marked.', 0, 'credit');
       setHolidayForm({ date: '', occasion: '', type: 'National', apply_to_all: true });
+      setEditingHolidayId(null);
       const updated = await getHolidays(holidayYear);
       setHolidays(updated);
     } else {
-      addToast(result.error || 'Failed to add holiday.', 0, 'debit');
+      addToast(result.error || (editingHolidayId ? 'Failed to update holiday.' : 'Failed to add holiday.'), 0, 'debit');
+    }
+  }
+
+  function handleEditHolidayClick(h: Holiday) {
+    setEditingHolidayId(h.id);
+    setHolidayForm({ date: h.date.slice(0, 10), occasion: h.occasion, type: h.type, apply_to_all: h.apply_to_all });
+  }
+
+  function handleCancelEditHoliday() {
+    setEditingHolidayId(null);
+    setHolidayForm({ date: '', occasion: '', type: 'National', apply_to_all: true });
+  }
+
+  async function handleDeleteHoliday(h: Holiday) {
+    if (!window.confirm(`Delete the holiday "${h.occasion}" on ${h.date}? This cannot be undone.`)) return;
+    setDeletingHolidayId(h.id);
+    const result = await deleteHoliday(h.id);
+    setDeletingHolidayId(null);
+    if (result.success) {
+      addToast('Holiday deleted.', 0, 'credit');
+      if (editingHolidayId === h.id) handleCancelEditHoliday();
+      const updated = await getHolidays(holidayYear);
+      setHolidays(updated);
+    } else {
+      addToast(result.error || 'Failed to delete holiday.', 0, 'debit');
     }
   }
 
@@ -1046,13 +1078,13 @@ export const Attendance: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-varistor-pageBg border-b border-varistor-border">
-                      <tr>{['Date', 'Occasion', 'Type'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
+                      <tr>{['Date', 'Occasion', 'Type', 'Actions'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {holidays.length === 0 ? (
-                        <tr><td colSpan={3} className="p-6 text-center text-xs text-varistor-muted">No holidays configured for {holidayYear}</td></tr>
+                        <tr><td colSpan={4} className="p-6 text-center text-xs text-varistor-muted">No holidays configured for {holidayYear}</td></tr>
                       ) : holidays.map((h, i) => (
-                        <tr key={h.id} className={`border-b border-varistor-border hover:bg-varistor-pageBg transition-varistor ${i % 2 === 0 ? '' : 'bg-varistor-pageBg/40'}`}>
+                        <tr key={h.id} className={`border-b border-varistor-border hover:bg-varistor-pageBg transition-varistor ${i % 2 === 0 ? '' : 'bg-varistor-pageBg/40'} ${editingHolidayId === h.id ? 'bg-varistor-limeLight' : ''}`}>
                           <td className={tdCls}>{fmtDate(h.date)}</td>
                           <td className={`${tdCls} font-semibold`}>{h.occasion}</td>
                           <td className={tdCls}>
@@ -1062,6 +1094,25 @@ export const Attendance: React.FC = () => {
                               : 'bg-gray-100 text-gray-500 border-gray-200'
                             }`}>{h.type}</span>
                           </td>
+                          <td className={tdCls}>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleEditHolidayClick(h)}
+                                className="p-1.5 rounded-lg text-varistor-muted hover:text-varistor-dark hover:bg-varistor-limeLight transition-varistor"
+                                title="Edit holiday"
+                              >
+                                <Edit2 size={14} strokeWidth={1.5} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHoliday(h)}
+                                disabled={deletingHolidayId === h.id}
+                                className="p-1.5 rounded-lg text-varistor-muted hover:text-red-600 hover:bg-red-50 transition-varistor disabled:opacity-50"
+                                title="Delete holiday"
+                              >
+                                <Trash2 size={14} strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1070,7 +1121,11 @@ export const Attendance: React.FC = () => {
 
                 {/* Add holiday form */}
                 <div className="p-5 space-y-4">
-                  <h4 className="text-sm font-bold text-varistor-dark flex items-center gap-2"><Plus size={16} strokeWidth={1.5} /> Add Holiday</h4>
+                  <h4 className="text-sm font-bold text-varistor-dark flex items-center gap-2">
+                    {editingHolidayId
+                      ? <><Edit2 size={16} strokeWidth={1.5} /> Edit Holiday</>
+                      : <><Plus size={16} strokeWidth={1.5} /> Add Holiday</>}
+                  </h4>
                   <div>
                     <label className="block text-xs font-semibold text-varistor-muted mb-1.5">Date</label>
                     <input type="date" value={holidayForm.date} onChange={e => setHolidayForm(p => ({ ...p, date: e.target.value }))}
@@ -1097,9 +1152,16 @@ export const Attendance: React.FC = () => {
                         : <ToggleLeft size={24} className="text-varistor-muted" />}
                     </button>
                   </div>
-                  <Button variant="primary" onClick={handleSaveHoliday} isLoading={savingHoliday} className="w-full">
-                    <Plus size={15} strokeWidth={1.5} /> Save holiday
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="primary" onClick={handleSaveHoliday} isLoading={savingHoliday} className="flex-1">
+                      {editingHolidayId ? <><Edit2 size={15} strokeWidth={1.5} /> Update holiday</> : <><Plus size={15} strokeWidth={1.5} /> Save holiday</>}
+                    </Button>
+                    {editingHolidayId && (
+                      <Button variant="secondary" onClick={handleCancelEditHoliday} className="flex-shrink-0">
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
